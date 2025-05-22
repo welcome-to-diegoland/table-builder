@@ -1554,10 +1554,15 @@ function handleStatClick(event) {
   // Mostrar los grupos filtrados en el orden original
   orderedGroupIds.forEach(groupId => {
     const groupItems = filteredItemsMap[groupId];
+    if (!groupItems || groupItems.length === 0) return; // <-- evita mostrar grupos vacíos
+  
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     } else if (groupItems.every(item => item.customOrder !== undefined)) {
+      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    }
+    else if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
     // ... resto del código
