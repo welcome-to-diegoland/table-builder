@@ -555,28 +555,19 @@ function applyMultipleFilters() {
   const visibleItems = [];
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
-  
-    // Si hay orden personalizado, ordénalo según groupOrderMap
+    if (!groupItems || groupItems.length === 0) return;
+
+    // ORDEN PERSONALIZADO
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
-    
-    // Si no, usa customOrder si existe
-    else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
-    }
-  
-    if (groupItems.length > 0) {
-      visibleItems.push(...groupItems);
-    }
+
+    visibleItems.push(...groupItems);
   });
 
   displayFilteredResults(visibleItems);
 }
-
 
 
 function displayFilteredResults(filteredItems) {
@@ -625,12 +616,14 @@ function displayFilteredResults(filteredItems) {
   // Mostrar cada grupo en el orden correcto
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
+    if (!groupItems || groupItems.length === 0) return;
+
+    // ORDEN PERSONALIZADO
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
+
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
@@ -703,13 +696,6 @@ function displayFilteredResults(filteredItems) {
       rightContainer.appendChild(newBadge);
     }
 
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
-    }
-    
     // Badge "Unido"
     if (isMergedGroup) {
       const mergedBadge = document.createElement("span");
@@ -726,7 +712,6 @@ function displayFilteredResults(filteredItems) {
     output.appendChild(groupDiv);
   });
 }
-
 
 function getAttributeStatsForItems(items) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
@@ -1494,10 +1479,10 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
 function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
-  
+
   // Forzar el filtrado por item_code si es necesario
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-  
+
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
@@ -1514,7 +1499,7 @@ function handleStatClick(event) {
   filteredItems.forEach(item => {
     const details = skuToObject[item.SKU] || {};
     const hasValue = details[filterAttribute]?.toString().trim();
-    
+
     if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
       filteredGroupIds.add(item["IG ID"]);
       if (!filteredItemsMap[item["IG ID"]]) {
@@ -1537,13 +1522,12 @@ function handleStatClick(event) {
     </div>
   `;
 
-  // Agregar evento al botón de limpiar filtro
   output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
 
   // Mantener el orden original de los grupos
   const orderedGroupIds = [];
   const uniqueGroupIds = new Set();
-  
+
   filteredItems.forEach(item => {
     if (filteredGroupIds.has(item["IG ID"]) && !uniqueGroupIds.has(item["IG ID"])) {
       orderedGroupIds.push(item["IG ID"]);
@@ -1551,21 +1535,19 @@ function handleStatClick(event) {
     }
   });
 
-  // Mostrar los grupos filtrados en el orden original
-orderedGroupIds.forEach(groupId => {
+  orderedGroupIds.forEach(groupId => {
     const groupItems = filteredItemsMap[groupId];
-    if (!groupItems || groupItems.length === 0) return; // Evita mostrar grupos vacíos
-  
+    if (!groupItems || groupItems.length === 0) return;
+
+    // ORDEN PERSONALIZADO
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
-  
+
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
-  
+
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupId;
@@ -1592,13 +1574,12 @@ orderedGroupIds.forEach(groupId => {
 
     const h2 = document.createElement("h2");
     h2.className = "group-title";
-    
+
     const link = document.createElement("a");
     link.href = `https://www.travers.com.mx/${groupId}`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = groupInfo.name || groupId;
-    
     h2.appendChild(link);
     infoDiv.appendChild(h2);
 
@@ -1660,7 +1641,7 @@ orderedGroupIds.forEach(groupId => {
     // Crear tabla de items resaltando el atributo filtrado
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
-});
+  });
 }
 
 function highlightActiveFilter() {
