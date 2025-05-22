@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Items agrupados por IG ID</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+</head>
+<body>
+  <div id="selection-counter"></div>
+  <header class="main-header">
+    <div class="header-content">
+      <div class="header-column left-column bg-primary-dark">
+        <div class="file-inputs">
+
+          <div class="input-group">
+            <label for="xlsxFile">Items File (xlsx):</label>
+            <input type="file" id="xlsxFile" accept=".xlsx,.xls" />
+          </div>
+        
+          <div class="input-group">
+            <label for="csvFile">Data File (csv):</label>
+            <input type="file" id="csvFile" accept=".csv" />
+          </div>
+        
+          <div class="input-group">
+            <label for="categoryDataFile">Category Data (xlsx):</label>
+            <input type="file" id="categoryDataFile" accept=".xlsx,.xls" />
+          </div>
+          
+        </div>
+      </div>
+      <div class="header-column right-column bg-primary-light">
+        <div class="header-buttons">
+          <button id="mergeGroupsBtn" class="header-web-btn">
+  <i class="fas fa-object-group"></i> Unir Grupos<br>Seleccionados
+</button>
+
+          <!-- tablas catalogo -->
+
+          <button id="applyCatTablesBtn" class="header-cat-btn">
+            Aplicar Catálogo<br>Actual
+          </button>  
+
+          <!-- tablas catalogo nuevas -->
+
+          <button id="applyCatOrderBtn" class="header-cat-btn">
+            Aplicar Catálogo<br>Nuevas
+          </button>
+
+          <button id="clearCatOrderBtn" class="header-cat-btn">
+            Limpiar Catálogo<br>Nuevas
+          </button>
+
+          <!-- tablas web -->
+
+          <button id="loadWebOrderBtn" class="header-web-btn">
+            Aplicar Web<br>Actual
+          </button>
+
+          <button id="applyOrderBtn" class="header-web-btn">
+            Aplicar Web<br>Nuevas
+          </button>
+
+          <button id="clearOrderBtn" class="header-web-btn">
+            Limpiar Web<br>Nuevas
+          </button>
+
+          <!-- tablas vacios -->
+          <button id="toggleEmptyBtn" class="header-att-btn">
+            <span class="toggle-content">
+              Atributos Vacíos<br>
+              <span class="toggle-state"></span>
+            </span>
+          </button>
+
+          <!-- filtros -->
+
+          <button id="loadDefaultFilters" class="header-filter-btn">
+            Aplicar Filtros<br>Actuales
+          </button>
+
+          <button id="clearFilterInputs" class="header-filter-btn">
+            Limpiar Filtros<br>Nuevos
+          </button>
+
+        </div>         
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <section class="left-section" id="leftSection">
+      <article class="box" id="box1">
+        <div class="box-content" id="fileInfo">
+          <h3>Instrucciones</h3>
+          <ol>
+            <li>Sube el archivo XLSX con los grupos</li>
+            <li>Sube el CSV con los detalles</li>
+            <li>Los resultados aparecerán a la derecha</li>
+          </ol>
+        </div>
+      </article>
+      <div class="horizontal-divider" id="horizontalDivider"></div>
+      <article class="box" id="box3">
+                <div class="box-content">
+          <div id="attributeStats"></div>
+        </div>
+
+      </article>
+      
+    </section>
+
+    <div class="vertical-divider" id="verticalDivider"></div>
+
+    <section class="right-section" id="rightSection">
+      <article class="box" id="box2">
+        <div class="box-content" id="stats"></div>
+
+      </article>
+      <div class="horizontal-divider" id="horizontalDivider2"></div>
+      <article class="box" id="box4">
+        <div class="box-content" id="output"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
