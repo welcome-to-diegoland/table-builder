@@ -1552,9 +1552,9 @@ function handleStatClick(event) {
   });
 
   // Mostrar los grupos filtrados en el orden original
-  orderedGroupIds.forEach(groupId => {
+orderedGroupIds.forEach(groupId => {
     const groupItems = filteredItemsMap[groupId];
-    if (!groupItems || groupItems.length === 0) return; // <-- evita mostrar grupos vacíos
+    if (!groupItems || groupItems.length === 0) return; // Evita mostrar grupos vacíos
   
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
@@ -1562,14 +1562,10 @@ function handleStatClick(event) {
     } else if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
-    else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
-    }
-    // ... resto del código
-  });
+  
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
-
+  
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupId;
@@ -1664,9 +1660,8 @@ function handleStatClick(event) {
     // Crear tabla de items resaltando el atributo filtrado
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
-  ;
+});
 }
-
 
 function highlightActiveFilter() {
   document.querySelectorAll('.clickable').forEach(td => {
