@@ -625,7 +625,10 @@ function displayFilteredResults(filteredItems) {
   // Mostrar cada grupo en el orden correcto
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
-    if (groupItems.every(item => item.customOrder !== undefined)) {
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
     const groupInfo = skuToObject[groupId] || {};
@@ -1551,9 +1554,14 @@ function handleStatClick(event) {
   // Mostrar los grupos filtrados en el orden original
   orderedGroupIds.forEach(groupId => {
     const groupItems = filteredItemsMap[groupId];
-    if (groupItems.every(item => item.customOrder !== undefined)) {
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
+    // ... resto del código
+  });
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
@@ -1651,7 +1659,7 @@ function handleStatClick(event) {
     // Crear tabla de items resaltando el atributo filtrado
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
-  });
+  ;
 }
 
 
@@ -2773,7 +2781,18 @@ function applyCategoryTables() {
     if (!groups[groupId]) groups[groupId] = [];
     groups[groupId].push(item);
   });
-
+  orderedGroupIds.forEach(groupId => {
+    const groupItems = groupMap[groupId];
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
+      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    }
+    if (groupItems.length > 0) {
+      visibleItems.push(...groupItems);
+    }
+  });
   output.innerHTML = '';
   createStatusMessage();
 
