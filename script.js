@@ -555,6 +555,12 @@ function applyMultipleFilters() {
   const visibleItems = [];
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL SI EXISTE
@@ -614,6 +620,12 @@ function displayFilteredResults(filteredItems) {
   // Mostrar cada grupo en el orden correcto
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL SI EXISTE
@@ -1384,6 +1396,12 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
     const groupId = item["IG ID"];
     if (groups[groupId] && !output.querySelector(`[data-group-id="${groupId}"]`)) {
       const groupItems = groups[groupId];
+      if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
       const groupInfo = skuToObject[groupId] || {};
       const isMergedGroup = mergedGroups.has(groupId);
 
@@ -1592,6 +1610,12 @@ orderedGroupIds.sort((a, b) => {
   // Procesar cada grupo en el orden original
   orderedGroupIds.forEach(groupId => {
     const groupItems = groups[groupId];
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
     
     if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
@@ -1838,6 +1862,12 @@ function renderMergedGroups(skuToObject) {
   // Procesar cada grupo
   Object.keys(groups).forEach(groupId => {
     const groupItems = groups[groupId];
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
     if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
@@ -2603,6 +2633,18 @@ function applyCategoryTables() {
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
     if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
+    if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     } else if (groupItems.every(item => item.customOrder !== undefined)) {
@@ -2618,6 +2660,12 @@ function applyCategoryTables() {
   // Procesar cada grupo
   for (const groupId in groups) {
     const groupItems = groups[groupId];
+    if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+} else if (groupItems.every(item => item.customOrder !== undefined)) {
+  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+}
     const groupInfo = skuToObject[groupId] || {};
 
     // Crear estructura del grupo
