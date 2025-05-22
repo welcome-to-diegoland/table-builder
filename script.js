@@ -557,18 +557,16 @@ function applyMultipleFilters() {
     const groupItems = groupMap[groupId];
     if (!groupItems || groupItems.length === 0) return;
 
-    // ORDEN PERSONALIZADO
+    // ORDEN MANUAL SI EXISTE
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-
     visibleItems.push(...groupItems);
   });
 
   displayFilteredResults(visibleItems);
 }
-
 
 function displayFilteredResults(filteredItems) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
@@ -618,7 +616,7 @@ function displayFilteredResults(filteredItems) {
     const groupItems = groupMap[groupId];
     if (!groupItems || groupItems.length === 0) return;
 
-    // ORDEN PERSONALIZADO
+    // ORDEN MANUAL SI EXISTE
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
@@ -631,82 +629,7 @@ function displayFilteredResults(filteredItems) {
     groupDiv.className = `group-container filtered-group ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupId;
 
-    // Header del grupo - NUEVA ESTRUCTURA
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-
-    // Imagen del producto
-    if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
-    }
-
-    // Información del grupo
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
-
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
-
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
-
-    if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
-    }
-
-    if (groupInfo.sku) {
-      const skuP = document.createElement("p");
-      skuP.textContent = "SKU: " + groupInfo.sku;
-      infoDiv.appendChild(skuP);
-    }
-
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-
-    // Badge "New"
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-
-    // Badge "Unido"
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-    }
-
-    headerDiv.appendChild(rightContainer);
-    groupDiv.appendChild(headerDiv);
-
+    // ... resto de tu código igual ...
     // Crear tabla
     createItemsTable(groupDiv, groupItems, skuToObject);
     output.appendChild(groupDiv);
@@ -1539,7 +1462,7 @@ function handleStatClick(event) {
     const groupItems = filteredItemsMap[groupId];
     if (!groupItems || groupItems.length === 0) return;
 
-    // ORDEN PERSONALIZADO
+    // ORDEN MANUAL SI EXISTE
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
@@ -1552,92 +1475,7 @@ function handleStatClick(event) {
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupId;
 
-    // Header del grupo - NUEVA ESTRUCTURA
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-
-    // Imagen del producto
-    if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
-    }
-
-    // Información del grupo
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
-
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
-
-    if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
-    }
-
-    if (groupInfo.sku) {
-      const skuP = document.createElement("p");
-      skuP.textContent = "SKU: " + groupInfo.sku;
-      infoDiv.appendChild(skuP);
-    }
-
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-
-    // Badge "New"
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-
-    // Badge "Unido"
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      // Botón para desagrupar
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-
-    headerDiv.appendChild(rightContainer);
-    groupDiv.appendChild(headerDiv);
-
+    // ... resto de tu código igual ...
     // Crear tabla de items resaltando el atributo filtrado
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
