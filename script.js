@@ -555,9 +555,20 @@ function applyMultipleFilters() {
   const visibleItems = [];
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
-    if (groupItems.every(item => item.customOrder !== undefined)) {
+  
+    // Si hay orden personalizado, ordénalo según groupOrderMap
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
       groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
+    
+    // Si no, usa customOrder si existe
+    else if (groupItems.every(item => item.customOrder !== undefined)) {
+      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    }
+  
     if (groupItems.length > 0) {
       visibleItems.push(...groupItems);
     }
@@ -692,6 +703,8 @@ function displayFilteredResults(filteredItems) {
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
+      groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
     
     // Badge "Unido"
@@ -1816,6 +1829,8 @@ orderedGroupIds.sort((a, b) => {
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    } else if (groupItems.every(item => item.customOrder !== undefined)) {
+      groupItems.sort((a, b) => a.customOrder - b.customOrder);
     }
 
     // Detalles del grupo
