@@ -219,12 +219,6 @@ function handleRowReorder(evt) {
   // Obtener todos los SKUs en el nuevo orden
   const newOrder = rows.map(row => row.dataset.sku).filter(Boolean);
 
-  newOrder.forEach((sku, index) => {
-    const item = filteredItems.find(it => it.SKU === sku && it["IG ID"] === groupId);
-    if (item) {
-      item.customOrder = index;
-    }
-  });
   
   // Actualizar filteredItems con el nuevo orden
   const groupItems = filteredItems.filter(item => item["IG ID"] === groupId);
@@ -1862,8 +1856,9 @@ if (groupOrderMap.has(groupId)) {
       origin.className = "group-origin";
       details.appendChild(origin);
     }
-    if (groupItems.every(i => i.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
 
     infoDiv.appendChild(details);
