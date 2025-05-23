@@ -556,10 +556,8 @@ console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderM
 
 function displayFilteredResults(filteredItems) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-
   console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
 
-  // Mostrar encabezado con filtros activos
   let filtersHtml = Object.keys(activeFilters).map(attr =>
     `<span class="active-filter-tag" data-attribute="${attr}">
       ${attr}: ${activeFilters[attr]}
@@ -574,7 +572,6 @@ function displayFilteredResults(filteredItems) {
     </div>
   `;
 
-  // Eventos para quitar filtros
   document.querySelectorAll('.remove-filter-btn').forEach(btn => {
     btn.addEventListener('click', function () {
       const attr = this.getAttribute('data-attribute');
@@ -583,119 +580,104 @@ function displayFilteredResults(filteredItems) {
     });
   });
 
-  // Actualizar dropdowns
   updateAttributeDropdowns(filteredItems);
 
-  // Agrupar items por grupo y mantener orden de aparición
   const groupMap = {};
   const orderedGroupIds = [];
 
   filteredItems.forEach(item => {
-    const groupId = item["IG ID"];
-    if (!groupMap[groupId]) {
-      groupMap[groupId] = [];
-      orderedGroupIds.push(groupId);
+    const groupIdStr = String(item["IG ID"]);
+    if (!groupMap[groupIdStr]) {
+      groupMap[groupIdStr] = [];
+      orderedGroupIds.push(groupIdStr);
     }
-    groupMap[groupId].push(item);
+    groupMap[groupIdStr].push(item);
   });
 
-  // Mostrar cada grupo en el orden correcto
-  orderedGroupIds.forEach(groupId => {
-    const groupItems = groupMap[groupId];
+  orderedGroupIds.forEach(groupIdStr => {
+    const groupItems = groupMap[groupIdStr];
 
-    // ORDENAR SIEMPRE los items visibles del grupo según groupOrderMap, si existe
-// Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
+      console.log('[render][skip]', groupIdStr, groupItems);
+      return;
+    }
 
-    // Trae el objeto de grupo correcto (para imagen, logo, nombre)
-    const groupInfo = objectData.find(o => o.SKU == groupId) || {};
-    const isMergedGroup = mergedGroups.has(groupId);
+    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (!Array.isArray(orderedSkus)) {
+      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
+    } else {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+
+    const groupInfo = objectData.find(o => o.SKU == groupIdStr) || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
 
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container filtered-group ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupId;
+    groupDiv.dataset.groupId = groupIdStr;
 
-    // Header del grupo
+    // Header
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-
-    // Imagen del producto
     if (groupInfo.image) {
       const productImg = document.createElement("img");
       productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
       productImg.className = "product-img";
       leftContainer.appendChild(productImg);
     }
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-
     const h2 = document.createElement("h2");
     h2.className = "group-title";
-
     const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
-
+    link.textContent = groupInfo.name || groupIdStr;
     h2.appendChild(link);
     infoDiv.appendChild(h2);
-
     if (groupInfo.brand_logo) {
       const logoImg = document.createElement("img");
       logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
       logoImg.className = "logo-img";
       infoDiv.appendChild(logoImg);
     }
-
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
       infoDiv.appendChild(skuP);
     }
-
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
 
-    // Contenedor derecho (badges)
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
-
-    // Badge "New"
     const hasNewItem = groupItems.some(item => {
       const details = objectData.find(o => o.SKU === item.SKU);
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
-
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       rightContainer.appendChild(newBadge);
     }
-
-    // Badge "Unido"
     if (isMergedGroup) {
       const mergedBadge = document.createElement("span");
       mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
     }
-
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
-    // Crear tabla
     createItemsTable(groupDiv, groupItems, skuToObject);
     output.appendChild(groupDiv);
   });
@@ -1433,41 +1415,44 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
 
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const groups = {};
-  
-  // Agrupar items manteniendo el orden original
   filteredItems.forEach(item => {
-    if (filteredGroupIds.has(item["IG ID"])) {
-      if (!groups[item["IG ID"]]) {
-        groups[item["IG ID"]] = [];
+    const groupIdStr = String(item["IG ID"]);
+    if (filteredGroupIds.has(groupIdStr)) {
+      if (!groups[groupIdStr]) {
+        groups[groupIdStr] = [];
       }
-      groups[item["IG ID"]].push(item);
+      groups[groupIdStr].push(item);
     }
   });
 
-  // Mostrar los grupos en el orden original
   filteredItems.forEach(item => {
-    const groupId = item["IG ID"];
-    if (groups[groupId] && !output.querySelector(`[data-group-id="${groupId}"]`)) {
-      const groupItems = groups[groupId];
+    const groupIdStr = String(item["IG ID"]);
+    if (groups[groupIdStr] && !output.querySelector(`[data-group-id="${groupIdStr}"]`)) {
+      const groupItems = groups[groupIdStr];
 
-      console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
- // Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-      console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+      if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
+        console.log('[render][skip]', groupIdStr, groupItems);
+        return;
+      }
+      console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+      if (!groupOrderMap.has(groupIdStr)) {
+        groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+      }
+      const orderedSkus = groupOrderMap.get(groupIdStr);
+      if (!Array.isArray(orderedSkus)) {
+        console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
+      } else {
+        groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+      }
+      console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
-
-      const groupInfo = skuToObject[groupId] || {};
-      const isMergedGroup = mergedGroups.has(groupId);
+      const groupInfo = skuToObject[groupIdStr] || {};
+      const isMergedGroup = mergedGroups.has(groupIdStr);
 
       const groupDiv = document.createElement("div");
       groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-      groupDiv.dataset.groupId = groupId;
+      groupDiv.dataset.groupId = groupIdStr;
 
-      // Resto del código para crear el grupo...
       createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
       createItemsTable(groupDiv, groupItems, skuToObject, attribute);
       output.appendChild(groupDiv);
@@ -1475,14 +1460,13 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
   });
 }
 
-// Función corregida: handleStatClick
 function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
-
+  
   // Forzar el filtrado por item_code si es necesario
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-
+  
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
@@ -1491,22 +1475,22 @@ function handleStatClick(event) {
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
 
-  // Agrupar items filtrados por grupo según el valor requerido
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const filteredGroupIds = new Set();
   const filteredItemsMap = {};
 
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-
+  // Filtrar los items
   filteredItems.forEach(item => {
     const details = skuToObject[item.SKU] || {};
     const hasValue = details[filterAttribute]?.toString().trim();
-
+    
     if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
-      filteredGroupIds.add(item["IG ID"]);
-      if (!filteredItemsMap[item["IG ID"]]) {
-        filteredItemsMap[item["IG ID"]] = [];
+      const groupIdStr = String(item["IG ID"]);
+      filteredGroupIds.add(groupIdStr);
+      if (!filteredItemsMap[groupIdStr]) {
+        filteredItemsMap[groupIdStr] = [];
       }
-      filteredItemsMap[item["IG ID"]].push(item);
+      filteredItemsMap[groupIdStr].push(item);
     }
   });
 
@@ -1523,128 +1507,114 @@ function handleStatClick(event) {
     </div>
   `;
 
+  // Agregar evento al botón de limpiar filtro
   output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
 
   // Mantener el orden original de los grupos
   const orderedGroupIds = [];
   const uniqueGroupIds = new Set();
-
+  
   filteredItems.forEach(item => {
-    if (filteredGroupIds.has(item["IG ID"]) && !uniqueGroupIds.has(item["IG ID"])) {
-      orderedGroupIds.push(item["IG ID"]);
-      uniqueGroupIds.add(item["IG ID"]);
+    const groupIdStr = String(item["IG ID"]);
+    if (filteredGroupIds.has(groupIdStr) && !uniqueGroupIds.has(groupIdStr)) {
+      orderedGroupIds.push(groupIdStr);
+      uniqueGroupIds.add(groupIdStr);
     }
   });
 
-  orderedGroupIds.forEach(groupId => {
-    const groupItems = filteredItemsMap[groupId];
+  // Mostrar los grupos filtrados en el orden original
+  orderedGroupIds.forEach(groupIdStr => {
+    const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
 
-    // ORDEN MANUAL DEL USUARIO
-    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
-// Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+    // === BLOQUE DE ORDEN MANUAL (igual que en processItemGroups) ===
+    // Aplica el orden manual si existe
+    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (!Array.isArray(orderedSkus)) {
+      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
+    } else {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+    // === FIN BLOQUE DE ORDEN ===
 
-    // Trae el objeto de grupo correcto (para imagen, logo, nombre)
-    const groupInfo = objectData.find(o => o.SKU == groupId) || {};
-    const isMergedGroup = mergedGroups.has(groupId);
+    const groupInfo = skuToObject[groupIdStr] || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
 
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupId;
+    groupDiv.dataset.groupId = groupIdStr;
 
     // Header del grupo - NUEVA ESTRUCTURA
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-
-    // Imagen del producto
     if (groupInfo.image) {
       const productImg = document.createElement("img");
       productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
       productImg.className = "product-img";
       leftContainer.appendChild(productImg);
     }
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-
     const h2 = document.createElement("h2");
     h2.className = "group-title";
-
     const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
+    link.textContent = groupInfo.name || groupIdStr;
     h2.appendChild(link);
     infoDiv.appendChild(h2);
-
     if (groupInfo.brand_logo) {
       const logoImg = document.createElement("img");
       logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
       logoImg.className = "logo-img";
       infoDiv.appendChild(logoImg);
     }
-
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
       infoDiv.appendChild(skuP);
     }
-
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
 
-    // Contenedor derecho (badges)
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
-
-    // Badge "New"
     const hasNewItem = groupItems.some(item => {
       const details = skuToObject[item.SKU];
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
-
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       rightContainer.appendChild(newBadge);
     }
-
-    // Badge "Unido"
     if (isMergedGroup) {
       const mergedBadge = document.createElement("span");
       mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
-
-      // Botón para desagrupar
       const unmergeBtn = document.createElement("button");
       unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
+      unmergeBtn.dataset.groupId = groupIdStr;
       unmergeBtn.addEventListener('click', function() {
         unmergeGroup(this.dataset.groupId);
       });
       rightContainer.appendChild(unmergeBtn);
     }
-
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
-    // Crear tabla de items resaltando el atributo filtrado
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
   });
@@ -1706,87 +1676,82 @@ function processItemGroups(skuToObject) {
   // Agrupar items por IG ID en orden de aparición
   const groups = {};
   const orderedGroupIds = [];
-  // Ordenar los grupos por fecha de creación (si está disponible)
-orderedGroupIds.sort((a, b) => {
-  const groupA = objectData.find(o => o.SKU === a);
-  const groupB = objectData.find(o => o.SKU === b);
-  return (groupA?.groupCreatedAt || 0) - (groupB?.groupCreatedAt || 0);
-});
-
   filteredItems.forEach(item => {
-    const groupId = String(item["IG ID"]);
-    if (!groups[groupId]) {
-      groups[groupId] = [];
-      orderedGroupIds.push(groupId);
+    const groupIdStr = String(item["IG ID"]);
+    if (!groups[groupIdStr]) {
+      groups[groupIdStr] = [];
+      orderedGroupIds.push(groupIdStr);
     }
-    groups[groupId].push(item);
+    groups[groupIdStr].push(item);
   });
 
   output.innerHTML = '';
   createStatusMessage();
 
-  // Controles de grupo
   const controlsDiv = document.createElement("div");
   controlsDiv.className = "groups-controls";
-
-  // Botón para unir grupos
   const mergeBtn = document.createElement("button");
   mergeBtn.className = "btn btn-primary";
   mergeBtn.textContent = "Agrupar";
   mergeBtn.addEventListener('click', mergeSelectedGroups);
-
-  // Botón para seleccionar todos los grupos
   const selectAllBtn = document.createElement("button");
   selectAllBtn.className = "btn btn-secondary";
   selectAllBtn.textContent = "Seleccionar Todos";
   selectAllBtn.addEventListener('click', selectAllGroups);
-
-  // Botón para deseleccionar todos los grupos
   const deselectAllBtn = document.createElement("button");
   deselectAllBtn.className = "btn btn-outline-secondary";
   deselectAllBtn.textContent = "Deseleccionar Todos";
   deselectAllBtn.addEventListener('click', deselectAllGroups);
-
   const selectionCount = document.createElement("span");
   selectionCount.className = "selection-count";
   selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
-
-  // Agregar botones al contenedor
   controlsDiv.appendChild(mergeBtn);
   controlsDiv.appendChild(selectAllBtn);
   controlsDiv.appendChild(deselectAllBtn);
   controlsDiv.appendChild(selectionCount);
-  
   output.appendChild(controlsDiv);
 
-  // Procesar cada grupo en el orden original
-  orderedGroupIds.forEach(groupId => {
-    const groupItems = groups[groupId];
+  orderedGroupIds.forEach(groupIdStr => {
+    const groupItems = groups[groupIdStr];
 
- 
-const groupInfo = skuToObject[groupId] || {};
-    const isMergedGroup = mergedGroups.has(groupId);
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
+      console.log('[render][skip]', groupIdStr, groupItems);
+      return;
+    }
+
+    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (!Array.isArray(orderedSkus)) {
+      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
+    } else {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+
+    const groupInfo = skuToObject[groupIdStr] || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
 
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupId;
+    groupDiv.dataset.groupId = groupIdStr;
 
     // Checkbox de selección
     const checkboxDiv = document.createElement("div");
     checkboxDiv.className = "group-checkbox-container";
     checkboxDiv.innerHTML = `
-      <input type="checkbox" class="group-checkbox" id="group-${groupId}" 
-             data-group-id="${groupId}"
-             ${selectedGroups.has(groupId) ? 'checked' : ''}>
-      <label for="group-${groupId}"></label>
+      <input type="checkbox" class="group-checkbox" id="group-${groupIdStr}" 
+             data-group-id="${groupIdStr}"
+             ${selectedGroups.has(groupIdStr) ? 'checked' : ''}>
+      <label for="group-${groupIdStr}"></label>
     `;
     groupDiv.appendChild(checkboxDiv);
 
-    // Header del grupo - NUEVA ESTRUCTURA
+    // Header del grupo
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
 
@@ -1802,14 +1767,12 @@ const groupInfo = skuToObject[groupId] || {};
     // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-
     const title = document.createElement("h2");
     title.className = "group-title";
-
     const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
-    link.textContent = groupInfo.name || groupId;
+    link.textContent = groupInfo.name || groupIdStr;
     title.appendChild(link);
     infoDiv.appendChild(title);
 
@@ -1820,40 +1783,20 @@ const groupInfo = skuToObject[groupId] || {};
       logo.onerror = () => logo.style.display = 'none';
       infoDiv.appendChild(logo);
     }
-    
-if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-  console.log('[render][skip]', groupId, groupItems);
-  return;
-}
 
-
-
-// Detalles del grupo
     const details = document.createElement("div");
     details.className = "group-details";
-
     if (groupInfo.sku) {
       const sku = document.createElement("p");
       sku.textContent = `SKU: ${groupInfo.sku}`;
       details.appendChild(sku);
     }
-
     if (isMergedGroup) {
       const origin = document.createElement("p");
-      origin.textContent = `Contiene items de: ${mergedGroups.get(groupId).originalGroups.join(', ')}`;
+      origin.textContent = `Contiene items de: ${mergedGroups.get(groupIdStr).originalGroups.join(', ')}`;
       origin.className = "group-origin";
       details.appendChild(origin);
     }
-
-    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
- // Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
-
     infoDiv.appendChild(details);
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
@@ -1861,47 +1804,37 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
     // Contenedor derecho (badges)
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
-
-    // Badge "New"
     const hasNewItem = groupItems.some(item => {
       const details = skuToObject[item.SKU];
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
-
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       rightContainer.appendChild(newBadge);
     }
-
-    // Badge "Unido"
     if (isMergedGroup) {
       const mergedBadge = document.createElement("span");
       mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
-
-      // Botón para desagrupar
       const unmergeBtn = document.createElement("button");
       unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
+      unmergeBtn.dataset.groupId = groupIdStr;
       unmergeBtn.addEventListener('click', function() {
         unmergeGroup(this.dataset.groupId);
       });
       rightContainer.appendChild(unmergeBtn);
     }
-
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
-    // Crear tabla de items
     createItemsTable(groupDiv, groupItems, skuToObject);
     output.appendChild(groupDiv);
 
-    // Evento del checkbox
     groupDiv.querySelector('.group-checkbox').addEventListener('change', function() {
       if (this.checked) {
         selectedGroups.add(this.dataset.groupId);
@@ -2766,128 +2699,94 @@ function applyCategoryTables() {
     return;
   }
   console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
-
-  // Establecer estados
-  currentViewState.catTables = true;
-  currentViewState.webOrder = false;
-  currentViewState.catOrder = false;
-  useCatOrder = false;
-
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const groups = {};
-
-  // Agrupar items
   filteredItems.forEach(item => {
-    const groupId = item["IG ID"];
-    if (!groups[groupId]) groups[groupId] = [];
-    groups[groupId].push(item);
+    const groupIdStr = String(item["IG ID"]);
+    if (!groups[groupIdStr]) groups[groupIdStr] = [];
+    groups[groupIdStr].push(item);
   });
 
   output.innerHTML = '';
   createStatusMessage();
+  for (const groupIdStr in groups) {
+    const groupItems = groups[groupIdStr];
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
+      console.log('[render][skip]', groupIdStr, groupItems);
+      continue;
+    }
+    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (!Array.isArray(orderedSkus)) {
+      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
+    } else {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
-  // Procesar cada grupo
-  for (const groupId in groups) {
-    const groupItems = groups[groupId];
-
-    // Ordenar según groupOrderMap si existe
-    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
-// Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
-
-    const groupInfo = skuToObject[groupId] || {};
-
-    // Crear estructura del grupo
+    const groupInfo = skuToObject[groupIdStr] || {};
     const groupDiv = document.createElement("div");
     groupDiv.className = "group-container";
-
-    // Header del grupo - NUEVA ESTRUCTURA
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-
-    // Badge "New"
     const hasNewItem = groupItems.some(item => {
       const details = skuToObject[item.SKU];
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
-
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       headerDiv.appendChild(newBadge);
     }
-
-    // Imagen del producto
     if (groupInfo.image) {
       const productImg = document.createElement("img");
       productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
       productImg.className = "product-img";
       leftContainer.appendChild(productImg);
     }
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-
     const h2 = document.createElement("h2");
     h2.className = "group-title";
-
     const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
-
+    link.textContent = groupInfo.name || groupIdStr;
     h2.appendChild(link);
     infoDiv.appendChild(h2);
-
-    // Logo de marca
     if (groupInfo.brand_logo) {
       const logoImg = document.createElement("img");
       logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
       logoImg.className = "logo-img";
       infoDiv.appendChild(logoImg);
     }
-
-    // SKU
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
       infoDiv.appendChild(skuP);
     }
-
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
-
-    // Contenedor derecho (badges)
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
-
-    // Si hay badge "New", moverlo al contenedor derecho
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       rightContainer.appendChild(newBadge);
     }
-
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
-    // Obtener atributos específicos de table_attributes_cat
     const itemWithCatAttrs = groupItems.find(item => item.table_attributes_cat);
     let customAttrs = [];
-
     if (itemWithCatAttrs) {
       customAttrs = itemWithCatAttrs.table_attributes_cat
         .replace(/\s+/g, ',')
@@ -2895,12 +2794,9 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
         .map(attr => attr.trim())
         .filter(attr => attr);
     }
-
-    // Crear tabla con atributos personalizados
     createItemsTable(groupDiv, groupItems, skuToObject, null, customAttrs);
     output.appendChild(groupDiv);
   }
-
   fileInfoDiv.innerHTML += `<p class="text-success">✅ Tablas Cat aplicadas</p>`;
 }
 
