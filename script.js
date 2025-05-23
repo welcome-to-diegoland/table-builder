@@ -2320,6 +2320,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   const table = document.createElement("table");
   table.className = "table table-striped table-bordered attribute-table";
   table.style.width = "100%";
+  table.style.tableLayout = "fixed"; // Importante para que los anchos se respeten
 
   // Obtener atributos ordenados
   let orderedAttributes;
@@ -2344,7 +2345,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
   // Crear THEAD
   let theadHtml = "<thead><tr><th style='width: 10px;' class='drag-handle-column'></th>"; // Columna para drag handle
-  
+
   filteredAttributes.forEach(attr => {
     let isAllEmpty = true;
     for (const item of groupItems) {
@@ -2357,14 +2358,17 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const isHighlighted = attr.attribute === highlightAttribute;
     theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''}">${attr.attribute}</th>`;
   });
-  
-  // Columnas forzadas
+
+  // Columnas forzadas con ancho
   forcedColumns.forEach(forced => {
-    theadHtml += `<th>${forced}</th>`;
+    let width = "";
+    if (forced === "item_code") width = "width:92px;min-width:92px;max-width:92px;";
+    if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
+    theadHtml += `<th style="${width}">${forced}</th>`;
   });
-  
-  // Columna para mostrar grupo original (solo para items unidos)
-  theadHtml += `<th style="width:100px">Origen</th></tr></thead>`;
+
+  // Columna de origen (ancho fijo)
+  theadHtml += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th></tr></thead>`;
 
   // Crear TBODY
   const tbody = document.createElement("tbody");
@@ -2444,15 +2448,20 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       row.appendChild(cell);
     });
     
-    // Columnas forzadas
+    // Columnas forzadas con anchos fijos
     forcedColumns.forEach(forced => {
       const cell = document.createElement("td");
-      cell.style.minWidth = "100px";
-      
+      let width = "";
+      if (forced === "item_code") width = "100px";
+      if (forced === "precio") width = "100px";
+      cell.style.width = width;
+      cell.style.minWidth = width;
+      cell.style.maxWidth = width;
+
       const value = details[forced] || "";
       const highlightStyle = forced === 'item_code' && shouldHighlight ? 
-                         'background-color: #e6e6fa; font-weight: bold;' : '';
-      cell.style = highlightStyle;
+                         'background-color: #e6e6fa;' : '';
+      if (highlightStyle) cell.style = highlightStyle + `width:${width};min-width:${width};max-width:${width};`;
       
       if (forced === 'item_code' && value) {
         const link = document.createElement("a");
@@ -2468,8 +2477,11 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       row.appendChild(cell);
     });
     
-    // Columna de origen (solo la celda se alterna)
+    // Columna de origen con ancho fijo
     const originCell = document.createElement("td");
+    originCell.style.width = "100px";
+    originCell.style.minWidth = "100px";
+    originCell.style.maxWidth = "100px";
     let origenValue;
     if (isMergedItem) {
       origenValue = item.__originalIGID;
