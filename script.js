@@ -213,34 +213,20 @@ function setupDragAndDropForAllTables() {
 function handleRowReorder(evt) {
   const tbody = evt.to;
   const groupId = tbody.closest('.group-container').dataset.groupId;
-  const table = tbody.closest('table');
   const rows = Array.from(tbody.querySelectorAll('tr:not(.skip-dnd)'));
-  
-  // Obtener todos los SKUs en el nuevo orden
-  const newOrder = rows.map(row => row.dataset.sku).filter(Boolean);
+  const newVisibleOrder = rows.map(row => row.dataset.sku).filter(Boolean);
 
-  
-  // Actualizar filteredItems con el nuevo orden
-  const groupItems = filteredItems.filter(item => item["IG ID"] === groupId);
-  const newGroupItems = [];
-  
-  newOrder.forEach(sku => {
-    const item = groupItems.find(item => item.SKU === sku);
-    if (item) newGroupItems.push(item);
-  });
-  
-  groupOrderMap.set(groupId, newOrder);
+  // Orden completo anterior
+  const prevFullOrder = groupOrderMap.get(groupId) || 
+    filteredItems.filter(item => item["IG ID"] === groupId).map(item => item.SKU);
 
-  // Conservar items que no están en la tabla (por filtros)
-  groupItems.forEach(item => {
-    if (!newOrder.includes(item.SKU)) newGroupItems.push(item);
-  });
-
-  // Actualizar filteredItems
-  filteredItems = [
-    ...filteredItems.filter(item => item["IG ID"] !== groupId),
-    ...newGroupItems
+  // Nuevo orden: visibles primero (en el nuevo orden), luego los demás
+  const newFullOrder = [
+    ...newVisibleOrder,
+    ...prevFullOrder.filter(sku => !newVisibleOrder.includes(sku))
   ];
+
+  groupOrderMap.set(groupId, newFullOrder);
 
   // Feedback visual
   showTemporaryMessage(`Orden del grupo ${groupId} actualizado`);
@@ -553,10 +539,15 @@ function applyMultipleFilters() {
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL DEL USUARIO
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+// Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+}
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+
     visibleItems.push(...groupItems);
   });
 
@@ -565,6 +556,8 @@ function applyMultipleFilters() {
 
 function displayFilteredResults(filteredItems) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+
+  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
 
   // Mostrar encabezado con filtros activos
   let filtersHtml = Object.keys(activeFilters).map(attr =>
@@ -611,11 +604,12 @@ function displayFilteredResults(filteredItems) {
     const groupItems = groupMap[groupId];
 
     // ORDENAR SIEMPRE los items visibles del grupo según groupOrderMap, si existe
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      // El sort solo usará los SKUs presentes en el array filtrado
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+// Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+}
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 
     // Trae el objeto de grupo correcto (para imagen, logo, nombre)
     const groupInfo = objectData.find(o => o.SKU == groupId) || {};
@@ -1455,15 +1449,16 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
     const groupId = item["IG ID"];
     if (groups[groupId] && !output.querySelector(`[data-group-id="${groupId}"]`)) {
       const groupItems = groups[groupId];
-      if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else 
 
-if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+      console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+ // Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
 }
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+      console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+
 
       const groupInfo = skuToObject[groupId] || {};
       const isMergedGroup = mergedGroups.has(groupId);
@@ -1546,10 +1541,14 @@ function handleStatClick(event) {
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL DEL USUARIO
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+// Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+}
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 
     // Trae el objeto de grupo correcto (para imagen, logo, nombre)
     const groupInfo = objectData.find(o => o.SKU == groupId) || {};
@@ -1702,6 +1701,8 @@ function processItemGroups(skuToObject) {
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
 
+  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
+
   // Agrupar items por IG ID en orden de aparición
   const groups = {};
   const orderedGroupIds = [];
@@ -1761,11 +1762,9 @@ orderedGroupIds.sort((a, b) => {
   // Procesar cada grupo en el orden original
   orderedGroupIds.forEach(groupId => {
     const groupItems = groups[groupId];
-    if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-}
-    const groupInfo = skuToObject[groupId] || {};
+
+ 
+const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
     const groupDiv = document.createElement("div");
@@ -1822,16 +1821,14 @@ orderedGroupIds.sort((a, b) => {
       infoDiv.appendChild(logo);
     }
     
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
+  console.log('[render][skip]', groupId, groupItems);
+  return;
+}
 
-    // Detalles del grupo
+
+
+// Detalles del grupo
     const details = document.createElement("div");
     details.className = "group-details";
 
@@ -1848,10 +1845,14 @@ orderedGroupIds.sort((a, b) => {
       details.appendChild(origin);
     }
 
-if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+ // Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
 }
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 
     infoDiv.appendChild(details);
     leftContainer.appendChild(infoDiv);
@@ -2012,17 +2013,15 @@ function renderMergedGroups(skuToObject) {
   Object.keys(groups).forEach(groupId => {
     const groupItems = groups[groupId];
 
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
-else 
-
-
-if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+ // Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
 }
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
@@ -2766,6 +2765,7 @@ function applyCategoryTables() {
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
+  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
 
   // Establecer estados
   currentViewState.catTables = true;
@@ -2791,10 +2791,14 @@ function applyCategoryTables() {
     const groupItems = groups[groupId];
 
     // Ordenar según groupOrderMap si existe
-    if (groupOrderMap.has(groupId)) {
-      const orderedSkus = groupOrderMap.get(groupId);
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
+// Inicializa el orden si no existe
+if (!groupOrderMap.has(groupId)) {
+  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+}
+const orderedSkus = groupOrderMap.get(groupId);
+groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 
     const groupInfo = skuToObject[groupId] || {};
 
@@ -2909,6 +2913,7 @@ function initVerticalDrag(e) {
 }
 
 function handleVerticalDrag(e) {
+  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
   if (!isVerticalDragging) return;
   const containerWidth = container.getBoundingClientRect().width;
   const dividerWidth = verticalDivider.offsetWidth;
