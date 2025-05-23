@@ -2351,7 +2351,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   const groupId = groupItems[0]?.["IG ID"];
   const isMergedGroup = mergedGroups.has(groupId);
   if (isMergedGroup) {
-    container.classList.add('merged-group');
+    container.classList.add('merged-group'); 
   }
 
   const table = document.createElement("table");
