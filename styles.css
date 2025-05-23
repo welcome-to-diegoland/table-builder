@@ -441,14 +441,6 @@ html, body {
   box-shadow: 0 0 0 2px #e74c3c;
 }
 
-.clickable.active-filter::after {
-  content: "✓";
-  position: absolute;
-  right: 5px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-weight: bold;
-}
 
 .active-with-value::after {
   color: #2ecc71;
@@ -1440,7 +1432,39 @@ tr.selected td {
   text-align: center;
 }
 
+.attribute-stats-table {
+  table-layout: fixed !important;
+}
+.attribute-stats-table th,
+.attribute-stats-table td {
+  text-align: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 4px 6px;
+}
 
+.attribute-stats-table input[type="number"],
+.attribute-stats-table .order-input,
+.attribute-stats-table .order-cat-input,
+.attribute-stats-table .filter-order-input,
+.attribute-stats-table select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  font-size: 12px;
+  text-align: center;
+  padding: 2px 4px;
+}
 
+.attribute-stats-table th:first-child,
+.attribute-stats-table td:first-child {
+  text-align: left !important;
+}
 
-
+.attribute-stats-table td:first-child select,
+.attribute-stats-table td:first-child .attribute-dropdown {
+  text-align: left !important;
+  padding-left: 8px !important;
+}

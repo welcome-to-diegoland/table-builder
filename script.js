@@ -876,32 +876,41 @@ function processAttributeStats(skuToObject) {
     attributeStatsDiv.innerHTML = '<p>No hay atributos usados en las tablas</p>';
   }
 }
-
 function createStatsColumn(stats) {
+  // Puedes editar estos valores para ajustar el ancho de cada columna
+  const colWidthAtributo = 'auto'; // flexible
+  const colMinWidthAtributo = '120px';
+  const colWidthFiltro = '50px';
+  const colWidthWeb = '50px';
+  const colWidthCat = '50px';
+  const colWidthConValor = '40px';
+  const colWidthSinValor = '40px';
+
   const column = document.createElement("div");
   column.className = "stats-column";
   
   const table = document.createElement("table");
   table.className = "table table-sm table-bordered attribute-stats-table";
-  
+  table.style.tableLayout = "fixed"; // Importante para respetar anchos
+
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width: 50px">Filtro</th>
-        <th style="width: 60px">Col Web</th>
-        <th style="width: 60px">Col Cat</th>
-        <th>
+        <th style="width:${colWidthAtributo}; min-width:${colMinWidthAtributo};">
           <div class="attribute-header-wrapper">
             Atributo
-            <button class="btn-clear-filter" title="Limpiar filtros">
+            <button class="btn-clear-filter" title="Limpiar filtros" type="button">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 6L6 18M6 6l12 12"/>
               </svg>
             </button>
           </div>
         </th>
-        <th>Con valor</th>
-        <th>Sin valor</th>
+        <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro};">Filtro</th>
+        <th style="width:${colWidthWeb}; min-width:${colWidthWeb};">Col<br>Web</th>
+        <th style="width:${colWidthCat}; min-width:${colWidthCat};">Col<br>Cat</th>
+        <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con<br>valor</th>
+        <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin<br>valor</th>
       </tr>
     </thead>
     <tbody>
@@ -921,40 +930,47 @@ function createStatsColumn(stats) {
         
         // Crear dropdown para el atributo
         const dropdown = createAttributeDropdown(stat.attribute, stat.uniqueValues);
-                
+
         return `
         <tr>
-          <td>
+          <td style="width:${colWidthAtributo}; min-width:${colMinWidthAtributo};">${dropdown}</td>
+          <td style="width:${colWidthFiltro}; min-width:${colWidthFiltro};">
             <div class="filter-input-container">
               <input type="number" min="0" class="filter-order-input form-control form-control-sm" 
                    data-attribute="${stat.attribute}" 
                    value="${filterValue}">
             </div>
           </td>
-          <td><input type="number" min="1" class="order-input form-control form-control-sm" 
-               data-attribute="${stat.attribute}" 
-               value="${displayValue}"></td>
-          <td><input type="number" min="1" class="order-cat-input form-control form-control-sm" 
-               data-attribute="${stat.attribute}" 
-               value=""></td>
-          <td>${dropdown}</td>
-          <td class="clickable with-value" 
+          <td style="width:${colWidthWeb}; min-width:${colWidthWeb};">
+            <input type="number" min="1" class="order-input form-control form-control-sm" 
+                   data-attribute="${stat.attribute}" 
+                   value="${displayValue}">
+          </td>
+          <td style="width:${colWidthCat}; min-width:${colWidthCat};">
+            <input type="number" min="1" class="order-cat-input form-control form-control-sm" 
+                   data-attribute="${stat.attribute}" 
+                   value="">
+          </td>
+          <td style="width:${colWidthConValor}; min-width:${colWidthConValor};" class="clickable with-value" 
               data-attribute="${stat.attribute}" 
               data-type="withValue">${stat.withValue}</td>
-          <td class="clickable without-value" 
+          <td style="width:${colWidthSinValor}; min-width:${colWidthSinValor};" class="clickable without-value" 
               data-attribute="${stat.attribute}" 
               data-type="withoutValue">${stat.withoutValue}</td>
         </tr>
-      `}).join('')}
+      `;
+      }).join('')}
     </tbody>
   `;
 
-  // Asignar el evento de limpieza al botón btn-clear-filter
-  table.querySelector('.btn-clear-filter').addEventListener('click', function() {
-    clearAllFilters();
+  // Asignar el evento de limpieza al/los botón/es btn-clear-filter
+  table.querySelectorAll('.btn-clear-filter').forEach(btn => {
+    btn.addEventListener('click', function() {
+      clearAllFilters();
+    });
   });
 
-  // Resto del código de eventos (sin cambios)
+  // Eventos para dropdowns de atributo
   table.querySelectorAll('.attribute-dropdown').forEach(dropdown => {
     dropdown.addEventListener('change', function() {
       const attribute = this.getAttribute('data-attribute');
@@ -963,14 +979,13 @@ function createStatsColumn(stats) {
     });
   });
 
+  // Eventos para inputs de filtro
   table.querySelectorAll('.filter-order-input').forEach(input => {
     const attribute = input.getAttribute('data-attribute');
     attributeFilterInputs[attribute] = input;
-    
     input.addEventListener('change', function() {
       const value = this.value.trim();
       const numericValue = parseInt(value) || 0;
-      
       if (value === '' || numericValue === 0) {
         this.value = '';
         localStorage.setItem(`filter_${attribute}`, '0');
@@ -981,10 +996,12 @@ function createStatsColumn(stats) {
     });
   });
 
+  // Eventos para inputs de orden
   table.querySelectorAll('.order-input, .order-cat-input').forEach(input => {
     input.addEventListener('change', saveAttributeOrder);
   });
 
+  // Eventos para celdas de click
   table.querySelectorAll('.clickable').forEach(cell => {
     cell.addEventListener('click', handleStatClick);
   });
@@ -2353,9 +2370,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   const tbody = document.createElement("tbody");
   tbody.id = `tbody-${groupId}`; // ID único para cada tabla
 
-  // Variables para alternar colores
-  let currentColorClass = 'original-row-color1';
-  let lastOriginalGroup = null;
+  // === Alternancia de color SOLO en la celda Origen ===
+  let currentColorClass = 'origen-cell-color1';
+  let lastOrigenValue = null;
   
   groupItems.forEach((item, itemIndex) => {
     const details = skuToObject[item.SKU] || {};
@@ -2368,20 +2385,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
     const row = document.createElement("tr");
     row.dataset.sku = item.SKU; // Agregar SKU como data attribute
-    
-    if (isMergedItem) {
-      // Cambiar color solo cuando cambie el grupo original
-      if (lastOriginalGroup !== item.__originalIGID) {
-        currentColorClass = currentColorClass === 'original-row-color1' 
-                         ? 'original-row-color2' 
-                         : 'original-row-color1';
-        lastOriginalGroup = item.__originalIGID;
-      }
-      
-      row.dataset.originalIgid = item.__originalIGID;
-      row.title = `Originalmente del grupo ${item.__originalIGID}`;
-      row.classList.add(currentColorClass);
-    }
 
     // Celda de drag handle
     const dragCell = document.createElement("td");
@@ -2465,10 +2468,20 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       row.appendChild(cell);
     });
     
-    // Columna de origen (para items unidos)
+    // Columna de origen (solo la celda se alterna)
     const originCell = document.createElement("td");
+    let origenValue;
     if (isMergedItem) {
-      originCell.textContent = item.__originalIGID;
+      origenValue = item.__originalIGID;
+      // Alternar color cuando cambie el valor de origen
+      if (lastOrigenValue !== origenValue) {
+        currentColorClass = currentColorClass === 'origen-cell-color1'
+          ? 'origen-cell-color2'
+          : 'origen-cell-color1';
+        lastOrigenValue = origenValue;
+      }
+      originCell.textContent = origenValue;
+      originCell.classList.add(currentColorClass);
       originCell.style.fontSize = "0.8em";
       originCell.style.color = "#666";
     } else {
@@ -2478,7 +2491,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       originCell.style.fontWeight = "bold";
     }
     row.appendChild(originCell);
-    
     tbody.appendChild(row);
   });
 
@@ -2501,124 +2513,11 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   // Configurar selección múltiple
   setupRowSelection(table);
 
-  // Estilos CSS para la tabla
+  // Estilos CSS para la celda Origen
   const style = document.createElement('style');
   style.textContent = `
-    /* Estilos para drag and drop */
-    .drag-handle-column {
-      width: 20px;
-      min-width: 20px !important;
-    }
-    
-    .drag-handle {
-      cursor: move;
-      user-select: none;
-      text-align: center;
-      opacity: 0.5;
-      transition: opacity 0.2s;
-      width: 20px;
-      color: #6c757d;
-      font-size: 1.2em;
-      padding: 0.3rem 0.5rem;
-    }
-    
-    .drag-handle:hover {
-      opacity: 1;
-      color: #495057;
-      background-color: #f1f3f5;
-    }
-    
-    .sortable-chosen {
-      background-color: #f8f9fa !important;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    
-    .sortable-ghost {
-      background-color: #e9ecef !important;
-      opacity: 0.8;
-    }
-    
-    .sortable-ghost .drag-handle {
-      visibility: hidden;
-    }
-    
-    /* Estilos para selección múltiple */
-    tr.selected {
-      background-color: #d4edff !important;
-    }
-    
-    tr.selected td {
-      border-color: #bfdfff !important;
-    }
-    
-    /* Estilos para filas alternadas de grupos unidos */
-    .original-row-color1 {
-      background-color: #f8f9fa;
-    }
-    .original-row-color2 {
-      background-color: #e9ecef;
-    }
-    
-    /* Efecto hover para filas de grupos unidos */
-    tr[data-original-igid]:hover {
-      background-color: #e2e6ea !important;
-    }
-    
-    /* Estilos existentes */
-    .empty-header {
-      color: #aaa;
-      font-style: italic;
-      background-color: #f8f9fa;
-    }
-    .empty-cell {
-      background-color: #f9f9f9;
-      padding: 0.3rem;
-    }
-    .filled-cell {
-      background-color: #e6ffe6 !important;
-    }
-    .highlight-cell {
-      background-color: #fffacd !important;
-    }
-    .highlight-column {
-      background-color: #fffacd !important;
-    }
-    
-    .attribute-table th,
-    .attribute-table td {
-      min-width: 100px !important;
-      max-width: 300px;
-      padding: 0.4rem;
-      vertical-align: top;
-    }
-    
-    .table-input {
-      width: 90px;
-      min-width: 90px;
-      max-width: 90px;
-      border: 1px solid #ddd;
-      padding: 0.2rem 0.3rem;
-      background-color: transparent;
-      box-sizing: border-box;
-      margin: 0 auto;
-      display: block;
-    }
-    
-    .attribute-table td {
-      white-space: normal;
-      word-break: break-word;
-    }
-    
-    .table-input:focus {
-      background-color: white;
-      outline: none;
-      border-color: #80bdff;
-      box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
-    }
-    
-    .merged-group {
-      border-left: 4px solid #007bff;
-    }
+    .origen-cell-color1 { background-color: #e8f5e9 !important; }
+    .origen-cell-color2 { background-color: #e3f2fd !important; }
   `;
   table.appendChild(style);
 
