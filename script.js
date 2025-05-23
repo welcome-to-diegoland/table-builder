@@ -558,8 +558,11 @@ function applyMultipleFilters() {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
     if (!groupItems || groupItems.length === 0) return;
 
@@ -623,9 +626,13 @@ function displayFilteredResults(filteredItems) {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
+
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL SI EXISTE
@@ -1399,9 +1406,13 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
       if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
+
       const groupInfo = skuToObject[groupId] || {};
       const isMergedGroup = mergedGroups.has(groupId);
 
@@ -1613,13 +1624,17 @@ orderedGroupIds.sort((a, b) => {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
     
-    if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
-    }
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+}
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
@@ -1680,8 +1695,10 @@ orderedGroupIds.sort((a, b) => {
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    } else
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
 
     // Detalles del grupo
@@ -1865,12 +1882,13 @@ function renderMergedGroups(skuToObject) {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
-    if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
-    }
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
 
@@ -2635,21 +2653,32 @@ function applyCategoryTables() {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
+
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    } else if (groupItems.every(item => item.customOrder !== undefined)) {
-      groupItems.sort((a, b) => a.customOrder - b.customOrder);
+    } else 
+
+    if (groupOrderMap.has(groupId)) {
+      const orderedSkus = groupOrderMap.get(groupId);
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
+
     if (groupItems.length > 0) {
       visibleItems.push(...groupItems);
     }
@@ -2663,8 +2692,11 @@ function applyCategoryTables() {
     if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else if (groupItems.every(item => item.customOrder !== undefined)) {
-  groupItems.sort((a, b) => a.customOrder - b.customOrder);
+} else 
+
+if (groupOrderMap.has(groupId)) {
+  const orderedSkus = groupOrderMap.get(groupId);
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
     const groupInfo = skuToObject[groupId] || {};
 
