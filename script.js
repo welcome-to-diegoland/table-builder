@@ -1722,7 +1722,6 @@ function processItemGroups(skuToObject) {
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
 
-
   // Agrupar items por IG ID en orden de aparición
   const groups = {};
   const orderedGroupIds = [];
@@ -1763,7 +1762,6 @@ function processItemGroups(skuToObject) {
 
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = groups[groupIdStr];
-
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
       return;
     }
@@ -1879,17 +1877,71 @@ function processItemGroups(skuToObject) {
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
+    // ----------- PLECA DE DETALLES DESPLEGABLE -----------
+    const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+    let detailsHtml = "";
+    if (groupObj) {
+      if (groupObj.ventajas) {
+        detailsHtml += `<div class="details-row"><strong>Ventajas:</strong> ${groupObj.ventajas}</div>`;
+      }
+      if (groupObj.aplicaciones) {
+        detailsHtml += `<div class="details-row"><strong>Aplicaciones:</strong> ${groupObj.aplicaciones}</div>`;
+      }
+      if (groupObj.especificaciones) {
+        detailsHtml += `<div class="details-row"><strong>Especificaciones:</strong> ${groupObj.especificaciones}</div>`;
+      }
+      if (groupObj.incluye) {
+        detailsHtml += `<div class="details-row"><strong>Incluye:</strong> ${groupObj.incluye}</div>`;
+      }
+    }
+
+    let plecaDiv = null;
+    if (detailsHtml) {
+      plecaDiv = document.createElement("div");
+      plecaDiv.className = "group-details-pleca";
+
+      // Botón de despliegue
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Ver detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+
+      // Contenedor de los detalles, oculto por default
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+      detailsDiv.innerHTML = detailsHtml;
+
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Ver detalles" : "▲ Ocultar detalles";
+      });
+
+      plecaDiv.appendChild(toggleDetailsBtn);
+      plecaDiv.appendChild(detailsDiv);
+
+      groupDiv.appendChild(plecaDiv);
+    }
+
+    // ¡LLAMA ASÍ!
     createItemsTable(groupDiv, groupItems, skuToObject);
+
     output.appendChild(groupDiv);
 
-    groupDiv.querySelector('.group-checkbox').addEventListener('change', function() {
-      if (this.checked) {
-        selectedGroups.add(this.dataset.groupId);
-      } else {
-        selectedGroups.delete(this.dataset.groupId);
-      }
-      selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
-    });
+    // Checkbox handler
+    const groupCheckbox = groupDiv.querySelector('.group-checkbox');
+    if (groupCheckbox) {
+      groupCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+          selectedGroups.add(this.dataset.groupId);
+        } else {
+          selectedGroups.delete(this.dataset.groupId);
+        }
+        selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
+      });
+    }
   });
 }
 
@@ -2303,6 +2355,8 @@ function addMergeStyles() {
 function createItemsTable(container, groupItems, skuToObject, highlightAttribute = null, customAttributes = null) {
   // Preservar el header del grupo si existe
   const existingHeader = container.querySelector('.group-header');
+  // Buscar la pleca de detalles, si existe
+  const plecaDiv = container.querySelector('.group-details-pleca');
   
   // Limpiar solo la tabla anterior
   const existingTable = container.querySelector('.table-responsive');
@@ -2537,8 +2591,10 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   tableContainer.className = "table-responsive";
   tableContainer.appendChild(table);
   
-  // Insertar tabla después del header si existe
-  if (existingHeader) {
+  // Insertar tabla después de la pleca si existe, si no después del header, si no al final
+  if (plecaDiv) {
+    plecaDiv.insertAdjacentElement('afterend', tableContainer);
+  } else if (existingHeader) {
     existingHeader.insertAdjacentElement('afterend', tableContainer);
   } else {
     container.appendChild(tableContainer);
