@@ -520,6 +520,12 @@ function updateOrderInputs() {
 
 // Función corregida: applyMultipleFilters
 function applyMultipleFilters() {
+  // Si NO hay filtros activos, regresamos a la UI principal
+  if (Object.keys(activeFilters).length === 0) {
+    render();
+    return;
+  }
+
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const filteredSet = new Set();
 
@@ -574,12 +580,11 @@ function applyMultipleFilters() {
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL DEL USUARIO
-// Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    if (!groupOrderMap.has(groupId)) {
+      groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupId);
+    groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 
     visibleItems.push(...groupItems);
   });
@@ -609,7 +614,7 @@ function displayFilteredResults(filteredItems) {
       const attr = this.getAttribute('data-attribute');
       delete activeFilters[attr];
       if (Object.keys(activeFilters).length === 0) {
-        render(); // ← Esto reconstruye la UI y muestra TODOS los controles
+        render();
       } else {
         applyMultipleFilters();
       }
@@ -769,16 +774,18 @@ function updateAttributeDropdowns(filteredItems) {
 function handleDropdownFilter(e) {
   const attribute = e.target.getAttribute('data-attribute');
   const value = e.target.value;
-  
+
   if (value) {
-    // Agregar filtro
     activeFilters[attribute] = value;
   } else {
-    // Remover filtro
     delete activeFilters[attribute];
   }
-  
-  applyMultipleFilters();
+  // Nueva lógica:
+  if (Object.keys(activeFilters).length === 0) {
+    render();
+  } else {
+    applyMultipleFilters();
+  }
 }
 
 // Asignar el evento a los dropdowns
