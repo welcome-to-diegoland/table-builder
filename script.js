@@ -593,7 +593,7 @@ function displayFilteredResults(filteredItems) {
   // Actualizar dropdowns
   updateAttributeDropdowns(filteredItems);
 
-  // Agrupar y mantener orden original
+  // Agrupar items por grupo y mantener orden de aparición
   const groupMap = {};
   const orderedGroupIds = [];
 
@@ -610,8 +610,10 @@ function displayFilteredResults(filteredItems) {
   orderedGroupIds.forEach(groupId => {
     const groupItems = groupMap[groupId];
 
+    // ORDENAR SIEMPRE los items visibles del grupo según groupOrderMap, si existe
     if (groupOrderMap.has(groupId)) {
       const orderedSkus = groupOrderMap.get(groupId);
+      // El sort solo usará los SKUs presentes en el array filtrado
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
 
@@ -1760,16 +1762,6 @@ orderedGroupIds.sort((a, b) => {
   orderedGroupIds.forEach(groupId => {
     const groupItems = groups[groupId];
     if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-} else 
-
-if (groupOrderMap.has(groupId)) {
-  const orderedSkus = groupOrderMap.get(groupId);
-  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-}
-    
-if (groupOrderMap.has(groupId)) {
   const orderedSkus = groupOrderMap.get(groupId);
   groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
 }
