@@ -1006,8 +1006,6 @@ input[type="file"] {
 
 .table-input {
   width: 80%;
-  min-width: 100px;
-  max-width: 200px;
   border: 1px solid #ddd;
   padding: 0.25rem 0.5rem;
   background-color: transparent;
@@ -1467,4 +1465,16 @@ tr.selected td {
 .attribute-stats-table td:first-child .attribute-dropdown {
   text-align: left !important;
   padding-left: 8px !important;
+}
+
+/* Fija el ancho de la columna drag a 50px en todas las tablas de items */
+.attribute-table th.drag-handle-column,
+.attribute-table td.drag-handle {
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  text-align: center;
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
