@@ -198,10 +198,11 @@ function initializeDragAndDrop() {
 function setupDragAndDropForAllTables() {
   document.querySelectorAll('.attribute-table tbody').forEach(tbody => {
     new Sortable(tbody, {
-      animation: 150,
+      animation: 0,
       handle: '.drag-handle',
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
+      forceFallback: true, //
       onStart: function(evt) {
         setTimeout(() => {
           const originalRow = evt.item;
@@ -226,6 +227,16 @@ function setupDragAndDropForAllTables() {
         }, 0);
       },
       onEnd: function(evt) {
+        // Refuerza el tamaño por si la animación hace un "snap"
+        const originalRow = evt.item;
+        const ghostRow = document.querySelector('.sortable-ghost');
+        if (ghostRow && originalRow) {
+          ghostRow.style.height = `${originalRow.offsetHeight}px`;
+          Array.from(ghostRow.children).forEach((cell, i) => {
+            if (originalRow.children[i])
+              cell.style.width = `${originalRow.children[i].offsetWidth}px`;
+          });
+        }
         handleRowReorder(evt);
       }
     });
