@@ -608,7 +608,11 @@ function displayFilteredResults(filteredItems) {
     btn.addEventListener('click', function () {
       const attr = this.getAttribute('data-attribute');
       delete activeFilters[attr];
-      applyMultipleFilters();
+      if (Object.keys(activeFilters).length === 0) {
+        render(); // ← Esto reconstruye la UI y muestra TODOS los controles
+      } else {
+        applyMultipleFilters();
+      }
     });
   });
 
