@@ -213,19 +213,16 @@ function setupDragAndDropForAllTables() {
                 cell.style.width = `${originalRow.children[i].offsetWidth}px`;
             });
           }
-          // DRAG IMAGE FIX
-          if (evt.originalEvent && originalRow) {
-            const dragImage = originalRow.cloneNode(true);
-            dragImage.style.position = "absolute";
-            dragImage.style.top = "-9999px";
-            dragImage.style.left = "-9999px";
-            dragImage.style.background = "#d4edff";
-            document.body.appendChild(dragImage);
-            evt.originalEvent.dataTransfer.setDragImage(dragImage, 0, 0);
-            setTimeout(() => {
-              document.body.removeChild(dragImage);
-            }, 0);
+          // ---- DRAG IMAGE INVISIBLE FIX ----
+          // Crea un canvas vacío como drag image invisible
+          if (evt.originalEvent && evt.originalEvent.dataTransfer) {
+            const img = document.createElement('img');
+            img.src =
+              'data:image/svg+xml;base64,' +
+              btoa('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>');
+            evt.originalEvent.dataTransfer.setDragImage(img, 0, 0);
           }
+          // ---- FIN DRAG IMAGE INVISIBLE FIX ----
         }, 0);
       },
       onEnd: function(evt) {
