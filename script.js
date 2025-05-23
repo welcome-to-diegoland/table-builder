@@ -202,12 +202,39 @@ function setupDragAndDropForAllTables() {
       handle: '.drag-handle',
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
+      onStart: function(evt) {
+        setTimeout(() => {
+          const originalRow = evt.item;
+          const ghostRow = document.querySelector('.sortable-ghost');
+          if (ghostRow && originalRow) {
+            ghostRow.style.height = `${originalRow.offsetHeight}px`;
+            Array.from(ghostRow.children).forEach((cell, i) => {
+              if (originalRow.children[i])
+                cell.style.width = `${originalRow.children[i].offsetWidth}px`;
+            });
+          }
+          // DRAG IMAGE FIX
+          if (evt.originalEvent && originalRow) {
+            const dragImage = originalRow.cloneNode(true);
+            dragImage.style.position = "absolute";
+            dragImage.style.top = "-9999px";
+            dragImage.style.left = "-9999px";
+            dragImage.style.background = "#d4edff";
+            document.body.appendChild(dragImage);
+            evt.originalEvent.dataTransfer.setDragImage(dragImage, 0, 0);
+            setTimeout(() => {
+              document.body.removeChild(dragImage);
+            }, 0);
+          }
+        }, 0);
+      },
       onEnd: function(evt) {
         handleRowReorder(evt);
       }
     });
   });
 }
+
 
 // Función para manejar el reordenamiento de filas
 function handleRowReorder(evt) {
@@ -539,14 +566,12 @@ function applyMultipleFilters() {
     if (!groupItems || groupItems.length === 0) return;
 
     // ORDEN MANUAL DEL USUARIO
-console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 // Inicializa el orden si no existe
 if (!groupOrderMap.has(groupId)) {
   groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
 }
 const orderedSkus = groupOrderMap.get(groupId);
 groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 
     visibleItems.push(...groupItems);
   });
@@ -556,7 +581,6 @@ console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderM
 
 function displayFilteredResults(filteredItems) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
 
   let filtersHtml = Object.keys(activeFilters).map(attr =>
     `<span class="active-filter-tag" data-attribute="${attr}">
@@ -598,11 +622,9 @@ function displayFilteredResults(filteredItems) {
     const groupItems = groupMap[groupIdStr];
 
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      console.log('[render][skip]', groupIdStr, groupItems);
       return;
     }
 
-    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -612,7 +634,6 @@ function displayFilteredResults(filteredItems) {
     } else {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
     const groupInfo = objectData.find(o => o.SKU == groupIdStr) || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
@@ -1398,7 +1419,6 @@ function unmergeGroup(groupId) {
   fileInfoDiv.innerHTML += `<p class="text-success">✅ Grupo unido ${groupId} ha sido desagrupado</p>`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
   
-  console.log(`Grupo ${groupId} desagrupado. Grupos restaurados: ${mergedGroupData.originalGroups.join(', ')}`);
 }
 
 function displayFilteredGroups(filteredGroupIds, attribute, type) {
@@ -1431,10 +1451,8 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
       const groupItems = groups[groupIdStr];
 
       if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-        console.log('[render][skip]', groupIdStr, groupItems);
         return;
       }
-      console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
       if (!groupOrderMap.has(groupIdStr)) {
         groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
       }
@@ -1444,7 +1462,6 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
       } else {
         groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
       }
-      console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
       const groupInfo = skuToObject[groupIdStr] || {};
       const isMergedGroup = mergedGroups.has(groupIdStr);
@@ -1529,7 +1546,6 @@ function handleStatClick(event) {
 
     // === BLOQUE DE ORDEN MANUAL (igual que en processItemGroups) ===
     // Aplica el orden manual si existe
-    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -1539,7 +1555,6 @@ function handleStatClick(event) {
     } else {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
     // === FIN BLOQUE DE ORDEN ===
 
     const groupInfo = skuToObject[groupIdStr] || {};
@@ -1671,7 +1686,6 @@ function processItemGroups(skuToObject) {
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
 
-  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
 
   // Agrupar items por IG ID en orden de aparición
   const groups = {};
@@ -1715,11 +1729,9 @@ function processItemGroups(skuToObject) {
     const groupItems = groups[groupIdStr];
 
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      console.log('[render][skip]', groupIdStr, groupItems);
       return;
     }
 
-    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -1729,7 +1741,6 @@ function processItemGroups(skuToObject) {
     } else {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
@@ -1924,9 +1935,6 @@ function mergeSelectedGroups() {
   fileInfoDiv.innerHTML += `<p class="text-success">${message}</p>`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 
-  // 9. Log para depuración
-  console.log('Grupo unido creado:', mergedGroups.get(newGroupId));
-  console.log('IG IDs después de unir:', [...new Set(filteredItems.map(i => i["IG ID"]))]);
 }
 
 
@@ -1946,14 +1954,12 @@ function renderMergedGroups(skuToObject) {
   Object.keys(groups).forEach(groupId => {
     const groupItems = groups[groupId];
 
-    console.log('[render][before sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
  // Inicializa el orden si no existe
 if (!groupOrderMap.has(groupId)) {
   groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
 }
 const orderedSkus = groupOrderMap.get(groupId);
 groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    console.log('[render][after sort]', groupId, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupId));
 
     const groupInfo = skuToObject[groupId] || {};
     const isMergedGroup = mergedGroups.has(groupId);
@@ -2698,7 +2704,6 @@ function applyCategoryTables() {
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
-  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const groups = {};
   filteredItems.forEach(item => {
@@ -2712,10 +2717,8 @@ function applyCategoryTables() {
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      console.log('[render][skip]', groupIdStr, groupItems);
       continue;
     }
-    console.log('[render][before sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -2725,7 +2728,6 @@ function applyCategoryTables() {
     } else {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    console.log('[render][after sort]', groupIdStr, groupItems.map(i => i.SKU), 'orderMap:', groupOrderMap.get(groupIdStr));
 
     const groupInfo = skuToObject[groupIdStr] || {};
     const groupDiv = document.createElement("div");
@@ -2809,7 +2811,6 @@ function initVerticalDrag(e) {
 }
 
 function handleVerticalDrag(e) {
-  console.log('[groupOrderMap]', JSON.stringify(Array.from(groupOrderMap.entries())));
   if (!isVerticalDragging) return;
   const containerWidth = container.getBoundingClientRect().width;
   const dividerWidth = verticalDivider.offsetWidth;
