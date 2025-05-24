@@ -76,9 +76,6 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('horizontalDivider').addEventListener('mousedown', (e) => {
     initHorizontalDrag(e, 'box1', 'box3');
   });
-  document.getElementById('horizontalDivider2').addEventListener('mousedown', (e) => {
-    initHorizontalDrag(e, 'box2', 'box4');
-  });
 
   xlsxFileInput.addEventListener("change", handleXLSX);
   csvFileInput.addEventListener("change", handleCSV);
@@ -89,11 +86,6 @@ document.addEventListener('DOMContentLoaded', function() {
   clearOrderBtn.addEventListener("click", clearAttributeOrder);
   clearCatOrderBtn.addEventListener("click", clearCatOrder);
   addMergeStyles();
-  
-  verticalDivider.addEventListener('mousedown', initVerticalDrag);
-  document.getElementById('horizontalDivider').addEventListener('mousedown', (e) => {
-    initHorizontalDrag(e, 'box1', 'box3');
-  });
   
   toggleEmptyBtn.addEventListener("click", toggleEmptyAttributes);
   clearFilterInputsBtn.addEventListener("click", clearFilterInputs);
@@ -664,28 +656,34 @@ function displayFilteredResults(filteredItems) {
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
+
+    // Imagen del producto 
     if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
+      const img = document.createElement("img");
+      img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
+      img.className = "product-img";
+      img.onerror = () => img.style.display = 'none';
+      leftContainer.appendChild(img);
     }
+
+    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
+    const title = document.createElement("h2");
+    title.className = "group-title";
     const link = document.createElement("a");
     link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
-    link.rel = "noopener noreferrer";
     link.textContent = groupInfo.name || groupIdStr;
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
+    title.appendChild(link);
+    infoDiv.appendChild(title);
+
     if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
+      const logo = document.createElement("img");
+      logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
+      logo.className = "brand-logo";
+      logo.onerror = () => logo.style.display = 'none';
+      infoDiv.appendChild(logo);
     }
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
@@ -1605,29 +1603,36 @@ function handleStatClick(event) {
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
+    
+    // Imagen del producto 
     if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
+      const img = document.createElement("img");
+      img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
+      img.className = "product-img";
+      img.onerror = () => img.style.display = 'none';
+      leftContainer.appendChild(img);
     }
+
+    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
+    const title = document.createElement("h2");
+    title.className = "group-title";
     const link = document.createElement("a");
     link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
-    link.rel = "noopener noreferrer";
     link.textContent = groupInfo.name || groupIdStr;
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
+    title.appendChild(link);
+    infoDiv.appendChild(title);
+
     if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
+      const logo = document.createElement("img");
+      logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
+      logo.className = "brand-logo";
+      logo.onerror = () => logo.style.display = 'none';
+      infoDiv.appendChild(logo);
     }
+    
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
@@ -1800,7 +1805,7 @@ function processItemGroups(skuToObject) {
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
 
-    // Imagen del producto
+    // Imagen del producto 
     if (groupInfo.image) {
       const img = document.createElement("img");
       img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
@@ -1882,16 +1887,16 @@ function processItemGroups(skuToObject) {
     let detailsHtml = "";
     if (groupObj) {
       if (groupObj.ventajas) {
-        detailsHtml += `<div class="details-row"><strong>Ventajas:</strong> ${groupObj.ventajas}</div>`;
+        detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
       }
       if (groupObj.aplicaciones) {
-        detailsHtml += `<div class="details-row"><strong>Aplicaciones:</strong> ${groupObj.aplicaciones}</div>`;
+        detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
       }
       if (groupObj.especificaciones) {
-        detailsHtml += `<div class="details-row"><strong>Especificaciones:</strong> ${groupObj.especificaciones}</div>`;
+        detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
       }
       if (groupObj.incluye) {
-        detailsHtml += `<div class="details-row"><strong>Incluye:</strong> ${groupObj.incluye}</div>`;
+        detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
       }
     }
 
@@ -1903,7 +1908,7 @@ function processItemGroups(skuToObject) {
       // Botón de despliegue
       const toggleDetailsBtn = document.createElement("button");
       toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Ver detalles";
+      toggleDetailsBtn.textContent = "▼ Detalles";
       toggleDetailsBtn.setAttribute("aria-expanded", "false");
 
       // Contenedor de los detalles, oculto por default
@@ -1916,7 +1921,7 @@ function processItemGroups(skuToObject) {
         const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
         toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
         detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Ver detalles" : "▲ Ocultar detalles";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
       });
 
       plecaDiv.appendChild(toggleDetailsBtn);
@@ -2065,35 +2070,33 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
 
-    // Imagen del producto
+    // Imagen del producto 
     if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
+      const img = document.createElement("img");
+      img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
+      img.className = "product-img";
+      img.onerror = () => img.style.display = 'none';
+      leftContainer.appendChild(img);
     }
 
     // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
-    
+    const title = document.createElement("h2");
+    title.className = "group-title";
     const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = groupInfo.name || groupId;
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
+    link.textContent = groupInfo.name || groupIdStr;
+    title.appendChild(link);
+    infoDiv.appendChild(title);
 
-    // Logo de marca
     if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
+      const logo = document.createElement("img");
+      logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
+      logo.className = "brand-logo";
+      logo.onerror = () => logo.style.display = 'none';
+      infoDiv.appendChild(logo);
     }
 
     // SKU y procedencia
@@ -2416,7 +2419,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   // Columnas forzadas con ancho
   forcedColumns.forEach(forced => {
     let width = "";
-    if (forced === "item_code") width = "width:92px;min-width:92px;max-width:92px;";
+    if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
     if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
     theadHtml += `<th style="${width}">${forced}</th>`;
   });
@@ -2732,29 +2735,35 @@ function applyCategoryTables() {
       newBadge.textContent = "New";
       headerDiv.appendChild(newBadge);
     }
+    // Imagen del producto 
     if (groupInfo.image) {
-      const productImg = document.createElement("img");
-      productImg.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      productImg.className = "product-img";
-      leftContainer.appendChild(productImg);
+      const img = document.createElement("img");
+      img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
+      img.className = "product-img";
+      img.onerror = () => img.style.display = 'none';
+      leftContainer.appendChild(img);
     }
+
+    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-    const h2 = document.createElement("h2");
-    h2.className = "group-title";
+    const title = document.createElement("h2");
+    title.className = "group-title";
     const link = document.createElement("a");
     link.href = `https://www.travers.com.mx/${groupIdStr}`;
     link.target = "_blank";
-    link.rel = "noopener noreferrer";
     link.textContent = groupInfo.name || groupIdStr;
-    h2.appendChild(link);
-    infoDiv.appendChild(h2);
+    title.appendChild(link);
+    infoDiv.appendChild(title);
+
     if (groupInfo.brand_logo) {
-      const logoImg = document.createElement("img");
-      logoImg.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logoImg.className = "logo-img";
-      infoDiv.appendChild(logoImg);
+      const logo = document.createElement("img");
+      logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
+      logo.className = "brand-logo";
+      logo.onerror = () => logo.style.display = 'none';
+      infoDiv.appendChild(logo);
     }
+
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
