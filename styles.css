@@ -117,17 +117,17 @@ html, body {
 
 .main-container {
   position: fixed;
-  top: var(--header-height);
+  top: var(--header-height, 70px);
   left: 0;
   width: 100%;
-  height: calc(100% - var(--header-height));
-  display: flex;
   background: #eee;
-  padding: 10px;
-  gap: var(--espacio);
+  padding: 10px;   /* <-- este padding agrega espacio alrededor */
+  gap: var(--espacio, 3px);
+  height: calc(100% - var(--header-height, 70px));
+  display: flex;
 }
 
-.left-section, .right-section {
+.left-section {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -140,10 +140,7 @@ html, body {
   min-width: 250px;
 }
 
-.right-section {
-  flex: 1;
-  min-width: 300px;
-}
+
 
 .box {
   flex: 1 1 auto;
@@ -310,8 +307,36 @@ html, body {
   height: 90%;
 }
 
+#box4, #box4 .box-content, #output {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: auto !important;
+  display: flex;
+  flex-direction: column;
+  /* Elimina cualquier margen o padding inferior heredado */
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
 #box4 {
-  height: 100%;
+  border-bottom-right-radius: 0 !important;
+}
+
+.right-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0 !important;
+}
+.right-section .box {
+  margin-bottom: 0 !important;
+}
+
+.right-section .box {
+  margin-bottom: 0 !important;
 }
 
 .order-controls {
@@ -502,12 +527,13 @@ html, body {
     max-width: 100%;
   }
   
-  .main-container {
-    flex-direction: column;
-  }
   
-  .left-section, .right-section {
-    width: 100% !important;
+  .left-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    gap: var(--espacio);
   }
   
   .vertical-divider {
@@ -1337,18 +1363,6 @@ tr.selected td {
   border-color: #bfdfff !important;
 }
 
-#selection-counter {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: #007bff;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  z-index: 1000;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
 
 /* Context Menu (opcional) */
 .context-menu {
@@ -1369,19 +1383,8 @@ tr.selected td {
   background-color: #f8f9fa;
 }
 
-/* Selection Counter */
-#selection-counter {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: #007bff;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  z-index: 1000;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
+
+
 
 /* Temporary Message */
 #temp-message {
@@ -1479,4 +1482,36 @@ tr.selected td {
 }
 .details-row {
   margin-bottom: 8px;
+}
+
+#box1, #box1 * {
+  font-size: 14px !important;
+  
+}
+
+#box1 p,
+#box1 li,
+#box1 ol,
+#box1 ul,
+#box1 h3,
+#box1 h4,
+#box1 h5,
+#box1 h6 {
+  margin-bottom: 4px !important;   /* Reduce espacio vertical */
+  margin-top: 0 !important;
+  line-height: 1.2 !important;     /* Más compacto */
+}
+
+#box1 ol,
+#box1 ul {
+  margin-left: 16px !important;    /* Indentación estándar */
+}
+
+#box1 h3,
+#box1 h4,
+#box1 h5,
+#box1 h6 {
+  margin-bottom: 4px !important;
+  margin-top: 4px !important;
+  font-weight: bold;
 }
