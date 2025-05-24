@@ -1800,136 +1800,144 @@ function processItemGroups(skuToObject) {
     `;
     groupDiv.appendChild(checkboxDiv);
 
-    // Header del grupo
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
+// Header del grupo - NUEVA ESTRUCTURA
+const headerDiv = document.createElement("div");
+headerDiv.className = "group-header";
 
-    // Imagen del producto 
-    if (groupInfo.image) {
-      const img = document.createElement("img");
-      img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
-      img.className = "product-img";
-      img.onerror = () => img.style.display = 'none';
-      leftContainer.appendChild(img);
-    }
+// Contenedor principal (imagen + info + badges)
+const headerContentDiv = document.createElement("div");
+headerContentDiv.className = "group-header-content";
 
-    // Información del grupo
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
+// Contenedor izquierdo (imagen + info)
+const leftContainer = document.createElement("div");
+leftContainer.className = "group-header-left";
 
-    if (groupInfo.brand_logo) {
-      const logo = document.createElement("img");
-      logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
-      logo.className = "brand-logo";
-      logo.onerror = () => logo.style.display = 'none';
-      infoDiv.appendChild(logo);
-    }
+// Imagen del producto 
+if (groupInfo.image) {
+    const img = document.createElement("img");
+    img.src = `https://www.travers.com.mx/media/catalog/product/${groupInfo.image}`;
+    img.className = "product-img";
+    img.onerror = () => img.style.display = 'none';
+    leftContainer.appendChild(img);
+}
 
-    const details = document.createElement("div");
-    details.className = "group-details";
-    if (groupInfo.sku) {
-      const sku = document.createElement("p");
-      sku.textContent = `SKU: ${groupInfo.sku}`;
-      details.appendChild(sku);
-    }
-    if (isMergedGroup) {
-      const origin = document.createElement("p");
-      origin.textContent = `Contiene items de: ${mergedGroups.get(groupIdStr).originalGroups.join(', ')}`;
-      origin.className = "group-origin";
-      details.appendChild(origin);
-    }
-    infoDiv.appendChild(details);
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
+// Información del grupo
+const infoDiv = document.createElement("div");
+infoDiv.className = "group-info";
+const title = document.createElement("h2");
+title.className = "group-title";
+const link = document.createElement("a");
+link.href = `https://www.travers.com.mx/${groupIdStr}`;
+link.target = "_blank";
+link.textContent = groupInfo.name || groupIdStr;
+title.appendChild(link);
+infoDiv.appendChild(title);
 
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
+if (groupInfo.brand_logo) {
+    const logo = document.createElement("img");
+    logo.src = `https://www.travers.com.mx/media/catalog/category/${groupInfo.brand_logo}`;
+    logo.className = "brand-logo";
+    logo.onerror = () => logo.style.display = 'none';
+    infoDiv.appendChild(logo);
+}
+
+if (groupInfo.sku) {
+    const skuP = document.createElement("p");
+    skuP.textContent = "SKU: " + groupInfo.sku;
+    infoDiv.appendChild(skuP);
+}
+leftContainer.appendChild(infoDiv);
+headerContentDiv.appendChild(leftContainer);
+
+// Contenedor derecho (badges)
+const rightContainer = document.createElement("div");
+rightContainer.className = "group-header-right";
+const hasNewItem = groupItems.some(item => {
+    const details = skuToObject[item.SKU];
+    return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+});
+if (hasNewItem) {
+    const newBadge = document.createElement("span");
+    newBadge.className = "new-badge";
+    newBadge.textContent = "New";
+    rightContainer.appendChild(newBadge);
+}
+if (isMergedGroup) {
+    const mergedBadge = document.createElement("span");
+    mergedBadge.className = "merged-badge";
+    mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
+    rightContainer.appendChild(mergedBadge);
+}
+      // Botón para desagrupar
+      if (isMergedGroup) {
       const unmergeBtn = document.createElement("button");
       unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupIdStr;
+      unmergeBtn.dataset.groupIdStr = groupIdStr;
       unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
+        unmergeGroup(this.dataset.groupIdStr);
       });
       rightContainer.appendChild(unmergeBtn);
     }
-    headerDiv.appendChild(rightContainer);
-    groupDiv.appendChild(headerDiv);
 
-    // ----------- PLECA DE DETALLES DESPLEGABLE -----------
-    const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
-    let detailsHtml = "";
-    if (groupObj) {
-      if (groupObj.ventajas) {
+headerContentDiv.appendChild(rightContainer);
+headerDiv.appendChild(headerContentDiv);
+
+// Contenedor de detalles (pleca)
+const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+let detailsHtml = "";
+if (groupObj) {
+    if (groupObj.ventajas) {
         detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
-      }
-      if (groupObj.aplicaciones) {
-        detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
-      }
-      if (groupObj.especificaciones) {
-        detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
-      }
-      if (groupObj.incluye) {
-        detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
-      }
     }
+    if (groupObj.aplicaciones) {
+        detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
+    }
+    if (groupObj.especificaciones) {
+        detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
+    }
+    if (groupObj.incluye) {
+        detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
+    }
+}
 
-    let plecaDiv = null;
-    if (detailsHtml) {
-      plecaDiv = document.createElement("div");
-      plecaDiv.className = "group-details-pleca";
+if (detailsHtml) {
+    const detailsContainer = document.createElement("div");
+    detailsContainer.className = "group-details-container";
 
-      // Botón de despliegue
-      const toggleDetailsBtn = document.createElement("button");
-      toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Detalles";
-      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+    // Botón de despliegue
+    const toggleDetailsBtn = document.createElement("button");
+    toggleDetailsBtn.className = "toggle-details-btn";
+    toggleDetailsBtn.textContent = "▼ Detalles";
+    toggleDetailsBtn.setAttribute("aria-expanded", "false");
 
-      // Contenedor de los detalles, oculto por default
-      const detailsDiv = document.createElement("div");
-      detailsDiv.className = "group-extra-details";
-      detailsDiv.style.display = "none";
-      detailsDiv.innerHTML = detailsHtml;
+    // Contenedor de los detalles, oculto por default
+    const detailsDiv = document.createElement("div");
+    detailsDiv.className = "group-extra-details";
+    detailsDiv.style.display = "none";
+    detailsDiv.innerHTML = detailsHtml;
 
-      toggleDetailsBtn.addEventListener("click", function () {
+    toggleDetailsBtn.addEventListener("click", function () {
         const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
         toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
         detailsDiv.style.display = expanded ? "none" : "block";
         toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
-      });
+        
+        // Ajustar el tamaño del grupo cuando se expande/contrae
+        const groupDiv = this.closest('.group-container');
+        if (groupDiv) {
+            groupDiv.style.transition = 'height 0.3s ease';
+            groupDiv.style.overflow = 'hidden';
+        }
+    });
 
-      plecaDiv.appendChild(toggleDetailsBtn);
-      plecaDiv.appendChild(detailsDiv);
+    detailsContainer.appendChild(toggleDetailsBtn);
+    detailsContainer.appendChild(detailsDiv);
+    headerDiv.appendChild(detailsContainer);
+}
 
-      groupDiv.appendChild(plecaDiv);
-    }
+groupDiv.appendChild(headerDiv);
 
     // ¡LLAMA ASÍ!
     createItemsTable(groupDiv, groupItems, skuToObject);
