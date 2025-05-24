@@ -405,9 +405,8 @@ function showTemporaryMessage(message) {
   msgDiv.id = 'temp-message';
   msgDiv.textContent = message;
   msgDiv.style.position = 'fixed';
-  msgDiv.style.bottom = '60px';
+  msgDiv.style.bottom = '20px';
   msgDiv.style.right = '20px';
-  msgDiv.style.backgroundColor = '#007bff';
   msgDiv.style.color = 'white';
   msgDiv.style.padding = '8px 15px';
   msgDiv.style.borderRadius = '4px';
@@ -1937,38 +1936,96 @@ if (groupObj) {
 }
 
 if (detailsHtml) {
-    const detailsContainer = document.createElement("div");
-    detailsContainer.className = "group-details-container";
+  const detailsContainer = document.createElement("div");
+  detailsContainer.className = "group-details-container";
 
-    // Botón de despliegue
-    const toggleDetailsBtn = document.createElement("button");
-    toggleDetailsBtn.className = "toggle-details-btn";
-    toggleDetailsBtn.textContent = "▼ Detalles";
-    toggleDetailsBtn.setAttribute("aria-expanded", "false");
+  // Botón de despliegue
+  const toggleDetailsBtn = document.createElement("button");
+  toggleDetailsBtn.className = "toggle-details-btn";
+  toggleDetailsBtn.textContent = "▼ Detalles";
+  toggleDetailsBtn.setAttribute("aria-expanded", "false");
 
-    // Contenedor de los detalles, oculto por default
-    const detailsDiv = document.createElement("div");
-    detailsDiv.className = "group-extra-details";
-    detailsDiv.style.display = "none";
-    detailsDiv.innerHTML = detailsHtml;
+  // Contenedor de los detalles
+  const detailsDiv = document.createElement("div");
+  detailsDiv.className = "group-extra-details";
+  detailsDiv.style.display = "none";
 
-    toggleDetailsBtn.addEventListener("click", function () {
-        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
-        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
-        detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+  if (isMergedGroup) {
+    const mergedGroupData = mergedGroups.get(groupIdStr);
+    const mergedTextarea = document.createElement("textarea");
+    mergedTextarea.className = "form-control merged-group-textarea";
+    mergedTextarea.rows = 10;
+    
+    let mergedContent = "";
+    
+    
+    mergedGroupData.originalGroups.forEach(originalGroupId => {
+      const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+      
+      
+      // BUSCAR POR IG ID ORIGINAL (usando __originalIGID u Original IG ID como fallback)
+      const matchingItems = filteredItems.filter(item => {
+        if (!item || typeof item !== 'object') return false;
         
-        // Ajustar el tamaño del grupo cuando se expande/contrae
-        const groupDiv = this.closest('.group-container');
-        if (groupDiv) {
-            groupDiv.style.transition = 'height 0.3s ease';
-            groupDiv.style.overflow = 'hidden';
+        // Verificar si el item tiene el IG ID original
+        const originalIdMatch = 
+          String(item["__originalIGID"]) === String(originalGroupId) ||
+          String(item["Original IG ID"]) === String(originalGroupId);
+        
+        
+        return originalIdMatch;
+      });
+            
+      // Obtener el primer código válido
+      const firstValidItem = matchingItems.find(item => item?.Name);
+      const itemCode = firstValidItem?.Name || originalGroupId;
+            
+      // Formatear la línea
+      mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}, ${itemCode}\n`;
+      
+      // Resto del código para los detalles...
+      const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+      fields.forEach(field => {
+        if (originalGroupInfo[field]) {
+          let fieldValue = originalGroupInfo[field]
+            .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+            .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+          mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
         }
+      });
+      
+      mergedContent += "--------------------\n\n";
     });
+    
+    mergedTextarea.value = mergedContent.trim();
+    
+    // Botón para guardar cambios
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+    saveBtn.textContent = "Guardar Cambios";
+    saveBtn.addEventListener('click', function() {
+      // Lógica para guardar cambios
+      console.log("Guardando cambios para grupos unidos:", mergedTextarea.value);
+    });
+    
+    detailsDiv.appendChild(mergedTextarea);
+    detailsDiv.appendChild(saveBtn);
+    
+  } else {
+    // Para grupos normales, mantener el formato ORIGINAL sin cambios
+    detailsDiv.innerHTML = detailsHtml;
+  }
 
-    detailsContainer.appendChild(toggleDetailsBtn);
-    detailsContainer.appendChild(detailsDiv);
-    headerDiv.appendChild(detailsContainer);
+  toggleDetailsBtn.addEventListener("click", function () {
+    const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+    toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+    detailsDiv.style.display = expanded ? "none" : "block";
+    toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+  });
+
+  detailsContainer.appendChild(toggleDetailsBtn);
+  detailsContainer.appendChild(detailsDiv);
+  headerDiv.appendChild(detailsContainer);
 }
 
 groupDiv.appendChild(headerDiv);
@@ -2435,7 +2492,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   });
 
   // Crear THEAD
-  let theadHtml = "<thead><tr><th style='width: 10px;' class='drag-handle-column'></th>"; // Columna para drag handle
+  let theadHtml = "<thead><tr>";
+  
+  // Columna de drag handle con botón de reset
+  theadHtml += `
+    <th style='width: 10px;' class='drag-handle-column'>
+      <span class='drag-reset-btn' title='Reordenar a estado original'><br>×</span>
+    </th>
+  `;
 
   filteredAttributes.forEach(attr => {
     let isAllEmpty = true;
@@ -2616,11 +2680,37 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   // Configurar selección múltiple
   setupRowSelection(table);
 
-  // Estilos CSS para la celda Origen
+  // Agregar evento al botón de reset
+  table.querySelector('.drag-reset-btn').addEventListener('click', function() {
+    resetGroupOrder(groupId);
+  });
+
+  // Estilos CSS para la celda Origen y el botón de reset
   const style = document.createElement('style');
   style.textContent = `
     .origen-cell-color1 { background-color: #e8f5e9 !important; }
     .origen-cell-color2 { background-color: #e3f2fd !important; }
+    
+    .drag-handle-column {
+      position: relative;
+    }
+    
+    .drag-reset-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 3px;
+      color: #999;
+      z-index: 10;
+    }
+    
+    .drag-reset-btn:hover {
+      color: #333;
+      background-color: #eee;
+      border-radius: 3px;
+    }
   `;
   table.appendChild(style);
 
@@ -2636,6 +2726,33 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   } else {
     container.appendChild(tableContainer);
   }
+}
+
+function resetGroupOrder(groupId) {
+  // Obtener los SKUs en el orden original (como aparecen en filteredItems)
+  const originalSkus = filteredItems
+    .filter(item => item["IG ID"] === groupId)
+    .map(item => item.SKU);
+  
+  // Actualizar el orden en groupOrderMap
+  groupOrderMap.set(groupId, originalSkus);
+  
+  // Volver a renderizar el grupo
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  const groupItems = filteredItems.filter(item => item["IG ID"] === groupId);
+  
+  // Encontrar el contenedor del grupo
+  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+  if (groupContainer) {
+    // Eliminar la tabla existente
+    const existingTable = groupContainer.querySelector('.table-responsive');
+    if (existingTable) existingTable.remove();
+    
+    // Crear nueva tabla con el orden original
+    createItemsTable(groupContainer, groupItems, skuToObject);
+  }
+  
+  showTemporaryMessage(`Orden del grupo ${groupId} restaurado`);
 }
 
 function setupRowSelection(table) {
