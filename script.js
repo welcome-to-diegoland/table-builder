@@ -115,6 +115,7 @@ function clearAllChecks() {
   });
 }
 
+
 function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
 }
