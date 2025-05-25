@@ -1117,13 +1117,13 @@ function clearAllFilters() {
       localStorage.removeItem(key);
     }
   });
-  
-  // 5. Reprocesar items si hay datos cargados
-  if (objectData.length && filteredItems.length) {
-    const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-    processItemGroups(skuToObject);
+
+  // 5. RE-RENDER usando los mismos items en uso
+  if (filteredItems.length) {
+    // Recalcula stats, tablas y dropdowns, usando solo los items que están en filteredItems ahora
+    render();
   }
-  
+
   fileInfoDiv.innerHTML += `<p>Todos los filtros han sido limpiados completamente</p>`;
 }
 
