@@ -646,21 +646,18 @@ function applyMultipleFilters() {
 
 function displayFilteredResults(filteredItems) {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-
   let filtersHtml = Object.keys(activeFilters).map(attr =>
     `<span class="active-filter-tag" data-attribute="${attr}">
       ${attr}: ${activeFilters[attr]}
       <button class="remove-filter-btn" data-attribute="${attr}">×</button>
     </span>`
   ).join('');
-
   output.innerHTML = `
     <div class="filter-results">
       <h3>Filtros activos: ${filtersHtml || 'Ninguno'}</h3>
       <p>Mostrando ${filteredItems.length} items</p>
     </div>
   `;
-
   document.querySelectorAll('.remove-filter-btn').forEach(btn => {
     btn.addEventListener('click', function () {
       const attr = this.getAttribute('data-attribute');
@@ -677,7 +674,6 @@ function displayFilteredResults(filteredItems) {
 
   const groupMap = {};
   const orderedGroupIds = [];
-
   filteredItems.forEach(item => {
     const groupIdStr = String(item["IG ID"]);
     if (!groupMap[groupIdStr]) {
@@ -689,24 +685,18 @@ function displayFilteredResults(filteredItems) {
 
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = groupMap[groupIdStr];
-
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
       return;
     }
-
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
     const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (!Array.isArray(orderedSkus)) {
-      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
-    } else {
+    if (Array.isArray(orderedSkus)) {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-
     const groupInfo = objectData.find(o => o.SKU == groupIdStr) || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container filtered-group ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
@@ -716,13 +706,8 @@ function displayFilteredResults(filteredItems) {
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-
-    // Imagen del producto 
     const productImg = createProductImageElement(groupInfo.image);
     leftContainer.appendChild(productImg);
-    
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
     const title = document.createElement("h2");
@@ -733,10 +718,8 @@ function displayFilteredResults(filteredItems) {
     link.textContent = groupInfo.name || groupIdStr;
     title.appendChild(link);
     infoDiv.appendChild(title);
-
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
-    
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
@@ -744,7 +727,6 @@ function displayFilteredResults(filteredItems) {
     }
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
-
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
     const hasNewItem = groupItems.some(item => {
@@ -764,9 +746,63 @@ function displayFilteredResults(filteredItems) {
       rightContainer.appendChild(mergedBadge);
     }
     headerDiv.appendChild(rightContainer);
+
+    // Detalles de grupo unido
+    if (isMergedGroup) {
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "group-details-container";
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+      const mergedTextarea = document.createElement("textarea");
+      mergedTextarea.className = "form-control merged-group-textarea";
+      mergedTextarea.rows = 10;
+      let mergedContent = getMergedGroupDetails(groupIdStr);
+      if (!mergedContent) {
+        const mergedGroupData = mergedGroups.get(groupIdStr);
+        mergedContent = "";
+        mergedGroupData.originalGroups.forEach(originalGroupId => {
+          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+          fields.forEach(field => {
+            if (originalGroupInfo[field]) {
+              let fieldValue = originalGroupInfo[field]
+                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+            }
+          });
+          mergedContent += "--------------------\n\n";
+        });
+      }
+      mergedTextarea.value = mergedContent.trim();
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+      saveBtn.textContent = "Guardar Cambios";
+      saveBtn.addEventListener('click', function() {
+        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
+      });
+      detailsDiv.appendChild(mergedTextarea);
+      detailsDiv.appendChild(saveBtn);
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+      });
+      detailsContainer.appendChild(toggleDetailsBtn);
+      detailsContainer.appendChild(detailsDiv);
+      headerDiv.appendChild(detailsContainer);
+    }
     groupDiv.appendChild(headerDiv);
 
     createItemsTable(groupDiv, groupItems, skuToObject);
+
     output.appendChild(groupDiv);
   });
 }
@@ -842,6 +878,8 @@ function handleDropdownFilter(e) {
 document.querySelectorAll('.attribute-dropdown').forEach(dropdown => {
   dropdown.addEventListener('change', handleDropdownFilter);
 });
+
+
 function processAttributeStats(skuToObject) {
   const usedInTables = new Set();
   const itemCounts = {};
@@ -1566,15 +1604,11 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
 function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
-  
-  // Forzar el filtrado por item_code si es necesario
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-  
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
   }
-
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
 
@@ -1582,22 +1616,17 @@ function handleStatClick(event) {
   const filteredGroupIds = new Set();
   const filteredItemsMap = {};
 
-  // Filtrar los items
   filteredItems.forEach(item => {
     const details = skuToObject[item.SKU] || {};
     const hasValue = details[filterAttribute]?.toString().trim();
-    
     if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
       const groupIdStr = String(item["IG ID"]);
       filteredGroupIds.add(groupIdStr);
-      if (!filteredItemsMap[groupIdStr]) {
-        filteredItemsMap[groupIdStr] = [];
-      }
+      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
       filteredItemsMap[groupIdStr].push(item);
     }
   });
 
-  // Mostrar resultados
   output.innerHTML = `
     <div class="filter-results">
       <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
@@ -1609,14 +1638,10 @@ function handleStatClick(event) {
       <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
     </div>
   `;
-
-  // Agregar evento al botón de limpiar filtro
   output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
 
-  // Mantener el orden original de los grupos
   const orderedGroupIds = [];
   const uniqueGroupIds = new Set();
-  
   filteredItems.forEach(item => {
     const groupIdStr = String(item["IG ID"]);
     if (filteredGroupIds.has(groupIdStr) && !uniqueGroupIds.has(groupIdStr)) {
@@ -1625,43 +1650,29 @@ function handleStatClick(event) {
     }
   });
 
-  // Mostrar los grupos filtrados en el orden original
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
-
-    // === BLOQUE DE ORDEN MANUAL (igual que en processItemGroups) ===
-    // Aplica el orden manual si existe
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
     const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (!Array.isArray(orderedSkus)) {
-      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
-    } else {
+    if (Array.isArray(orderedSkus)) {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    // === FIN BLOQUE DE ORDEN ===
-
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
-    // Header del grupo - NUEVA ESTRUCTURA
+    // Header
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-    
-    // Imagen del producto 
     const productImg = createProductImageElement(groupInfo.image);
     leftContainer.appendChild(productImg);
-    
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
     const title = document.createElement("h2");
@@ -1672,10 +1683,8 @@ function handleStatClick(event) {
     link.textContent = groupInfo.name || groupIdStr;
     title.appendChild(link);
     infoDiv.appendChild(title);
-
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
-    
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
@@ -1683,7 +1692,6 @@ function handleStatClick(event) {
     }
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
-
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
     const hasNewItem = groupItems.some(item => {
@@ -1705,15 +1713,68 @@ function handleStatClick(event) {
       unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupIdStr;
+      unmergeBtn.dataset.groupIdStr = groupIdStr;
       unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
+        unmergeGroup(this.dataset.groupIdStr);
       });
       rightContainer.appendChild(unmergeBtn);
     }
     headerDiv.appendChild(rightContainer);
-    groupDiv.appendChild(headerDiv);
 
+    // Detalles de grupo unido
+    if (isMergedGroup) {
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "group-details-container";
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+      const mergedTextarea = document.createElement("textarea");
+      mergedTextarea.className = "form-control merged-group-textarea";
+      mergedTextarea.rows = 10;
+      let mergedContent = getMergedGroupDetails(groupIdStr);
+      if (!mergedContent) {
+        // Default solo si nunca se editó
+        const mergedGroupData = mergedGroups.get(groupIdStr);
+        mergedContent = "";
+        mergedGroupData.originalGroups.forEach(originalGroupId => {
+          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+          fields.forEach(field => {
+            if (originalGroupInfo[field]) {
+              let fieldValue = originalGroupInfo[field]
+                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+            }
+          });
+          mergedContent += "--------------------\n\n";
+        });
+      }
+      mergedTextarea.value = mergedContent.trim();
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+      saveBtn.textContent = "Guardar Cambios";
+      saveBtn.addEventListener('click', function() {
+        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
+      });
+      detailsDiv.appendChild(mergedTextarea);
+      detailsDiv.appendChild(saveBtn);
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+      });
+      detailsContainer.appendChild(toggleDetailsBtn);
+      detailsContainer.appendChild(detailsDiv);
+      headerDiv.appendChild(detailsContainer);
+    }
+    groupDiv.appendChild(headerDiv);
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
   });
@@ -1766,6 +1827,24 @@ function createStatusMessage() {
   }
 }
 
+function getMergedGroupDetails(groupId) {
+  if (mergedGroups.has(groupId) && typeof mergedGroups.get(groupId).details === 'string' && mergedGroups.get(groupId).details !== '') {
+    return mergedGroups.get(groupId).details;
+  }
+  const local = localStorage.getItem(`merged_details_${groupId}`);
+  if (local) return local;
+  return '';
+}
+
+function saveMergedGroupDetails(groupId, value) {
+  if (mergedGroups.has(groupId)) mergedGroups.get(groupId).details = value;
+  localStorage.setItem(`merged_details_${groupId}`, value);
+  // Si existe en objectData también lo puedes guardar ahí si lo deseas
+  const groupObj = objectData.find(o => o.SKU === groupId);
+  if (groupObj) groupObj.details = value;
+  showTemporaryMessage('Detalles de grupo guardados');
+}
+
 function processItemGroups(skuToObject) {
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
@@ -1810,17 +1889,13 @@ function processItemGroups(skuToObject) {
 
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = groups[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      return;
-    }
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
 
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
     const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (!Array.isArray(orderedSkus)) {
-      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
-    } else {
+    if (Array.isArray(orderedSkus)) {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
 
@@ -1861,35 +1936,25 @@ function processItemGroups(skuToObject) {
     // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-    
-    // Título (editable solo para grupos unidos)
     const titleContainer = document.createElement("div");
     titleContainer.className = "group-title-container";
-    
+
     if (isMergedGroup) {
-      // Para grupos unidos: input editable
       const titleInput = document.createElement("input");
       titleInput.type = "text";
       titleInput.className = "group-title-input";
       titleInput.value = groupInfo.name || groupIdStr;
-      
       titleInput.addEventListener("blur", function() {
         const newTitle = this.value.trim();
         if (newTitle) {
           const groupObj = objectData.find(o => o.SKU === groupIdStr);
-          if (groupObj) {
-            groupObj.name = newTitle;
-          }
+          if (groupObj) groupObj.name = newTitle;
           const mergedGroup = mergedGroups.get(groupIdStr);
-          if (mergedGroup) {
-            mergedGroup.name = newTitle;
-          }
+          if (mergedGroup) mergedGroup.name = newTitle;
         }
       });
-      
       titleContainer.appendChild(titleInput);
     } else {
-      // Para grupos normales: título estático con link
       const title = document.createElement("h2");
       title.className = "group-title";
       const link = document.createElement("a");
@@ -1899,9 +1964,8 @@ function processItemGroups(skuToObject) {
       title.appendChild(link);
       titleContainer.appendChild(title);
     }
-    
-    infoDiv.appendChild(titleContainer);
 
+    infoDiv.appendChild(titleContainer);
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
 
@@ -1931,7 +1995,7 @@ function processItemGroups(skuToObject) {
       mergedBadge.className = "merged-badge";
       mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
-      
+
       const unmergeBtn = document.createElement("button");
       unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
       unmergeBtn.textContent = "Desagrupar";
@@ -1942,7 +2006,6 @@ function processItemGroups(skuToObject) {
       });
       rightContainer.appendChild(unmergeBtn);
     }
-
     headerContentDiv.appendChild(rightContainer);
     headerDiv.appendChild(headerContentDiv);
 
@@ -1950,85 +2013,59 @@ function processItemGroups(skuToObject) {
     const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
     let detailsHtml = "";
     if (groupObj) {
-      if (groupObj.ventajas) {
-        detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
-      }
-      if (groupObj.aplicaciones) {
-        detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
-      }
-      if (groupObj.especificaciones) {
-        detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
-      }
-      if (groupObj.incluye) {
-        detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
-      }
+      if (groupObj.ventajas) detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
+      if (groupObj.aplicaciones) detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
+      if (groupObj.especificaciones) detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
+      if (groupObj.incluye) detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
     }
 
-    if (detailsHtml) {
+    if (detailsHtml || isMergedGroup) {
       const detailsContainer = document.createElement("div");
       detailsContainer.className = "group-details-container";
-
-      // Botón de despliegue
       const toggleDetailsBtn = document.createElement("button");
       toggleDetailsBtn.className = "toggle-details-btn";
       toggleDetailsBtn.textContent = "▼ Detalles";
       toggleDetailsBtn.setAttribute("aria-expanded", "false");
 
-      // Contenedor de los detalles
       const detailsDiv = document.createElement("div");
       detailsDiv.className = "group-extra-details";
       detailsDiv.style.display = "none";
 
       if (isMergedGroup) {
-        const mergedGroupData = mergedGroups.get(groupIdStr);
         const mergedTextarea = document.createElement("textarea");
         mergedTextarea.className = "form-control merged-group-textarea";
         mergedTextarea.rows = 10;
-        
-        let mergedContent = "";
-        
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          
-          // BUSCAR POR IG ID ORIGINAL
-          const matchingItems = filteredItems.filter(item => {
-            if (!item || typeof item !== 'object') return false;
-            const originalIdMatch = 
-              String(item["__originalIGID"]) === String(originalGroupId) ||
-              String(item["Original IG ID"]) === String(originalGroupId);
-            return originalIdMatch;
+        let mergedContent = getMergedGroupDetails(groupIdStr);
+        if (!mergedContent) {
+          // Genera el default solo si nunca se ha editado
+          const mergedGroupData = mergedGroups.get(groupIdStr);
+          mergedContent = "";
+          mergedGroupData.originalGroups.forEach(originalGroupId => {
+            const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+            mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+            const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+            fields.forEach(field => {
+              if (originalGroupInfo[field]) {
+                let fieldValue = originalGroupInfo[field]
+                  .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                  .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+                mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+              }
+            });
+            mergedContent += "--------------------\n\n";
           });
-                
-          const firstValidItem = matchingItems.find(item => item?.Name);
-          const itemCode = firstValidItem?.Name || originalGroupId;
-                
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}, ${itemCode}\n`;
-          
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
-          });
-          
-          mergedContent += "--------------------\n\n";
-        });
-        
+        }
         mergedTextarea.value = mergedContent.trim();
-        
+
         const saveBtn = document.createElement("button");
         saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
         saveBtn.textContent = "Guardar Cambios";
         saveBtn.addEventListener('click', function() {
-          console.log("Guardando cambios para grupos unidos:", mergedTextarea.value);
+          saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
         });
-        
+
         detailsDiv.appendChild(mergedTextarea);
         detailsDiv.appendChild(saveBtn);
-        
       } else {
         detailsDiv.innerHTML = detailsHtml;
       }
@@ -2047,7 +2084,6 @@ function processItemGroups(skuToObject) {
 
     groupDiv.appendChild(headerDiv);
 
-    // Crear la tabla de items
     createItemsTable(groupDiv, groupItems, skuToObject);
 
     output.appendChild(groupDiv);
@@ -2056,15 +2092,241 @@ function processItemGroups(skuToObject) {
     const groupCheckbox = groupDiv.querySelector('.group-checkbox');
     if (groupCheckbox) {
       groupCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-          selectedGroups.add(this.dataset.groupId);
-        } else {
-          selectedGroups.delete(this.dataset.groupId);
-        }
+        if (this.checked) selectedGroups.add(this.dataset.groupId);
+        else selectedGroups.delete(this.dataset.groupId);
         selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
       });
     }
   });
+}
+
+// ------------
+
+function renderMergedGroups(skuToObject) {
+  output.innerHTML = '';
+  const groups = {};
+  filteredItems.forEach(item => {
+    const groupId = item["IG ID"];
+    if (!groups[groupId]) groups[groupId] = [];
+    groups[groupId].push(item);
+  });
+
+  Object.keys(groups).forEach(groupId => {
+    const groupItems = groups[groupId];
+    if (!groupOrderMap.has(groupId)) {
+      groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupId);
+    groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+
+    const groupInfo = skuToObject[groupId] || {};
+    const isMergedGroup = mergedGroups.has(groupId);
+
+    const groupDiv = document.createElement("div");
+    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.dataset.groupId = groupId;
+
+    const headerDiv = document.createElement("div");
+    headerDiv.className = "group-header";
+    const leftContainer = document.createElement("div");
+    leftContainer.className = "group-header-left";
+    const productImg = createProductImageElement(groupInfo.image);
+    leftContainer.appendChild(productImg);
+
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "group-info";
+    const title = document.createElement("h2");
+    title.className = "group-title";
+    const link = document.createElement("a");
+    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.target = "_blank";
+    link.textContent = groupInfo.name || groupId;
+    title.appendChild(link);
+    infoDiv.appendChild(title);
+
+    const logo = createBrandLogoElement(groupInfo.brand_logo);
+    infoDiv.appendChild(logo);
+
+    const skuP = document.createElement("p");
+    skuP.textContent = `SKU: ${groupId}`;
+    infoDiv.appendChild(skuP);
+
+    if (isMergedGroup) {
+      const originP = document.createElement("p");
+      originP.className = "group-origin";
+      originP.textContent = `Contiene items de: ${mergedGroups.get(groupId).originalGroups.join(', ')}`;
+      infoDiv.appendChild(originP);
+    }
+
+    leftContainer.appendChild(infoDiv);
+    headerDiv.appendChild(leftContainer);
+
+    const rightContainer = document.createElement("div");
+    rightContainer.className = "group-header-right";
+    const hasNewItem = groupItems.some(item => {
+      const details = skuToObject[item.SKU];
+      return details?.shop_by?.trim().toLowerCase() === 'new';
+    });
+    if (hasNewItem) {
+      const newBadge = document.createElement("span");
+      newBadge.className = "new-badge";
+      newBadge.textContent = "New";
+      rightContainer.appendChild(newBadge);
+    }
+    if (isMergedGroup) {
+      const mergedBadge = document.createElement("span");
+      mergedBadge.className = "merged-badge";
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+      rightContainer.appendChild(mergedBadge);
+
+      const unmergeBtn = document.createElement("button");
+      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.textContent = "Desagrupar";
+      unmergeBtn.title = "Revertir esta unión de grupos";
+      unmergeBtn.dataset.groupId = groupId;
+      unmergeBtn.addEventListener('click', function() {
+        unmergeGroup(this.dataset.groupId);
+      });
+      rightContainer.appendChild(unmergeBtn);
+    }
+
+    headerDiv.appendChild(rightContainer);
+
+    if (isMergedGroup) {
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "group-details-container";
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+
+      const mergedGroupData = mergedGroups.get(groupId);
+      const mergedTextarea = document.createElement("textarea");
+      mergedTextarea.className = "form-control merged-group-textarea";
+      mergedTextarea.rows = 10;
+
+      let mergedDetails = mergedGroupData.details || '';
+      if (!mergedDetails) {
+        mergedDetails = localStorage.getItem(`merged_details_${groupId}`) || '';
+      }
+      let mergedContent = mergedDetails;
+      if (!mergedDetails) {
+        mergedContent = "";
+        mergedGroupData.originalGroups.forEach(originalGroupId => {
+          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+          fields.forEach(field => {
+            if (originalGroupInfo[field]) {
+              let fieldValue = originalGroupInfo[field]
+                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+            }
+          });
+          mergedContent += "--------------------\n\n";
+        });
+      }
+      mergedTextarea.value = mergedContent.trim();
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+      saveBtn.textContent = "Guardar Cambios";
+      saveBtn.addEventListener('click', function() {
+        mergedGroupData.details = mergedTextarea.value;
+        const groupObj = objectData.find(o => o.SKU === groupId);
+        if (groupObj) groupObj.details = mergedTextarea.value;
+        localStorage.setItem(`merged_details_${groupId}`, mergedTextarea.value);
+        showTemporaryMessage('Detalles de grupo guardados');
+      });
+
+      detailsDiv.appendChild(mergedTextarea);
+      detailsDiv.appendChild(saveBtn);
+
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+      });
+
+      detailsContainer.appendChild(toggleDetailsBtn);
+      detailsContainer.appendChild(detailsDiv);
+      headerDiv.appendChild(detailsContainer);
+    }
+
+    groupDiv.appendChild(headerDiv);
+    createItemsTable(groupDiv, groupItems, skuToObject);
+    output.appendChild(groupDiv);
+  });
+}
+
+function saveGroupDetails(groupId, updatedDetails) {
+  // Buscar y actualizar en objectData principal
+  const groupIndex = objectData.findIndex(o => String(o.SKU) === String(groupId));
+  if (groupIndex !== -1) {
+      // Conservar todos los datos existentes y solo actualizar los modificados
+      objectData[groupIndex] = { 
+          ...objectData[groupIndex], 
+          ...updatedDetails 
+      };
+  }
+  
+  // Si es un grupo fusionado, actualizar también en mergedGroups
+  if (mergedGroups.has(groupId)) {
+      const mergedGroup = mergedGroups.get(groupId);
+      mergedGroups.set(groupId, {
+          ...mergedGroup,
+          name: updatedDetails.name || mergedGroup.name,
+          ventajas: updatedDetails.ventajas || mergedGroup.ventajas,
+          aplicaciones: updatedDetails.aplicaciones || mergedGroup.aplicaciones,
+          especificaciones: updatedDetails.especificaciones || mergedGroup.especificaciones,
+          incluye: updatedDetails.incluye || mergedGroup.incluye
+      });
+  }
+  
+  // Guardar en localStorage para persistencia
+  localStorage.setItem('modifiedGroups', JSON.stringify({
+      objectData,
+      mergedGroups: Array.from(mergedGroups.entries())
+  }));
+}
+
+function loadSavedChanges() {
+  const savedData = localStorage.getItem('modifiedGroups');
+  if (savedData) {
+      const { objectData: savedObjectData, mergedGroups: savedMergedGroups } = JSON.parse(savedData);
+      
+      // Fusionar cambios guardados con los datos actuales
+      if (savedObjectData) {
+          objectData = objectData.map(item => {
+              const savedItem = savedObjectData.find(s => String(s.SKU) === String(item.SKU));
+              return savedItem ? { ...item, ...savedItem } : item;
+          });
+      }
+      
+      if (savedMergedGroups) {
+          mergedGroups = new Map(savedMergedGroups);
+      }
+  }
+}
+
+function initializeData(initialObjectData, initialFilteredItems) {
+  // Cargar datos iniciales
+  objectData = initialObjectData;
+  filteredItems = initialFilteredItems;
+  
+  // Cargar modificaciones guardadas
+  loadSavedChanges();
+  
+  // Inicializar groupOrderMap si es necesario
+  if (!groupOrderMap) {
+      groupOrderMap = new Map();
+  }
 }
 
 
@@ -2077,12 +2339,18 @@ function mergeSelectedGroups() {
   const groupsToMerge = Array.from(selectedGroups);
   const newGroupId = `merged-${Date.now()}`;
 
-  // 1. Crear array para los items unidos
-  const mergedItems = [];
+  // Recupera detalles si ya existían (en memoria o localStorage)
+  let previousDetails = '';
+  if (mergedGroups.has(newGroupId)) {
+    previousDetails = mergedGroups.get(newGroupId).details || '';
+  } else if (localStorage.getItem(`merged_details_${newGroupId}`)) {
+    previousDetails = localStorage.getItem(`merged_details_${newGroupId}`);
+  }
 
+  // Crear array para los items unidos
+  const mergedItems = [];
   groupsToMerge.forEach(groupId => {
     const itemsInGroup = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
-    
     itemsInGroup.forEach(item => {
       const mergedItem = {
         ...item,
@@ -2094,61 +2362,250 @@ function mergeSelectedGroups() {
     });
   });
 
-  // 2. Eliminar items de los grupos originales
+  // Eliminar items de los grupos originales
   filteredItems = filteredItems.filter(item => !groupsToMerge.includes(String(item["IG ID"])));
 
-  // 3. Agregar el nuevo grupo al principio
+  // Agregar el nuevo grupo al principio
   filteredItems = [...mergedItems, ...filteredItems];
 
-  // 4. Registrar el grupo unido
+  // Registrar el grupo unido
   mergedGroups.set(newGroupId, {
     originalGroups: [...groupsToMerge],
     items: [...mergedItems],
-    creationTime: Date.now()
+    creationTime: Date.now(),
+    details: previousDetails // CONSERVA SI YA EXISTÍA
   });
 
-  // 5. Agregar el nuevo grupo a objectData
+  // Agregar el nuevo grupo a objectData
   const firstGroupId = groupsToMerge[0];
   let firstGroupInfo = objectData.find(o => o.SKU == firstGroupId);
-
   if (!firstGroupInfo) {
     firstGroupInfo = {
       SKU: firstGroupId,
       name: `Grupo ${firstGroupId}`
     };
   }
-
   objectData = objectData.filter(o => o.SKU !== newGroupId);
-
   objectData.push({
     ...firstGroupInfo,
     SKU: newGroupId,
     name: `[Grouped] ${firstGroupInfo.name || firstGroupId}`,
     __isMergedGroup: true,
     __originalGroups: [...groupsToMerge],
-    groupCreatedAt: Date.now() // 👈 esto es lo nuevo
+    groupCreatedAt: Date.now(),
+    details: previousDetails // CONSERVA SI YA EXISTÍA
   });
 
-  // 6. Limpiar la selección visual
+  // Limpiar la selección visual
   selectedGroups.clear();
   document.querySelectorAll('.group-checkbox').forEach(cb => {
     cb.checked = false;
   });
 
-  // 7. Forzar render completo
+  // Forzar render completo
   if (filteredItems.length && objectData.length) {
     render();
   }
 
-  // 8. Mensaje visual
+  // Mensaje visual
   const message = `✅ ${groupsToMerge.length} grupos unidos como ${newGroupId}`;
   fileInfoDiv.innerHTML += `<p class="text-success">${message}</p>`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
+}
 
+function renderMergedGroups(skuToObject) {
+  // Limpiar output
+  output.innerHTML = '';
+  
+  // Agrupar items por IG ID (incluyendo los unidos)
+  const groups = {};
+  filteredItems.forEach(item => {
+    const groupId = item["IG ID"];
+    if (!groups[groupId]) groups[groupId] = [];
+    groups[groupId].push(item);
+  });
+
+  // Procesar cada grupo
+  Object.keys(groups).forEach(groupId => {
+    const groupItems = groups[groupId];
+
+    // Inicializa el orden si no existe
+    if (!groupOrderMap.has(groupId)) {
+      groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupId);
+    groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+
+    const groupInfo = skuToObject[groupId] || {};
+    const isMergedGroup = mergedGroups.has(groupId);
+
+    // Crear contenedor del grupo
+    const groupDiv = document.createElement("div");
+    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.dataset.groupId = groupId;
+
+    // Header del grupo
+    const headerDiv = document.createElement("div");
+    headerDiv.className = "group-header";
+
+    // Contenedor izquierdo (imagen + info)
+    const leftContainer = document.createElement("div");
+    leftContainer.className = "group-header-left";
+
+    // Imagen del producto 
+    const productImg = createProductImageElement(groupInfo.image);
+    leftContainer.appendChild(productImg);
+
+    // Información del grupo
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "group-info";
+    const title = document.createElement("h2");
+    title.className = "group-title";
+    const link = document.createElement("a");
+    link.href = `https://www.travers.com.mx/${groupId}`;
+    link.target = "_blank";
+    link.textContent = groupInfo.name || groupId;
+    title.appendChild(link);
+    infoDiv.appendChild(title);
+
+    const logo = createBrandLogoElement(groupInfo.brand_logo);
+    infoDiv.appendChild(logo);
+
+    // SKU y procedencia
+    const skuP = document.createElement("p");
+    skuP.textContent = `SKU: ${groupId}`;
+    infoDiv.appendChild(skuP);
+
+    if (isMergedGroup) {
+      const originP = document.createElement("p");
+      originP.className = "group-origin";
+      originP.textContent = `Contiene items de: ${mergedGroups.get(groupId).originalGroups.join(', ')}`;
+      infoDiv.appendChild(originP);
+    }
+
+    leftContainer.appendChild(infoDiv);
+    headerDiv.appendChild(leftContainer);
+
+    // Contenedor derecho (badges)
+    const rightContainer = document.createElement("div");
+    rightContainer.className = "group-header-right";
+
+    // Badge "New"
+    const hasNewItem = groupItems.some(item => {
+      const details = skuToObject[item.SKU];
+      return details?.shop_by?.trim().toLowerCase() === 'new';
+    });
+    
+    if (hasNewItem) {
+      const newBadge = document.createElement("span");
+      newBadge.className = "new-badge";
+      newBadge.textContent = "New";
+      rightContainer.appendChild(newBadge);
+    }
+
+    // Badge "Unido"
+    if (isMergedGroup) {
+      const mergedBadge = document.createElement("span");
+      mergedBadge.className = "merged-badge";
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+      rightContainer.appendChild(mergedBadge);
+
+      // Botón para desagrupar
+      const unmergeBtn = document.createElement("button");
+      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.textContent = "Desagrupar";
+      unmergeBtn.title = "Revertir esta unión de grupos";
+      unmergeBtn.dataset.groupId = groupId;
+      unmergeBtn.addEventListener('click', function() {
+        unmergeGroup(this.dataset.groupId);
+      });
+      rightContainer.appendChild(unmergeBtn);
+    }
+
+    headerDiv.appendChild(rightContainer);
+
+    // Detalles de grupo unido (editable)
+    if (isMergedGroup) {
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "group-details-container";
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+
+      const mergedGroupData = mergedGroups.get(groupId);
+      const mergedTextarea = document.createElement("textarea");
+      mergedTextarea.className = "form-control merged-group-textarea";
+      mergedTextarea.rows = 10;
+
+      let mergedDetails = mergedGroupData.details || '';
+      if (!mergedDetails) {
+        mergedDetails = localStorage.getItem(`merged_details_${groupId}`) || '';
+      }
+      let mergedContent = mergedDetails;
+      if (!mergedDetails) {
+        // Genera detalles por defecto
+        mergedContent = "";
+        mergedGroupData.originalGroups.forEach(originalGroupId => {
+          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+          fields.forEach(field => {
+            if (originalGroupInfo[field]) {
+              let fieldValue = originalGroupInfo[field]
+                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+            }
+          });
+          mergedContent += "--------------------\n\n";
+        });
+      }
+      mergedTextarea.value = mergedContent.trim();
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+      saveBtn.textContent = "Guardar Cambios";
+      saveBtn.addEventListener('click', function() {
+        mergedGroupData.details = mergedTextarea.value;
+        const groupObj = objectData.find(o => o.SKU === groupId);
+        if (groupObj) {
+          groupObj.details = mergedTextarea.value;
+        }
+        localStorage.setItem(`merged_details_${groupId}`, mergedTextarea.value);
+        showTemporaryMessage('Detalles de grupo guardados');
+      });
+
+      detailsDiv.appendChild(mergedTextarea);
+      detailsDiv.appendChild(saveBtn);
+
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+      });
+
+      detailsContainer.appendChild(toggleDetailsBtn);
+      detailsContainer.appendChild(detailsDiv);
+      headerDiv.appendChild(detailsContainer);
+    }
+
+    groupDiv.appendChild(headerDiv);
+
+    // Crear tabla con colores alternados para grupos originales
+    createItemsTable(groupDiv, groupItems, skuToObject);
+
+    output.appendChild(groupDiv);
+  });
 }
 
 
-function renderMergedGroups(skuToObject) {
+
   // Limpiar output
   output.innerHTML = '';
   
@@ -2341,7 +2798,7 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
     groupDiv.appendChild(tableContainer);
     output.appendChild(groupDiv);
   });
-}
+
 
 // 4. Agregar estos estilos CSS (puedes ponerlos en tu archivo CSS o crear un elemento style)
 function addMergeStyles() {
@@ -2873,42 +3330,25 @@ function applyCategoryTables() {
   createStatusMessage();
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      continue;
-    }
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) continue;
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
     const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (!Array.isArray(orderedSkus)) {
-      console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
-    } else {
+    if (Array.isArray(orderedSkus)) {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-
     const groupInfo = skuToObject[groupIdStr] || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
     const groupDiv = document.createElement("div");
-    groupDiv.className = "group-container";
+    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.dataset.groupId = groupIdStr;
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      headerDiv.appendChild(newBadge);
-    }
-    // Imagen del producto 
     const productImg = createProductImageElement(groupInfo.image);
     leftContainer.appendChild(productImg);
-    
-
-    // Información del grupo
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
     const title = document.createElement("h2");
@@ -2919,10 +3359,8 @@ function applyCategoryTables() {
     link.textContent = groupInfo.name || groupIdStr;
     title.appendChild(link);
     infoDiv.appendChild(title);
-
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
-
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
@@ -2932,11 +3370,72 @@ function applyCategoryTables() {
     headerDiv.appendChild(leftContainer);
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
+    const hasNewItem = groupItems.some(item => {
+      const details = skuToObject[item.SKU];
+      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+    });
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
       newBadge.textContent = "New";
       rightContainer.appendChild(newBadge);
+    }
+    if (isMergedGroup) {
+      const mergedBadge = document.createElement("span");
+      mergedBadge.className = "merged-badge";
+      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
+      rightContainer.appendChild(mergedBadge);
+
+      // Detalles de grupo unido
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "group-details-container";
+      const toggleDetailsBtn = document.createElement("button");
+      toggleDetailsBtn.className = "toggle-details-btn";
+      toggleDetailsBtn.textContent = "▼ Detalles";
+      toggleDetailsBtn.setAttribute("aria-expanded", "false");
+      const detailsDiv = document.createElement("div");
+      detailsDiv.className = "group-extra-details";
+      detailsDiv.style.display = "none";
+      const mergedTextarea = document.createElement("textarea");
+      mergedTextarea.className = "form-control merged-group-textarea";
+      mergedTextarea.rows = 10;
+      let mergedContent = getMergedGroupDetails(groupIdStr);
+      if (!mergedContent) {
+        const mergedGroupData = mergedGroups.get(groupIdStr);
+        mergedContent = "";
+        mergedGroupData.originalGroups.forEach(originalGroupId => {
+          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+          fields.forEach(field => {
+            if (originalGroupInfo[field]) {
+              let fieldValue = originalGroupInfo[field]
+                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+            }
+          });
+          mergedContent += "--------------------\n\n";
+        });
+      }
+      mergedTextarea.value = mergedContent.trim();
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+      saveBtn.textContent = "Guardar Cambios";
+      saveBtn.addEventListener('click', function() {
+        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
+      });
+      detailsDiv.appendChild(mergedTextarea);
+      detailsDiv.appendChild(saveBtn);
+      toggleDetailsBtn.addEventListener("click", function () {
+        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
+        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
+        detailsDiv.style.display = expanded ? "none" : "block";
+        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
+      });
+      detailsContainer.appendChild(toggleDetailsBtn);
+      detailsContainer.appendChild(detailsDiv);
+      headerDiv.appendChild(detailsContainer);
     }
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
