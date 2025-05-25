@@ -307,8 +307,8 @@ html, body {
 }
 
 .product-img {
-  max-width: 150px;
-  max-height: 150px;
+  max-width: 200px;
+  max-height: 200px;
   margin-right: 15px;
   object-fit: contain;
 }
@@ -1037,8 +1037,9 @@ input[type="file"] {
 
 .table-input {
   width: 80%;
+  height: 50% !important;
   border: 1px solid #ddd;
-  padding: 0.25rem 0.5rem;
+  padding: 0rem 0.5rem !important;
   background-color: transparent;
 }
 
@@ -1323,13 +1324,6 @@ tr[data-original-igid]:nth-child(even) {
 }
 
 
-.original-cell-color1 {
-    background-color: #f0f8ff; /* Azul claro */
-}
-.original-cell-color2 {
-    background-color: #e6f2ff; /* Azul un poco más oscuro */
-}
-
 /* Para resaltar filas al pasar el mouse */
 tr[data-original-igid]:hover {
     background-color: #d9e9ff !important;
@@ -1608,4 +1602,28 @@ html, body {
 }
 
 
+.group-title-container {
+  margin-bottom: 5px;
+}
 
+.group-title-input {
+  font-size: 1.1rem;
+  border: 1px solid #ddd;
+  background: white;
+  width: 400%;
+  padding: 5px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.group-title-input:hover {
+  border: 1px solid #80bdff;
+}
+
+.group-title-input:focus {
+  border: 1px solid #80bdff;
+  background: white;
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
