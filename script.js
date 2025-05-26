@@ -3621,8 +3621,8 @@ function updateCellStyle(cell, hasValue) {
 
 function applyCategoryTables() {
   if (!filteredItems.length || !objectData.length) {
-      console.log("objectData.length", objectData.length);
-  console.log("filteredItems.length", filteredItems.length);
+    console.log("objectData.length", objectData.length);
+    console.log("filteredItems.length", filteredItems.length);
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
@@ -3636,6 +3636,12 @@ function applyCategoryTables() {
 
   output.innerHTML = '';
   createStatusMessage();
+
+  // Depuración: estadísticas de columnas aplicadas
+  let missingCatAttrsGroups = [];
+  let emptyCatAttrsGroups = [];
+  let appliedColumnsMsgs = [];
+
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) continue;
@@ -3648,9 +3654,31 @@ function applyCategoryTables() {
     }
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
+
+    // --- ORDEN DE COLUMNAS SEGÚN table_attributes_cat ---
+    // Busca el primer item que tenga ese campo, no vacío
+    const itemWithCatAttrs = groupItems.find(item => item.table_attributes_cat && item.table_attributes_cat.trim());
+    let customAttrs = [];
+    if (itemWithCatAttrs) {
+      customAttrs = itemWithCatAttrs.table_attributes_cat
+        .replace(/\s+/g, ',')
+        .split(',')
+        .map(attr => attr.trim())
+        .filter(attr => attr);
+      if (customAttrs.length === 0) {
+        emptyCatAttrsGroups.push(groupIdStr);
+      }
+    } else {
+      missingCatAttrsGroups.push(groupIdStr);
+    }
+    appliedColumnsMsgs.push(`Grupo ${groupIdStr}: ${customAttrs.length ? customAttrs.join(', ') : '(sin columnas)'}`);
+    console.log(`Grupo ${groupIdStr} columnas aplicadas:`, customAttrs);
+
+    // --- Render de grupo y tabla ---
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
+    // HEADER
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
     const leftContainer = document.createElement("div");
@@ -3743,22 +3771,28 @@ function applyCategoryTables() {
       });
       detailsContainer.appendChild(toggleDetailsBtn);
       detailsContainer.appendChild(detailsDiv);
-      headerDiv.appendChild(detailsContainer);
+      rightContainer.appendChild(detailsContainer);
     }
     headerDiv.appendChild(rightContainer);
     groupDiv.appendChild(headerDiv);
 
-    const itemWithCatAttrs = groupItems.find(item => item.table_attributes_cat);
-    let customAttrs = [];
-    if (itemWithCatAttrs) {
-      customAttrs = itemWithCatAttrs.table_attributes_cat
-        .replace(/\s+/g, ',')
-        .split(',')
-        .map(attr => attr.trim())
-        .filter(attr => attr);
-    }
+    // Renderiza la tabla usando customAttrs
     createItemsTable(groupDiv, groupItems, skuToObject, null, customAttrs);
     output.appendChild(groupDiv);
+  }
+
+  // Mensajes visuales de depuración
+  if (appliedColumnsMsgs.length) {
+    fileInfoDiv.innerHTML += `<pre style="background:#f9f9f9; border:1px solid #ccc; padding:8px; margin-top:8px;">
+<strong>Columnas aplicadas por grupo:</strong>
+${appliedColumnsMsgs.join('\n')}
+</pre>`;
+  }
+  if (missingCatAttrsGroups.length) {
+    fileInfoDiv.innerHTML += `<p style="color:orange">⚠️ Grupo(s) sin campo <strong>table_attributes_cat</strong>: ${missingCatAttrsGroups.join(', ')}</p>`;
+  }
+  if (emptyCatAttrsGroups.length) {
+    fileInfoDiv.innerHTML += `<p style="color:orange">⚠️ Grupo(s) con <strong>table_attributes_cat</strong> vacío: ${emptyCatAttrsGroups.join(', ')}</p>`;
   }
   fileInfoDiv.innerHTML += `<p class="text-success">✅ Tablas Cat aplicadas</p>`;
 }
