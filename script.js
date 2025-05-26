@@ -19,6 +19,7 @@ const clearChecksBtn = document.getElementById("clearChecksBtn");
 const webFiltersBtn = document.getElementById("webFiltersBtn");
 const clearFilterInputsBtn = document.getElementById("clearFilterInputs");
 const loadDefaultFiltersBtn = document.getElementById("loadDefaultFilters");
+const combinedFileInput = document.getElementById("combinedFile");
 
 // Variables de estado
 let filteredItems = [];
@@ -77,13 +78,15 @@ document.addEventListener('DOMContentLoaded', function() {
     initHorizontalDrag(e, 'box1', 'box3');
   });
 
-  xlsxFileInput.addEventListener("change", handleXLSX);
+  //xlsxFileInput.addEventListener("change", handleXLSX);
   csvFileInput.addEventListener("change", handleCSV);
-  categoryDataFileInput.addEventListener("change", handleCategoryData);
+  //categoryDataFileInput.addEventListener("change", handleCategoryData);
   applyOrderBtn.addEventListener("click", applyOrder);
   applyCatOrderBtn.addEventListener("click", applyCatOrder);
   loadWebOrderBtn.addEventListener("click", loadWebOrder);
   clearOrderBtn.addEventListener("click", clearAttributeOrder);
+  document.getElementById('combinedFile').addEventListener('change', handleCombinedExcel);
+  combinedFileInput.addEventListener("change", handleCombinedExcel);
   clearCatOrderBtn.addEventListener("click", clearCatOrder);
   addMergeStyles();
   
@@ -119,11 +122,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
         const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
         data.push({
+          "CMS IG": cmsIg,          
           "Atributo": attr,
           "Filtros": filtroInput ? (filtroInput.value || "") : "",
           "Web": webInput ? (webInput.value || "") : "",
-          "Cat": catInput ? (catInput.value || "") : "",
-          "CMS IG": cmsIg
+          "Cat": catInput ? (catInput.value || "") : ""
         });
       });
     });
@@ -132,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (cmsSet.size >= 1) {
       cmsPart = [...cmsSet][0];
     }
-    const atributosCols = ["Atributo", "Filtros", "Web", "Cat", "CMS IG"];
+    const atributosCols = ["CMS IG", "Atributo", "Filtros", "Web", "Cat"];
     // Siempre crear la pestaña, aunque data esté vacío
     const wsAtributos = XLSX.utils.json_to_sheet(
       data.length ? data : [{}],
@@ -387,37 +390,108 @@ function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
 }
 
+
+
+function handleCombinedExcel(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    alert("Selecciona un archivo primero.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, {type: 'array'});
+
+    // Cargar hoja "data"
+    const dataSheet = workbook.Sheets['data'];
+    if (!dataSheet) {
+      alert('El archivo Excel no contiene una hoja llamada "data".');
+      return;
+    }
+    filteredItems = XLSX.utils.sheet_to_json(dataSheet);
+
+    // Cargar hoja "category-data"
+    const categorySheet = workbook.Sheets['category-data'];
+    if (!categorySheet) {
+      alert('El archivo Excel no contiene una hoja llamada "category-data".');
+      return;
+    }
+    categoryData = XLSX.utils.sheet_to_json(categorySheet);
+
+    // Notificar a funciones dependientes que ya están cargados ambos
+    onDataAndCategoryLoaded();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function processCategoryDataFromSheet() {
+  if (filteredItems.length > 0 && filteredItems[0]['CMS IG']) {
+    const cmsIgValue = filteredItems[0]['CMS IG'];
+    const matchedItem = categoryData.find(item => item.image && item.image.includes(`W${cmsIgValue}.png`));
+    
+    if (matchedItem) {
+      if (matchedItem.table_attributes) {
+        let attributesStr = matchedItem.table_attributes;
+        if (!attributesStr.includes(',') && attributesStr.includes(' ')) {
+          attributesStr = attributesStr.replace(/\s+/g, ',');
+        }
+        const attributes = attributesStr.split(',')
+          .map(attr => attr.trim())
+          .filter(attr => attr && !['marca', 'sku', 'price'].includes(attr));
+        defaultAttributesOrder = {};
+        attributes.forEach((attr, index) => {
+          defaultAttributesOrder[attr] = index + 1;
+        });
+      }
+      if (matchedItem.filter_attributes) {
+        let filterAttributesStr = matchedItem.filter_attributes;
+        if (!filterAttributesStr.includes(',') && filterAttributesStr.includes(' ')) {
+          filterAttributesStr = filterAttributesStr.replace(/\s+/g, ',');
+        }
+        const filterAttributes = filterAttributesStr.split(',')
+          .map(attr => attr.trim())
+          .filter(attr => attr);
+        defaultFilterAttributes = new Set(filterAttributes);
+        forcedFilterAttributes.forEach(attr => {
+          defaultFilterAttributes.add(attr);
+        });
+        applyWebFiltersVisualUpdate();
+      }
+      updateOrderInputs();
+    }
+  }
+  if (filteredItems.length > 0 && objectData.length > 0) {
+    render();
+  }
+}
+
 function handleXLSX(event) {
   const file = event.target.files[0];
-  if (!file) return;
-
-  fileInfoDiv.innerHTML = `<p>Procesando Items File: <strong>${file.name}</strong></p>`;
-  
   const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets["data"];
-      filteredItems = XLSX.utils.sheet_to_json(sheet);
-      
-      fileInfoDiv.innerHTML += `<p>✅ Items File cargado (${filteredItems.length} registros)</p>`;
-      
-      if (filteredItems[0] && filteredItems[0]['CMS IG']) {
-        fileInfoDiv.innerHTML += `<p>CMS IG encontrado: <strong>${filteredItems[0]['CMS IG']}</strong></p>`;
-      } else {
-        fileInfoDiv.innerHTML += `<p>No se encontró columna CMS IG en Items File</p>`;
-      }
-      
-      if (categoryData.length > 0) {
-        updateOrderInputs();
-      }
-      
-      if (objectData.length) render();
-    } catch (error) {
-      console.error("Error procesando Items File:", error);
-      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
-    }
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, {type: 'array'});
+
+    // Nombres de las hojas
+    const sheetNames = workbook.SheetNames; // ["data", "category-data"]
+    // Puedes verificar los nombres o asumir el orden
+
+    // Hoja principal de datos
+    const dataSheet = workbook.Sheets['data'] || workbook.Sheets[sheetNames[0]];
+    const dataJson = XLSX.utils.sheet_to_json(dataSheet);
+
+    // Hoja de categorías
+    const categorySheet = workbook.Sheets['category-data'] || workbook.Sheets[sheetNames[1]];
+    const categoryJson = XLSX.utils.sheet_to_json(categorySheet);
+
+    // Asignar a tus variables globales
+    filteredItems = dataJson;
+    categoryData = categoryJson;
+
+    // Llama a tus funciones de renderizado, filtrado, etc.
+    render();
   };
   reader.readAsArrayBuffer(file);
 }
@@ -756,24 +830,36 @@ function render() {
 function updateOrderInputs() {
   const inputs = document.querySelectorAll('.order-input, .order-cat-input');
   if (!inputs.length) return;
-  
+
   let updateCount = 0;
   inputs.forEach(input => {
     const attribute = input.getAttribute('data-attribute');
-    if (defaultAttributesOrder[attribute]) {
-      input.value = defaultAttributesOrder[attribute];
-      localStorage.setItem(`order_${attribute}`, defaultAttributesOrder[attribute]);
+    // Primero intenta cargar del localStorage (si el usuario ya puso algo)
+    const savedOrder = localStorage.getItem(
+      input.classList.contains('order-cat-input') ? `cat_order_${attribute}` : `order_${attribute}`
+    );
+    if (savedOrder) {
+      input.value = savedOrder;
       updateCount++;
+    } else if (defaultAttributesOrder[attribute]) {
+      input.value = defaultAttributesOrder[attribute];
+      localStorage.setItem(
+        input.classList.contains('order-cat-input') ? `cat_order_${attribute}` : `order_${attribute}`,
+        defaultAttributesOrder[attribute]
+      );
+      updateCount++;
+    } else {
+      input.value = '';
     }
   });
-  
+
   fileInfoDiv.innerHTML += `
     <p class="update-info">
       <strong>Actualización de órdenes:</strong> 
       ${updateCount} inputs actualizados
     </p>
   `;
-  
+
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 }
 
@@ -1171,6 +1257,7 @@ function processAttributeStats(skuToObject) {
     attributeStatsDiv.innerHTML = '<p>No hay atributos usados en las tablas</p>';
   }
 }
+
 function createStatsColumn(stats) {
   // Puedes editar estos valores para ajustar el ancho de cada columna
   const colWidthAtributo = 'auto'; // flexible
@@ -1210,19 +1297,30 @@ function createStatsColumn(stats) {
     </thead>
     <tbody>
       ${stats.map(stat => {
+        // Orden Web
         const savedOrder = localStorage.getItem(`order_${stat.attribute}`);
         const defaultValue = defaultAttributesOrder[stat.attribute];
-        const displayValue = savedOrder || defaultValue || '';
-        
+        const displayValue = (savedOrder !== null && savedOrder !== undefined) ? savedOrder : (defaultValue || '');
+
+        // Orden Cat
+        const savedCatOrder = localStorage.getItem(`cat_order_${stat.attribute}`);
+        const catDisplayValue = (savedCatOrder !== null && savedCatOrder !== undefined) ? savedCatOrder : '';
+
+        // Filtro: localStorage tiene máxima prioridad
+        const savedFilter = localStorage.getItem(`filter_${stat.attribute}`);
         let filterValue = '';
-        if (defaultFilterAttributes.size > 0 && defaultFilterAttributes.has(stat.attribute)) {
+        if (savedFilter !== null && savedFilter !== undefined && savedFilter !== '0') {
+          filterValue = savedFilter;
+        } else if (
+          defaultFilterAttributes.size > 0 &&
+          defaultFilterAttributes.has(stat.attribute)
+        ) {
           const order = Array.from(defaultFilterAttributes).indexOf(stat.attribute) + 1;
           filterValue = order.toString();
         } else {
-          const savedFilter = localStorage.getItem(`filter_${stat.attribute}`);
-          filterValue = savedFilter !== null && savedFilter !== '0' ? savedFilter : '';
+          filterValue = '';
         }
-        
+
         // Crear dropdown para el atributo
         const dropdown = createAttributeDropdown(stat.attribute, stat.uniqueValues);
 
@@ -1244,7 +1342,7 @@ function createStatsColumn(stats) {
           <td style="width:${colWidthCat}; min-width:${colWidthCat};">
             <input type="number" min="1" class="order-cat-input form-control form-control-sm" 
                    data-attribute="${stat.attribute}" 
-                   value="">
+                   value="${catDisplayValue}">
           </td>
           <td style="width:${colWidthConValor}; min-width:${colWidthConValor};" class="clickable with-value" 
               data-attribute="${stat.attribute}" 
@@ -1305,33 +1403,33 @@ function createStatsColumn(stats) {
   return column;
 }
 
+function syncAllFilterInputsToLocalStorage() {
+  document.querySelectorAll('.filter-order-input').forEach(input => {
+    const attribute = input.getAttribute('data-attribute');
+    const value = input.value.trim();
+    if (value === '' || value === '0') {
+      localStorage.setItem(`filter_${attribute}`, '0');
+    } else {
+      localStorage.setItem(`filter_${attribute}`, value);
+    }
+  });
+}
+
 function clearAllFilters() {
-  // 1. Limpiar todos los filtros activos
+  // Guarda lo que hay en los inputs ANTES de limpiar visualmente (¡pero no borres localStorage!)
+  syncAllFilterInputsToLocalStorage();
+
   activeFilters = {};
-  
-  // 2. Resetear todos los dropdowns
+
   document.querySelectorAll('.attribute-dropdown').forEach(dropdown => {
     dropdown.value = '';
   });
-  
-  // 3. Limpiar el filtro actual
+
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
-  
-  // 4. Limpiar filtros del localStorage
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('filter_')) {
-      localStorage.removeItem(key);
-    }
-  });
 
-  // 5. RE-RENDER usando los mismos items en uso
-  if (filteredItems.length) {
-    // Recalcula stats, tablas y dropdowns, usando solo los items que están en filteredItems ahora
-    render();
-  }
-
-  fileInfoDiv.innerHTML += `<p>Todos los filtros han sido limpiados completamente</p>`;
+  render();
+  fileInfoDiv.innerHTML += `<p>Todos los filtros han sido sincronizados pero no borrados.</p>`;
 }
 
 function filterItemsByAttributeValue(attribute, value) {

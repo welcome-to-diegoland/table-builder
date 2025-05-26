@@ -19,7 +19,7 @@
 
           <div class="input-group">
             <label for="xlsxFile">Items File (xlsx):</label>
-            <input type="file" id="xlsxFile" accept=".xlsx,.xls" />
+            <input type="file" id="combinedFile" accept=".xlsx,.xls" />
           </div>
         
           <div class="input-group">
@@ -36,13 +36,18 @@
       </div>
       <div class="header-column right-column bg-primary-light">
         <div class="header-buttons">
-          <button id="mergeGroupsBtn" class="header-web-btn">
-  <i class="fas fa-object-group"></i> Unir Grupos<br>Seleccionados
-</button>
-
-
-          <button id="exportStatsExcelBtn" class="btn btn-success">Exportar tabla de atributos</button>
           
+          <!-- exportar -->
+           
+          <button id="exportStatsExcelBtn" class="header-excel-btn">
+            Exportar<br>Excel
+          </button>
+
+          <!-- merge -->
+
+           <button id="mergeGroupsBtn" class="header-web-btn"><i class="fas fa-object-group"></i> Unir Grupos<br>Seleccionados
+          </button>
+
           <!-- tablas catalogo -->
 
           <button id="applyCatTablesBtn" class="header-cat-btn">
