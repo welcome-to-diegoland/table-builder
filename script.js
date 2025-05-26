@@ -390,38 +390,38 @@ function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
 }
 
-
-
 function handleCombinedExcel(event) {
   const file = event.target.files[0];
-  if (!file) {
-    alert("Selecciona un archivo primero.");
-    return;
-  }
+  if (!file) return;
+
+  fileInfoDiv.innerHTML = `<p>Procesando archivo combinado: <strong>${file.name}</strong></p>`;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, {type: 'array'});
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const dataSheet = workbook.Sheets["data"];
+      const catSheet = workbook.Sheets["category-data"];
+      if (!dataSheet || !catSheet) {
+        fileInfoDiv.innerHTML += `<p class="text-danger">El archivo debe tener las hojas "data" y "category-data"</p>`;
+        return;
+      }
+      filteredItems = XLSX.utils.sheet_to_json(dataSheet);
+      categoryData = XLSX.utils.sheet_to_json(catSheet);
+      fileInfoDiv.innerHTML += `<p>✅ Data cargada (${filteredItems.length} items)</p>`;
+      fileInfoDiv.innerHTML += `<p>✅ Category-data cargada (${categoryData.length} registros)</p>`;
 
-    // Cargar hoja "data"
-    const dataSheet = workbook.Sheets['data'];
-    if (!dataSheet) {
-      alert('El archivo Excel no contiene una hoja llamada "data".');
-      return;
+      // Procesar órdenes por defecto y filtros después de cargar categoryData
+      processCategoryDataFromSheet();
+
+      // Si ya está el CSV cargado, renderiza la UI
+      if (objectData.length > 0) render();
+
+    } catch (error) {
+      console.error("Error procesando archivo combinado:", error);
+      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
     }
-    filteredItems = XLSX.utils.sheet_to_json(dataSheet);
-
-    // Cargar hoja "category-data"
-    const categorySheet = workbook.Sheets['category-data'];
-    if (!categorySheet) {
-      alert('El archivo Excel no contiene una hoja llamada "category-data".');
-      return;
-    }
-    categoryData = XLSX.utils.sheet_to_json(categorySheet);
-
-    // Notificar a funciones dependientes que ya están cargados ambos
-    onDataAndCategoryLoaded();
   };
   reader.readAsArrayBuffer(file);
 }
@@ -430,8 +430,8 @@ function processCategoryDataFromSheet() {
   if (filteredItems.length > 0 && filteredItems[0]['CMS IG']) {
     const cmsIgValue = filteredItems[0]['CMS IG'];
     const matchedItem = categoryData.find(item => item.image && item.image.includes(`W${cmsIgValue}.png`));
-    
     if (matchedItem) {
+      // Procesa el orden de atributos para defaultAttributesOrder
       if (matchedItem.table_attributes) {
         let attributesStr = matchedItem.table_attributes;
         if (!attributesStr.includes(',') && attributesStr.includes(' ')) {
@@ -445,6 +445,7 @@ function processCategoryDataFromSheet() {
           defaultAttributesOrder[attr] = index + 1;
         });
       }
+      // Procesa los filtros por defecto
       if (matchedItem.filter_attributes) {
         let filterAttributesStr = matchedItem.filter_attributes;
         if (!filterAttributesStr.includes(',') && filterAttributesStr.includes(' ')) {
@@ -462,38 +463,32 @@ function processCategoryDataFromSheet() {
       updateOrderInputs();
     }
   }
+  // Si ya está el CSV cargado, renderiza la UI
   if (filteredItems.length > 0 && objectData.length > 0) {
     render();
   }
 }
 
-function handleXLSX(event) {
+function handleCSV(event) {
   const file = event.target.files[0];
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, {type: 'array'});
+  if (!file) return;
 
-    // Nombres de las hojas
-    const sheetNames = workbook.SheetNames; // ["data", "category-data"]
-    // Puedes verificar los nombres o asumir el orden
+  fileInfoDiv.innerHTML += `<p>Procesando Data File: <strong>${file.name}</strong></p>`;
 
-    // Hoja principal de datos
-    const dataSheet = workbook.Sheets['data'] || workbook.Sheets[sheetNames[0]];
-    const dataJson = XLSX.utils.sheet_to_json(dataSheet);
-
-    // Hoja de categorías
-    const categorySheet = workbook.Sheets['category-data'] || workbook.Sheets[sheetNames[1]];
-    const categoryJson = XLSX.utils.sheet_to_json(categorySheet);
-
-    // Asignar a tus variables globales
-    filteredItems = dataJson;
-    categoryData = categoryJson;
-
-    // Llama a tus funciones de renderizado, filtrado, etc.
-    render();
-  };
-  reader.readAsArrayBuffer(file);
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      objectData = results.data;
+      fileInfoDiv.innerHTML += `<p>✅ Data File cargado (${objectData.length} registros)</p>`;
+      // Si ya está el Excel combinado cargado, renderiza la UI
+      if (filteredItems.length > 0) render();
+    },
+    error: (error) => {
+      console.error("Error procesando Data File:", error);
+      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
+    }
+  });
 }
 
 function handleCSV(event) {
@@ -1576,6 +1571,8 @@ function saveAttributeOrder(e) {
 
 function loadWebOrder() {
   if (Object.keys(defaultAttributesOrder).length === 0) {
+      console.log("objectData.length", objectData.length);
+  console.log("filteredItems.length", filteredItems.length);
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
@@ -1711,6 +1708,8 @@ function getOrderedAttributes(groupItems, skuToObject) {
 
 function applyOrder() {
   if (objectData.length && filteredItems.length) {
+      console.log("objectData.length", objectData.length);
+  console.log("filteredItems.length", filteredItems.length);
     // 1. Establecer los estados correctos
     currentViewState.webOrder = true;
     currentViewState.catOrder = false;
@@ -1742,6 +1741,8 @@ function applyOrder() {
 
 function applyCatOrder() {
   if (objectData.length && filteredItems.length) {
+      console.log("objectData.length", objectData.length);
+  console.log("filteredItems.length", filteredItems.length);
     // 1. Establecer los estados correctos
     currentViewState.catOrder = true;
     currentViewState.webOrder = false;
@@ -3620,6 +3621,8 @@ function updateCellStyle(cell, hasValue) {
 
 function applyCategoryTables() {
   if (!filteredItems.length || !objectData.length) {
+      console.log("objectData.length", objectData.length);
+  console.log("filteredItems.length", filteredItems.length);
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
