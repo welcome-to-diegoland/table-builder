@@ -3621,8 +3621,6 @@ function updateCellStyle(cell, hasValue) {
 
 function applyCategoryTables() {
   if (!filteredItems.length || !objectData.length) {
-    console.log("objectData.length", objectData.length);
-    console.log("filteredItems.length", filteredItems.length);
     alert("Primero debes cargar los archivos necesarios");
     return;
   }
@@ -3637,14 +3635,13 @@ function applyCategoryTables() {
   output.innerHTML = '';
   createStatusMessage();
 
-  // Depuración: estadísticas de columnas aplicadas
   let missingCatAttrsGroups = [];
   let emptyCatAttrsGroups = [];
   let appliedColumnsMsgs = [];
 
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) continue;
+    if (!groupItems.length) continue;
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -3655,8 +3652,7 @@ function applyCategoryTables() {
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
 
-    // --- ORDEN DE COLUMNAS SEGÚN table_attributes_cat ---
-    // Busca el primer item que tenga ese campo, no vacío
+    // columnas catálogo
     const itemWithCatAttrs = groupItems.find(item => item.table_attributes_cat && item.table_attributes_cat.trim());
     let customAttrs = [];
     if (itemWithCatAttrs) {
@@ -3665,19 +3661,17 @@ function applyCategoryTables() {
         .split(',')
         .map(attr => attr.trim())
         .filter(attr => attr);
-      if (customAttrs.length === 0) {
-        emptyCatAttrsGroups.push(groupIdStr);
-      }
+      if (customAttrs.length === 0) emptyCatAttrsGroups.push(groupIdStr);
     } else {
       missingCatAttrsGroups.push(groupIdStr);
     }
     appliedColumnsMsgs.push(`Grupo ${groupIdStr}: ${customAttrs.length ? customAttrs.join(', ') : '(sin columnas)'}`);
-    console.log(`Grupo ${groupIdStr} columnas aplicadas:`, customAttrs);
 
     // --- Render de grupo y tabla ---
     const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
+
     // HEADER
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
@@ -3704,6 +3698,8 @@ function applyCategoryTables() {
     }
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
+
+    // RIGHT HEADER (badges)
     const rightContainer = document.createElement("div");
     rightContainer.className = "group-header-right";
     const hasNewItem = groupItems.some(item => {
@@ -3721,59 +3717,81 @@ function applyCategoryTables() {
       mergedBadge.className = "merged-badge";
       mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
+    }
+    headerDiv.appendChild(rightContainer);
 
-      // Detalles de grupo unido
+    // --- Bloque de detalles/pleca con toggle SIEMPRE ---
+    let detailsHtml = "";
+    if (groupInfo) {
+      if (groupInfo.ventajas) detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupInfo.ventajas}</div>`;
+      if (groupInfo.aplicaciones) detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupInfo.aplicaciones}</div>`;
+      if (groupInfo.especificaciones) detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupInfo.especificaciones}</div>`;
+      if (groupInfo.incluye) detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupInfo.incluye}</div>`;
+    }
+
+    if (detailsHtml || isMergedGroup) {
       const detailsContainer = document.createElement("div");
       detailsContainer.className = "group-details-container";
       const toggleDetailsBtn = document.createElement("button");
       toggleDetailsBtn.className = "toggle-details-btn";
       toggleDetailsBtn.textContent = "▼ Detalles";
       toggleDetailsBtn.setAttribute("aria-expanded", "false");
+
       const detailsDiv = document.createElement("div");
       detailsDiv.className = "group-extra-details";
       detailsDiv.style.display = "none";
-      const mergedTextarea = document.createElement("textarea");
-      mergedTextarea.className = "form-control merged-group-textarea";
-      mergedTextarea.rows = 10;
-      let mergedContent = getMergedGroupDetails(groupIdStr);
-      if (!mergedContent) {
-        const mergedGroupData = mergedGroups.get(groupIdStr);
-        mergedContent = "";
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
+
+      if (isMergedGroup) {
+        const mergedTextarea = document.createElement("textarea");
+        mergedTextarea.className = "form-control merged-group-textarea";
+        mergedTextarea.rows = 10;
+        let mergedContent = getMergedGroupDetails(groupIdStr);
+        if (!mergedContent) {
+          // Genera el default solo si nunca se ha editado
+          const mergedGroupData = mergedGroups.get(groupIdStr);
+          mergedContent = "";
+          mergedGroupData.originalGroups.forEach(originalGroupId => {
+            const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+            mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
+            const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+            fields.forEach(field => {
+              if (originalGroupInfo[field]) {
+                let fieldValue = originalGroupInfo[field]
+                  .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                  .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+                mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+              }
+            });
+            mergedContent += "--------------------\n\n";
           });
-          mergedContent += "--------------------\n\n";
+        }
+        mergedTextarea.value = mergedContent.trim();
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
+        saveBtn.textContent = "Guardar Cambios";
+        saveBtn.addEventListener('click', function() {
+          saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
         });
+
+        detailsDiv.appendChild(mergedTextarea);
+        detailsDiv.appendChild(saveBtn);
+      } else {
+        detailsDiv.innerHTML = detailsHtml;
       }
-      mergedTextarea.value = mergedContent.trim();
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
-      saveBtn.textContent = "Guardar Cambios";
-      saveBtn.addEventListener('click', function() {
-        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
-      });
-      detailsDiv.appendChild(mergedTextarea);
-      detailsDiv.appendChild(saveBtn);
+
       toggleDetailsBtn.addEventListener("click", function () {
         const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
         toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
         detailsDiv.style.display = expanded ? "none" : "block";
         toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
       });
+
       detailsContainer.appendChild(toggleDetailsBtn);
       detailsContainer.appendChild(detailsDiv);
-      rightContainer.appendChild(detailsContainer);
+      headerDiv.appendChild(detailsContainer);
     }
-    headerDiv.appendChild(rightContainer);
+
     groupDiv.appendChild(headerDiv);
 
     // Renderiza la tabla usando customAttrs
@@ -3781,7 +3799,6 @@ function applyCategoryTables() {
     output.appendChild(groupDiv);
   }
 
-  // Mensajes visuales de depuración
   if (appliedColumnsMsgs.length) {
     fileInfoDiv.innerHTML += `<pre style="background:#f9f9f9; border:1px solid #ccc; padding:8px; margin-top:8px;">
 <strong>Columnas aplicadas por grupo:</strong>
