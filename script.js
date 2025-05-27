@@ -394,7 +394,6 @@ function handleCombinedExcel(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  fileInfoDiv.innerHTML = `<p>Procesando archivo combinado: <strong>${file.name}</strong></p>`;
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -404,13 +403,11 @@ function handleCombinedExcel(event) {
       const dataSheet = workbook.Sheets["data"];
       const catSheet = workbook.Sheets["category-data"];
       if (!dataSheet || !catSheet) {
-        fileInfoDiv.innerHTML += `<p class="text-danger">El archivo debe tener las hojas "data" y "category-data"</p>`;
         return;
       }
       filteredItems = XLSX.utils.sheet_to_json(dataSheet);
       categoryData = XLSX.utils.sheet_to_json(catSheet);
-      fileInfoDiv.innerHTML += `<p>✅ Data cargada (${filteredItems.length} items)</p>`;
-      fileInfoDiv.innerHTML += `<p>✅ Category-data cargada (${categoryData.length} registros)</p>`;
+
 
       // Procesar órdenes por defecto y filtros después de cargar categoryData
       processCategoryDataFromSheet();
@@ -420,97 +417,156 @@ function handleCombinedExcel(event) {
 
     } catch (error) {
       console.error("Error procesando archivo combinado:", error);
-      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
     }
   };
   reader.readAsArrayBuffer(file);
 }
 
-function processCategoryDataFromSheet() {
-  if (filteredItems.length > 0 && filteredItems[0]['CMS IG']) {
-    const cmsIgValue = filteredItems[0]['CMS IG'];
-    const matchedItem = categoryData.find(item => item.image && item.image.includes(`W${cmsIgValue}.png`));
-    if (matchedItem) {
-      // Procesa el orden de atributos para defaultAttributesOrder
-      if (matchedItem.table_attributes) {
-        let attributesStr = matchedItem.table_attributes;
-        if (!attributesStr.includes(',') && attributesStr.includes(' ')) {
-          attributesStr = attributesStr.replace(/\s+/g, ',');
-        }
-        const attributes = attributesStr.split(',')
-          .map(attr => attr.trim())
-          .filter(attr => attr && !['marca', 'sku', 'price'].includes(attr));
-        defaultAttributesOrder = {};
-        attributes.forEach((attr, index) => {
-          defaultAttributesOrder[attr] = index + 1;
-        });
+function handleCombinedExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const dataSheet = workbook.Sheets["data"];
+      const catSheet = workbook.Sheets["category-data"];
+      if (!dataSheet || !catSheet) {
+        return;
       }
-      // Procesa los filtros por defecto
-      if (matchedItem.filter_attributes) {
-        let filterAttributesStr = matchedItem.filter_attributes;
-        if (!filterAttributesStr.includes(',') && filterAttributesStr.includes(' ')) {
-          filterAttributesStr = filterAttributesStr.replace(/\s+/g, ',');
-        }
-        const filterAttributes = filterAttributesStr.split(',')
-          .map(attr => attr.trim())
-          .filter(attr => attr);
-        defaultFilterAttributes = new Set(filterAttributes);
-        forcedFilterAttributes.forEach(attr => {
-          defaultFilterAttributes.add(attr);
-        });
-        applyWebFiltersVisualUpdate();
-      }
-      updateOrderInputs();
+      filteredItems = XLSX.utils.sheet_to_json(dataSheet);
+      categoryData = XLSX.utils.sheet_to_json(catSheet);
+
+      // ==>> AGREGA ESTA LÍNEA AQUÍ:
+      renderCategoryTree(categoryData, document.getElementById('fileInfo'));
+
+      // Procesar órdenes por defecto y filtros después de cargar categoryData
+      processCategoryDataFromSheet();
+
+      // Si ya está el CSV cargado, renderiza la UI
+      if (objectData.length > 0) render();
+
+    } catch (error) {
+      console.error("Error procesando archivo combinado:", error);
     }
-  }
-  // Si ya está el CSV cargado, renderiza la UI
-  if (filteredItems.length > 0 && objectData.length > 0) {
-    render();
-  }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function handleCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  fileInfoDiv.innerHTML += `<p>Procesando Data File: <strong>${file.name}</strong></p>`;
 
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: (results) => {
       objectData = results.data;
-      fileInfoDiv.innerHTML += `<p>✅ Data File cargado (${objectData.length} registros)</p>`;
       // Si ya está el Excel combinado cargado, renderiza la UI
       if (filteredItems.length > 0) render();
     },
     error: (error) => {
       console.error("Error procesando Data File:", error);
-      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
     }
   });
 }
 
-function handleCSV(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+function renderCategoryTree(categoryData, fileInfoDiv) {
+  // Construir estructura de árbol y mapa de imágenes
+  const tree = {};
+  const pathToImage = {};
 
-  fileInfoDiv.innerHTML += `<p>Procesando Data File: <strong>${file.name}</strong></p>`;
-  
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      objectData = results.data;
-      fileInfoDiv.innerHTML += `<p>✅ Data File cargado (${objectData.length} registros)</p>`;
-      if (filteredItems.length) render();
-    },
-    error: (error) => {
-      console.error("Error procesando Data File:", error);
-      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
+  // Filtrar filas inválidas
+  categoryData.forEach(row => {
+    if (!row.category || typeof row.category !== "string") return;
+    const path = row.category.split('ç');
+    let node = tree;
+    let currentPath = '';
+    for (let i = 0; i < path.length; i++) {
+      const key = path[i];
+      currentPath = currentPath ? currentPath + 'ç' + key : key;
+      if (!node[key]) node[key] = { __children: {}, __path: currentPath };
+      node = node[key].__children;
+      // Solo en la hoja, guarda image para ruta completa
+      if (i === path.length - 1 && row.image) {
+        pathToImage[currentPath] = row.image;
+      }
     }
   });
+
+  // Renderizar el árbol recursivamente
+  function createTreeHTML(nodeObj) {
+    const ul = document.createElement('ul');
+    ul.className = 'category-tree-ul';
+    Object.keys(nodeObj).forEach(key => {
+      if (key === '__children' || key === '__path') return;
+      const node = nodeObj[key];
+      const li = document.createElement('li');
+      li.className = 'category-tree-li';
+      const nodePath = node.__path;
+      const imageRaw = pathToImage[nodePath] || '';
+      let code = '';
+      if (imageRaw) code = imageRaw.replace(/^W/, '').replace(/\.png$/i, '');
+      const label = document.createElement('span');
+      label.className = 'category-tree-label';
+      label.setAttribute('data-path', nodePath);
+      label.textContent = code ? `[${code}] ${key}` : key;
+      label.style.cursor = 'pointer';
+      label.addEventListener('click', function(e) {
+        e.stopPropagation();
+        document.querySelectorAll('.category-tree-label.selected').forEach(el => el.classList.remove('selected'));
+        label.classList.add('selected');
+      });
+      li.appendChild(label);
+      const childrenKeys = Object.keys(node.__children).filter(k => k !== '__children' && k !== '__path');
+      if (childrenKeys.length > 0) {
+        const expandBtn = document.createElement('span');
+        expandBtn.textContent = '▶';
+        expandBtn.className = 'category-tree-expand-btn';
+        expandBtn.style.cursor = 'pointer';
+        expandBtn.style.marginRight = '6px';
+        expandBtn.setAttribute('aria-expanded', 'false');
+        li.insertBefore(expandBtn, label);
+        const childrenUl = createTreeHTML(node.__children);
+        childrenUl.style.display = 'none';
+        expandBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const expanded = expandBtn.getAttribute('aria-expanded') === 'true';
+          expandBtn.setAttribute('aria-expanded', !expanded);
+          childrenUl.style.display = expanded ? 'none' : 'block';
+          expandBtn.textContent = expanded ? '▶' : '▼';
+        });
+        li.appendChild(childrenUl);
+      }
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  // Limpiar y montar el árbol
+  fileInfoDiv.innerHTML = '';
+  const treeHtml = createTreeHTML(tree);
+  fileInfoDiv.appendChild(treeHtml);
+
+  // CSS básico para el árbol (solo se añade una vez)
+  const styleId = 'category-tree-style';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+    .category-tree-ul { list-style: none; margin-left: 1em; padding-left: 1em; border-left: 1px dashed #aaa; }
+    .category-tree-li { margin: 3px 0; }
+    .category-tree-label.selected { background: #ffe0b2; border-radius: 4px; }
+    .category-tree-expand-btn { font-weight: bold; }
+    .category-tree-label { padding: 2px 6px; }
+    `;
+    document.head.appendChild(style);
+  }
 }
+
 
 function initializeDragAndDrop() {
   // Agregar SortableJS si no está cargado
@@ -716,7 +772,6 @@ function handleCategoryData(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  fileInfoDiv.innerHTML += `<p>Procesando Category Data: <strong>${file.name}</strong></p>`;
   
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -726,7 +781,6 @@ function handleCategoryData(event) {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       categoryData = XLSX.utils.sheet_to_json(sheet);
       
-      fileInfoDiv.innerHTML += `<p>✅ Category Data cargado (${categoryData.length} registros)</p>`;
       
       if (filteredItems.length > 0 && filteredItems[0]['CMS IG']) {
         const cmsIgValue = filteredItems[0]['CMS IG'];
@@ -776,7 +830,6 @@ function handleCategoryData(event) {
       }
     } catch (error) {
       console.error("Error procesando Category Data:", error);
-      fileInfoDiv.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
     }
   };
   reader.readAsArrayBuffer(file);
@@ -848,12 +901,7 @@ function updateOrderInputs() {
     }
   });
 
-  fileInfoDiv.innerHTML += `
-    <p class="update-info">
-      <strong>Actualización de órdenes:</strong> 
-      ${updateCount} inputs actualizados
-    </p>
-  `;
+
 
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 }
@@ -1424,7 +1472,6 @@ function clearAllFilters() {
   highlightActiveFilter();
 
   render();
-  fileInfoDiv.innerHTML += `<p>Todos los filtros han sido sincronizados pero no borrados.</p>`;
 }
 
 function filterItemsByAttributeValue(attribute, value) {
@@ -1592,7 +1639,6 @@ function loadWebOrder() {
   if (objectData.length && filteredItems.length) {
     const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
     processItemGroups(skuToObject);
-    fileInfoDiv.innerHTML += `<p>Órdenes restaurados desde table_attributes</p>`;
   }
 }
 
@@ -1612,7 +1658,6 @@ function clearAttributeOrder() {
     const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
     processItemGroups(skuToObject);
     createStatusMessage();
-    fileInfoDiv.innerHTML += `<p>Órdenes Web eliminados</p>`;
   }
 }
 
@@ -1634,7 +1679,6 @@ function clearCatOrder() {
     const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
     processItemGroups(skuToObject);
     createStatusMessage();
-    fileInfoDiv.innerHTML += `<p>Órdenes Cat eliminados</p>`;
   }
 }
 
@@ -1732,10 +1776,7 @@ function applyOrder() {
     processItemGroups(skuToObject);
     
     // 4. Feedback visual
-    fileInfoDiv.innerHTML += `<p>Órdenes de columnas web aplicados</p>`;
-  } else {
-    alert("Primero debes cargar los archivos necesarios");
-  }
+  } 
 }
 
 
@@ -1765,9 +1806,7 @@ function applyCatOrder() {
     processItemGroups(skuToObject);
     
     // 4. Feedback visual
-    fileInfoDiv.innerHTML += `<p>Órdenes de categoría aplicados</p>`;
-  } else {
-    alert("Primero debes cargar los archivos necesarios");
+
   }
 }
 
@@ -1777,7 +1816,6 @@ function clearFilter() {
   if (objectData.length && filteredItems.length) {
     const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
     processItemGroups(skuToObject);
-    fileInfoDiv.innerHTML += `<p>Filtro limpiado</p>`;
   }
 }
 
@@ -1846,7 +1884,6 @@ function unmergeGroup(groupId) {
   }
   
   // 7. Mensaje visual
-  fileInfoDiv.innerHTML += `<p class="text-success">✅ Grupo unido ${groupId} ha sido desagrupado</p>`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
   
 }
@@ -2715,7 +2752,6 @@ function mergeSelectedGroups() {
 
   // Mensaje visual
   const message = `✅ ${groupsToMerge.length} grupos unidos como ${newGroupId}`;
-  fileInfoDiv.innerHTML += `<p class="text-success">${message}</p>`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 }
 
@@ -3800,18 +3836,12 @@ function applyCategoryTables() {
   }
 
   if (appliedColumnsMsgs.length) {
-    fileInfoDiv.innerHTML += `<pre style="background:#f9f9f9; border:1px solid #ccc; padding:8px; margin-top:8px;">
-<strong>Columnas aplicadas por grupo:</strong>
-${appliedColumnsMsgs.join('\n')}
-</pre>`;
+
   }
   if (missingCatAttrsGroups.length) {
-    fileInfoDiv.innerHTML += `<p style="color:orange">⚠️ Grupo(s) sin campo <strong>table_attributes_cat</strong>: ${missingCatAttrsGroups.join(', ')}</p>`;
   }
   if (emptyCatAttrsGroups.length) {
-    fileInfoDiv.innerHTML += `<p style="color:orange">⚠️ Grupo(s) con <strong>table_attributes_cat</strong> vacío: ${emptyCatAttrsGroups.join(', ')}</p>`;
   }
-  fileInfoDiv.innerHTML += `<p class="text-success">✅ Tablas Cat aplicadas</p>`;
 }
 
 function initVerticalDrag(e) {
@@ -3905,12 +3935,10 @@ function clearFilterInputs() {
     processItemGroups(skuToObject);
   }
 
-  fileInfoDiv.innerHTML += `<p class="text-success">✅ Inputs de filtro limpiados completamente</p>`;
 }
 
 function loadDefaultFilters() {
   if (defaultFilterAttributes.size === 0) {
-      fileInfoDiv.innerHTML += `<p class="text-warning">⚠️ No hay filtros predeterminados definidos</p>`;
       return;
   }
 
@@ -3929,5 +3957,4 @@ function loadDefaultFilters() {
 
   // 3. Regenerar dropdowns (sin afectar tablas)
   // 4. Feedback visual
-  fileInfoDiv.innerHTML += `<p class="text-success">✅ Filtros predeterminados cargados</p>`;
 }
