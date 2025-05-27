@@ -514,7 +514,6 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       label.className = 'category-tree-label';
       label.setAttribute('data-path', nodePath);
       label.textContent = code ? `[${code}] ${key}` : key;
-      label.style.cursor = 'pointer';
       label.addEventListener('click', function(e) {
         e.stopPropagation();
         document.querySelectorAll('.category-tree-label.selected').forEach(el => el.classList.remove('selected'));
@@ -523,11 +522,10 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       li.appendChild(label);
       const childrenKeys = Object.keys(node.__children).filter(k => k !== '__children' && k !== '__path');
       if (childrenKeys.length > 0) {
+        // Nodo con hijos: flecha visible
         const expandBtn = document.createElement('span');
-        expandBtn.textContent = '▶';
+        expandBtn.textContent = '+';
         expandBtn.className = 'category-tree-expand-btn';
-        expandBtn.style.cursor = 'pointer';
-        expandBtn.style.marginRight = '6px';
         expandBtn.setAttribute('aria-expanded', 'false');
         li.insertBefore(expandBtn, label);
         const childrenUl = createTreeHTML(node.__children);
@@ -537,10 +535,18 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
           const expanded = expandBtn.getAttribute('aria-expanded') === 'true';
           expandBtn.setAttribute('aria-expanded', !expanded);
           childrenUl.style.display = expanded ? 'none' : 'block';
-          expandBtn.textContent = expanded ? '▶' : '▼';
+          expandBtn.textContent = expanded ? '+' : '+';
         });
         li.appendChild(childrenUl);
+      } else {
+        // Nodo hoja: flecha invisible
+        const emptySpan = document.createElement('span');
+        emptySpan.className = 'category-tree-expand-btn empty';
+        emptySpan.textContent = '+'; // mismo carácter, pero invisible
+        emptySpan.style.visibility = 'hidden';
+        li.insertBefore(emptySpan, label);
       }
+
       ul.appendChild(li);
     });
     return ul;
@@ -548,23 +554,9 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
 
   // Limpiar y montar el árbol
   fileInfoDiv.innerHTML = '';
+  fileInfoDiv.classList.add('category-tree-container'); // importante para el scroll horizontal y nowrap
   const treeHtml = createTreeHTML(tree);
   fileInfoDiv.appendChild(treeHtml);
-
-  // CSS básico para el árbol (solo se añade una vez)
-  const styleId = 'category-tree-style';
-  if (!document.getElementById(styleId)) {
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
-    .category-tree-ul { list-style: none; margin-left: 1em; padding-left: 1em; border-left: 1px dashed #aaa; }
-    .category-tree-li { margin: 3px 0; }
-    .category-tree-label.selected { background: #ffe0b2; border-radius: 4px; }
-    .category-tree-expand-btn { font-weight: bold; }
-    .category-tree-label { padding: 2px 6px; }
-    `;
-    document.head.appendChild(style);
-  }
 }
 
 

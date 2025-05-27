@@ -1650,3 +1650,49 @@ html, body {
   outline: none;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
+
+.category-tree-container {
+  overflow-x: auto;     /* Habilita el scroll horizontal si es necesario */
+  width: 100%;
+  max-width: 100%;
+  white-space: nowrap;  /* ¡Clave para evitar saltos de línea! */
+  padding-left: 0;
+  margin-left: 0;
+
+}
+
+/* ul del árbol debe ser inline-block para respetar el nowrap del contenedor */
+.category-tree-ul {
+  display: inline-block;
+  vertical-align: top;
+  list-style: none;
+  margin-left: -5px;
+  padding-left: 0;
+  white-space: nowrap;
+}
+
+
+
+.category-tree-label.selected {
+  background: #ffe0b2;
+  border-radius: 4px;
+}
+
+.category-tree-expand-btn {
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: -5px !important;
+  display: inline-block;
+  width: 1.1em;  /* o el ancho que quede bien */
+  text-align: center;
+}
+.category-tree-expand-btn.empty {
+  cursor: default;
+}
+
+.category-tree-label {
+  padding: 2px 6px;
+  white-space: nowrap;  /* Evita saltos en label */
+  cursor: pointer;
+  user-select: text;    /* Permite seleccionar el texto */
+}
