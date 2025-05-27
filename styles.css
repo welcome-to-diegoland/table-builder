@@ -339,8 +339,54 @@ html, body {
   font-size: 18px;
 }
 
+
 #box1 {
-  height: 10%;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* evita doble scroll */
+}
+
+#fileInfo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.category-tree-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #fafafa;
+  z-index: 10;
+  padding: 10px 10px 0 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  width: 100%;
+  min-height: 48px;
+}
+
+.category-tree-header > button {
+  width: 100%;
+  margin: 0;
+}
+
+.category-tree-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 0;
+  padding: 0;
+}
+
+.category-tree-ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 
@@ -1650,50 +1696,77 @@ html, body {
   outline: none;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
+
 .category-tree-container {
-  max-height: 400px;
-  width: 300px; /* Ajusta el ancho a tu gusto */
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ddd;
-  background: #fff;
-  position: relative;
-  overflow: hidden;
-}
-
-.category-tree-header {
-  background: #fafafa;
-  padding: 10px 10px 0 10px;
-  flex-shrink: 0;
-  z-index: 2;
-}
-
-#btn-cargar-categoria {
+  overflow-x: auto;     /* Habilita el scroll horizontal si es necesario */
   width: 100%;
-  margin-bottom: 0;
+  max-width: 100%;
+  white-space: nowrap;  /* ¡Clave para evitar saltos de línea! */
+  padding-left: 0;
+  margin-left: 0;
+  position: relative; 
+
+}
+
+/* ul del árbol debe ser inline-block para respetar el nowrap del contenedor */
+.category-tree-ul {
+  display: inline-block;
+  vertical-align: top;
+  list-style: none;
+  margin-left: -5px;
+  padding-left: 0;
+  white-space: nowrap;
+}
+
+
+
+.category-tree-label.selected {
+  background: #ffe0b2;
   border-radius: 4px;
+}
+
+.category-tree-expand-btn {
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: -5px !important;
+  display: inline-block;
+  width: 1.1em;  /* o el ancho que quede bien */
+  text-align: center;
+}
+.category-tree-expand-btn.empty {
+  cursor: default;
+}
+
+.category-tree-label {
+  padding: 2px 6px;
+  white-space: nowrap;  /* Evita saltos en label */
+  cursor: pointer;
+  user-select: text;    /* Permite seleccionar el texto */
+}
+
+/* Estilo para el botón de cargar categoría */
+#btn-cargar-categoria {
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* Si quieres personalizar más el botón */
+#btn-cargar-categoria {
+  display: block;
+  margin-bottom: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: #1976d2;
   color: #fff;
   border: none;
   padding: 8px 16px;
+  border-radius: 4px;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.2s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
+
 #btn-cargar-categoria.btn.btn-primary:hover {
   background: #1257a0;
-}
-
-.category-tree-list {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 10px;
-  position: relative;
-}
-
-.category-tree-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }

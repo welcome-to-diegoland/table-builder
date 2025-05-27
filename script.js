@@ -449,7 +449,7 @@ function handleCSV(event) {
 }
 
 function renderCategoryTree(categoryData, fileInfoDiv) {
-  // Construir estructura del árbol (igual que antes)
+  // Construir estructura de árbol y mapa de imágenes
   const tree = {};
   const pathToImage = {};
 
@@ -520,22 +520,28 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
     return ul;
   }
 
-  // --------- CAMBIO PRINCIPAL: estructura HTML ---------
-  fileInfoDiv.innerHTML = `
-    <div class="category-tree-container">
-      <div class="category-tree-header">
-        <button id="btn-cargar-categoria" class="btn btn-primary">Cargar categoría</button>
-      </div>
-      <div class="category-tree-list"></div>
-    </div>
-  `;
-  // Monta el árbol en el lugar correcto
-  const treeHtml = createTreeHTML(tree);
-  const treeListDiv = fileInfoDiv.querySelector('.category-tree-list');
-  treeListDiv.appendChild(treeHtml);
+  // Limpiar y montar la estructura
+  fileInfoDiv.innerHTML = '';
 
-  // Event listener para el botón (igual que antes)
-  const cargarBtn = fileInfoDiv.querySelector('#btn-cargar-categoria');
+  // Header sticky con el botón
+  let header = document.createElement('div');
+  header.className = 'category-tree-header';
+  fileInfoDiv.appendChild(header);
+
+  let cargarBtn = document.createElement('button');
+  cargarBtn.id = 'btn-cargar-categoria';
+  cargarBtn.className = 'btn btn-primary';
+  cargarBtn.textContent = 'Cargar categoría';
+  header.appendChild(cargarBtn);
+
+  // Contenedor para el árbol (hace scroll, no el header)
+  let treeList = document.createElement('div');
+  treeList.className = 'category-tree-list';
+  fileInfoDiv.appendChild(treeList);
+
+  const treeHtml = createTreeHTML(tree);
+  treeList.appendChild(treeHtml);
+
   cargarBtn.addEventListener('click', function() {
     const selected = fileInfoDiv.querySelector('.category-tree-label.selected');
     if (!selected) {
@@ -585,7 +591,6 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
     render();
   });
 }
-
 
 function processCategoryDataFromSheet() {
   // Si no hay datos, no procesar
