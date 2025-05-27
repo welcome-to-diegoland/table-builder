@@ -177,7 +177,7 @@ html, body {
 }
 
 .horizontal-divider {
-  height: 1px;
+  height: 4px;
   cursor: row-resize;
   flex-shrink: 0;
   margin: 2px 0;
@@ -391,7 +391,7 @@ html, body {
 
 
 #box3 {
-  height: 90%;
+  height: 100%;
 }
 
 #box4 {

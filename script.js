@@ -70,8 +70,8 @@ const excludedAttributes = new Set([
   "paginadecatalogo", "seccion", "ventajas", "brand_logo",
   "item_group_id", "categoria", "item_codeunspcweb_search_term",
   "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web",
-  "unspc", "description", "descripcion", "especificaciones", "web_search_term", 
-  "catalog_page_number", "Weight"
+  "unspc", "description", "especificaciones", "web_search_term", 
+  "catalog_page_number", "Weight", "icono_nuevo"
 ]);
 const script = document.createElement('script');
 script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js';
@@ -494,7 +494,7 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       const childrenKeys = Object.keys(node.__children).filter(k => k !== '__children' && k !== '__path');
       if (childrenKeys.length > 0) {
         const expandBtn = document.createElement('span');
-        expandBtn.textContent = '+';
+        expandBtn.textContent = '⏵';
         expandBtn.className = 'category-tree-expand-btn';
         expandBtn.setAttribute('aria-expanded', 'false');
         li.insertBefore(expandBtn, label);
@@ -505,13 +505,13 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
           const expanded = expandBtn.getAttribute('aria-expanded') === 'true';
           expandBtn.setAttribute('aria-expanded', !expanded);
           childrenUl.style.display = expanded ? 'none' : 'block';
-          expandBtn.textContent = expanded ? '+' : '+';
+          expandBtn.textContent = expanded ? '⏵' : '⏷';
         });
         li.appendChild(childrenUl);
       } else {
         const emptySpan = document.createElement('span');
         emptySpan.className = 'category-tree-expand-btn empty';
-        emptySpan.textContent = '+';
+        emptySpan.textContent = '⏷';
         emptySpan.style.visibility = 'hidden';
         li.insertBefore(emptySpan, label);
       }
