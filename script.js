@@ -35,6 +35,12 @@ let currentFilter = {
 let showEmptyAttributes = false;
 let defaultAttributesOrder = {};
 let selectedGroups = new Set();
+let filteredItemsOriginal = [];
+
+let objectDataOriginal = [];
+
+
+
 let attributeFiltersState = {};
 let attributeFilterInputs = {};
 let activeFilters = {};
@@ -394,7 +400,6 @@ function handleCombinedExcel(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
@@ -403,50 +408,20 @@ function handleCombinedExcel(event) {
       const dataSheet = workbook.Sheets["data"];
       const catSheet = workbook.Sheets["category-data"];
       if (!dataSheet || !catSheet) {
+        alert("El archivo no contiene las hojas necesarias.");
         return;
       }
-      filteredItems = XLSX.utils.sheet_to_json(dataSheet);
+      // Guardar originales
+      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet);
+      filteredItems = filteredItemsOriginal.slice();
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
-
-      // Procesar órdenes por defecto y filtros después de cargar categoryData
-      processCategoryDataFromSheet();
-
-      // Si ya está el CSV cargado, renderiza la UI
-      if (objectData.length > 0) render();
-
-    } catch (error) {
-      console.error("Error procesando archivo combinado:", error);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function handleCombinedExcel(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const dataSheet = workbook.Sheets["data"];
-      const catSheet = workbook.Sheets["category-data"];
-      if (!dataSheet || !catSheet) {
-        return;
-      }
-      filteredItems = XLSX.utils.sheet_to_json(dataSheet);
-      categoryData = XLSX.utils.sheet_to_json(catSheet);
-
-      // ==>> AGREGA ESTA LÍNEA AQUÍ:
+      // Renderiza el árbol (con el botón)
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
 
-      // Procesar órdenes por defecto y filtros después de cargar categoryData
       processCategoryDataFromSheet();
 
-      // Si ya está el CSV cargado, renderiza la UI
-      if (objectData.length > 0) render();
+      // NO render() aquí, hasta elegir categoría
 
     } catch (error) {
       console.error("Error procesando archivo combinado:", error);
@@ -459,14 +434,13 @@ function handleCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: (results) => {
-      objectData = results.data;
-      // Si ya está el Excel combinado cargado, renderiza la UI
-      if (filteredItems.length > 0) render();
+      objectDataOriginal = results.data.slice();
+      objectData = objectDataOriginal.slice();
+      // NO render() aquí: Espera a que elijan categoría
     },
     error: (error) => {
       console.error("Error procesando Data File:", error);
@@ -475,11 +449,10 @@ function handleCSV(event) {
 }
 
 function renderCategoryTree(categoryData, fileInfoDiv) {
-  // Construir estructura de árbol y mapa de imágenes
+  // Construir estructura del árbol (igual que antes)
   const tree = {};
   const pathToImage = {};
 
-  // Filtrar filas inválidas
   categoryData.forEach(row => {
     if (!row.category || typeof row.category !== "string") return;
     const path = row.category.split('ç');
@@ -490,14 +463,12 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       currentPath = currentPath ? currentPath + 'ç' + key : key;
       if (!node[key]) node[key] = { __children: {}, __path: currentPath };
       node = node[key].__children;
-      // Solo en la hoja, guarda image para ruta completa
       if (i === path.length - 1 && row.image) {
         pathToImage[currentPath] = row.image;
       }
     }
   });
 
-  // Renderizar el árbol recursivamente
   function createTreeHTML(nodeObj) {
     const ul = document.createElement('ul');
     ul.className = 'category-tree-ul';
@@ -522,7 +493,6 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       li.appendChild(label);
       const childrenKeys = Object.keys(node.__children).filter(k => k !== '__children' && k !== '__path');
       if (childrenKeys.length > 0) {
-        // Nodo con hijos: flecha visible
         const expandBtn = document.createElement('span');
         expandBtn.textContent = '+';
         expandBtn.className = 'category-tree-expand-btn';
@@ -539,26 +509,114 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
         });
         li.appendChild(childrenUl);
       } else {
-        // Nodo hoja: flecha invisible
         const emptySpan = document.createElement('span');
         emptySpan.className = 'category-tree-expand-btn empty';
-        emptySpan.textContent = '+'; // mismo carácter, pero invisible
+        emptySpan.textContent = '+';
         emptySpan.style.visibility = 'hidden';
         li.insertBefore(emptySpan, label);
       }
-
       ul.appendChild(li);
     });
     return ul;
   }
 
-  // Limpiar y montar el árbol
-  fileInfoDiv.innerHTML = '';
-  fileInfoDiv.classList.add('category-tree-container'); // importante para el scroll horizontal y nowrap
+  // --------- CAMBIO PRINCIPAL: estructura HTML ---------
+  fileInfoDiv.innerHTML = `
+    <div class="category-tree-container">
+      <div class="category-tree-header">
+        <button id="btn-cargar-categoria" class="btn btn-primary">Cargar categoría</button>
+      </div>
+      <div class="category-tree-list"></div>
+    </div>
+  `;
+  // Monta el árbol en el lugar correcto
   const treeHtml = createTreeHTML(tree);
-  fileInfoDiv.appendChild(treeHtml);
+  const treeListDiv = fileInfoDiv.querySelector('.category-tree-list');
+  treeListDiv.appendChild(treeHtml);
+
+  // Event listener para el botón (igual que antes)
+  const cargarBtn = fileInfoDiv.querySelector('#btn-cargar-categoria');
+  cargarBtn.addEventListener('click', function() {
+    const selected = fileInfoDiv.querySelector('.category-tree-label.selected');
+    if (!selected) {
+      alert("Selecciona una categoría del árbol");
+      return;
+    }
+    const match = selected.textContent.match(/\[(.*?)\]/);
+    if (!match) {
+      alert("La categoría seleccionada no tiene código CMS válido");
+      return;
+    }
+    const cmsCode = match[1].trim();
+
+    if (!filteredItemsOriginal.length || !objectDataOriginal.length) {
+      alert("Primero carga los archivos de datos.");
+      return;
+    }
+
+    // 1. Filtra los SKUs del CMS
+    const filtered = filteredItemsOriginal.filter(x => (x["CMS IG"] || "").trim() === cmsCode);
+
+    if (!filtered.length) {
+      alert("No hay SKUs para este código CMS en los datos cargados.");
+      return;
+    }
+
+    // 2. Calcula los IG ID únicos de los SKUs filtrados
+    const validSkus = new Set(filtered.map(x => x.SKU));
+    const groupIds = new Set(filtered.map(x => String(x["IG ID"])).filter(Boolean));
+
+    // 3. Incluye SKUs y también los objetos grupo (SKU == IG ID)
+    objectData = objectDataOriginal.filter(obj =>
+      validSkus.has(obj.SKU) || groupIds.has(String(obj.SKU))
+    );
+
+    // 4. Actualiza el array visible
+    filteredItems = filtered;
+
+    // 5. Limpia merges/selección si aplica (si existen esas variables)
+    if (typeof selectedGroups !== "undefined") selectedGroups.clear();
+    if (typeof mergedGroups !== "undefined") mergedGroups.clear();
+
+    // 6. Procesar datos de categorías para orden/filtros
+    processCategoryDataFromSheet();
+
+    // 7. Renderiza
+    render();
+  });
 }
 
+
+function processCategoryDataFromSheet() {
+  // Si no hay datos, no procesar
+  if (!categoryData.length || !filteredItems.length) return;
+  // Tomar el CMS IG actual
+  const cmsIgValue = filteredItems[0]['CMS IG'];
+  // Buscar la fila de categoryData correspondiente al CMS IG
+  const matchedItem = categoryData.find(item => item.image && item.image.includes(`W${cmsIgValue}.png`));
+  if (matchedItem) {
+    // Procesa los atributos para defaultAttributesOrder, defaultFilterAttributes, etc...
+    // (Tu lógica aquí, igual que antes)
+    let attributesStr = matchedItem.table_attributes || "";
+    if (!attributesStr.includes(',') && attributesStr.includes(' ')) {
+      attributesStr = attributesStr.replace(/\s+/g, ',');
+    }
+    const attributes = attributesStr.split(',').map(attr => attr.trim()).filter(attr => attr && !['marca', 'sku', 'price'].includes(attr));
+    defaultAttributesOrder = {};
+    attributes.forEach((attr, index) => {
+      defaultAttributesOrder[attr] = index + 1;
+    });
+    // Filtros
+    let filterAttributesStr = matchedItem.filter_attributes || "";
+    if (!filterAttributesStr.includes(',') && filterAttributesStr.includes(' ')) {
+      filterAttributesStr = filterAttributesStr.replace(/\s+/g, ',');
+    }
+    const filterAttributes = filterAttributesStr.split(',').map(attr => attr.trim()).filter(attr => attr);
+    defaultFilterAttributes = new Set(filterAttributes);
+    forcedFilterAttributes.forEach(attr => defaultFilterAttributes.add(attr));
+    // (Agrega aquí tu lógica si tienes otras variables de orden/filtro)
+  }
+}
 
 function initializeDragAndDrop() {
   // Agregar SortableJS si no está cargado
