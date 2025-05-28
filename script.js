@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
   csvFileInput.addEventListener("change", handleCSV);
   //categoryDataFileInput.addEventListener("change", handleCategoryData);
   applyOrderBtn.addEventListener("click", applyOrder);
-  applyCatOrderBtn.addEventListener("click", applyCatOrder);
+  applyCatOrderBtn.addEventListener("click", applyCatOrder); 
   loadWebOrderBtn.addEventListener("click", loadWebOrder);
   clearOrderBtn.addEventListener("click", clearAttributeOrder);
   document.getElementById('combinedFile').addEventListener('change', handleCombinedExcel);
