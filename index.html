@@ -16,102 +16,54 @@
     <div class="header-content">
       <div class="header-column left-column bg-primary-dark">
         <div class="file-inputs">
-
           <div class="input-group">
             <label for="xlsxFile">Items File (xlsx):</label>
             <input type="file" id="combinedFile" accept=".xlsx,.xls" />
           </div>
-        
           <div class="input-group">
             <label for="csvFile">Data File (csv):</label>
             <input type="file" id="csvFile" accept=".csv" />
           </div>
-      
-          
         </div>
       </div>
       <div class="header-column right-column bg-primary-light">
         <div class="header-buttons">
-          
           <!-- exportar -->
-           
           <button id="exportStatsExcelBtn" class="header-excel-btn">
-            Exportar<br>Excel
+            Exportar todos<br>los Archivos
           </button>
-
-          <!-- merge -->
-
-           <button id="mergeGroupsBtn" class="header-web-btn"><i class="fas fa-object-group"></i> Unir Grupos<br>Seleccionados
+          <button id="exportAtributosBtn" class="header-excel-btn" title="Exportar solo Atributos">
+            <i class="fa fa-table"></i>
+            Exportar Órdenes<br>de Atributos
           </button>
-
-          <!-- tablas catalogo -->
-
-          <button id="applyCatTablesBtn" class="header-cat-btn">
-            Aplicar Catálogo<br>Actual
-          </button>  
-
-          <!-- tablas catalogo nuevas -->
-
-          <button id="applyCatOrderBtn" class="header-cat-btn">
-            Aplicar Catálogo<br>Nuevas
+          <button id="exportOrdenGruposBtn" class="header-excel-btn" title="Exportar solo Orden Grupos">
+            <i class="fa fa-layer-group"></i>
+            Exportar Orden<br>de Items
           </button>
-
-          <button id="clearCatOrderBtn" class="header-cat-btn">
-            Limpiar Catálogo<br>Nuevas
+          <button id="exportMergedBtn" class="header-excel-btn" title="Exportar solo Merged">
+            <i class="fa fa-object-group"></i>
+             Exportar Nuevos<br>Grupos
           </button>
-
-          <!-- tablas web -->
-
-          <button id="loadWebOrderBtn" class="header-web-btn">
-            Aplicar Web<br>Actual
+          <button id="exportValoresNuevosBtn" class="header-excel-btn" title="Exportar solo Valores Nuevos">
+            <i class="fa fa-pen"></i>
+            Exportar Valores<br>Faltantes
           </button>
-
-          <button id="applyOrderBtn" class="header-web-btn">
-            Aplicar Web<br>Nuevas
-          </button>
-
-          <button id="clearOrderBtn" class="header-web-btn">
-            Limpiar Web<br>Nuevas
-          </button>
-
-          <!-- tablas vacios -->
-          <button id="toggleEmptyBtn" class="header-att-btn">
-            <span class="toggle-content">
-              Atributos Vacíos<br>
-              <span class="toggle-state"></span>
-            </span>
-          </button>
-
-          <!-- filtros -->
-
-          <button id="loadDefaultFilters" class="header-filter-btn">
-            Aplicar Filtros<br>Actuales
-          </button>
-
-          <button id="clearFilterInputs" class="header-filter-btn">
-            Limpiar Filtros<br>Nuevos
-          </button>
-
-        </div>         
+        </div>
       </div>
     </div>
   </header>
-
   <main class="main-container">
     <section class="left-section" id="leftSection">
-      
       <article class="box" id="box1">
         <div id="fileInfo"></div>
       </article>
-
-      <div class="horizontal-divider" id="horizontalDivider"></div> 
+      <div class="horizontal-divider" id="horizontalDivider"></div>
       <article class="box" id="box3">
-                <div class="box-content">
+        <div class="box-content">
           <div id="attributeStats"></div>
         </div>
       </article>
     </section>
-
     <div class="vertical-divider" id="verticalDivider"></div>
     <section class="right-section" id="rightSection">
       <article class="box" id="box4">
@@ -121,5 +73,4 @@
   </main>
   <script src="script.js"></script>
 </body>
-
 </html>

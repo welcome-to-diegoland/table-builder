@@ -358,38 +358,6 @@ html, body {
   flex-direction: column;
 }
 
-.category-tree-header {
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: #fafafa;
-  z-index: 10;
-  padding: 10px 10px 0 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-  width: 100%;
-  min-height: 48px;
-}
-
-.category-tree-header > button {
-  width: 100%;
-  margin: 0;
-}
-
-.category-tree-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  margin-top: 0;
-  padding: 0;
-}
-
-.category-tree-ul {
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
 
 #box3 {
   height: 100%;
@@ -1698,6 +1666,38 @@ html, body {
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
+.category-tree-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  z-index: 10;
+  padding: 10px 10px 0 10px;
+  width: 100%;
+  min-height: 50px;
+}
+
+.category-tree-header > button {
+  width: 100%;
+  margin: 0;
+}
+#btn-cargar-categoria {
+  font-size: 16px !important;
+  display: block;
+    padding: 1px;
+}
+
+.category-tree-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 0;
+  padding: 0;
+}
+
+
+
 .category-tree-container {
   overflow-x: auto;     /* Habilita el scroll horizontal si es necesario */
   width: 100%;
@@ -1706,17 +1706,18 @@ html, body {
   padding-left: 0;
   margin-left: 0;
   position: relative; 
-
 }
 
 /* ul del árbol debe ser inline-block para respetar el nowrap del contenedor */
 .category-tree-ul {
+  padding-top: 0px !important;
   display: inline-block;
   vertical-align: top;
   list-style: none;
   margin-left: -5px;
   padding-left: 0;
   white-space: nowrap;
+
 }
 
 
@@ -1746,10 +1747,7 @@ html, body {
 }
 
 /* Estilo para el botón de cargar categoría */
-#btn-cargar-categoria {
-  display: block;
-  margin-bottom: 10px;
-}
+
 
 .filter-header-icons {
   display: flex;
@@ -1855,13 +1853,13 @@ html, body {
   justify-content: center;
   align-items: flex-start;
   margin-bottom: 0;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 .att-header-toggle-btn {
   background: none;
   border: 1px solid #bbb;
   border-radius: 5px;
-  padding: 0 4px;
+  padding: 3px 14px !important;
   min-width: 38px;
   min-height: 18px;
   font-size: 11px;
@@ -1869,7 +1867,7 @@ html, body {
   cursor: pointer;
   color: #666;
   transition: background 0.15s, border 0.15s, color 0.15s;
-  margin-bottom: 2px;
+  margin-bottom: 5px;
   margin-top: 2px;
 }
 .att-header-toggle-btn.active {

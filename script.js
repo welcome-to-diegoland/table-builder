@@ -87,23 +87,13 @@ document.addEventListener('DOMContentLoaded', function() {
   //xlsxFileInput.addEventListener("change", handleXLSX);
   csvFileInput.addEventListener("change", handleCSV);
   //categoryDataFileInput.addEventListener("change", handleCategoryData);
-  applyOrderBtn.addEventListener("click", applyOrder);
-  applyCatOrderBtn.addEventListener("click", applyCatOrder); 
-  loadWebOrderBtn.addEventListener("click", loadWebOrder);
-  clearOrderBtn.addEventListener("click", clearAttributeOrder);
   document.getElementById('combinedFile').addEventListener('change', handleCombinedExcel);
   combinedFileInput.addEventListener("change", handleCombinedExcel);
  
 
-  clearCatOrderBtn.addEventListener("click", clearCatOrder);
   addMergeStyles();
-  
-  toggleEmptyBtn.addEventListener("click", toggleEmptyAttributes);
-  clearFilterInputsBtn.addEventListener("click", clearFilterInputs);
-  loadDefaultFiltersBtn.addEventListener("click", loadDefaultFilters);
-  document.getElementById('mergeGroupsBtn').addEventListener('click', mergeSelectedGroups);
+
   const applyCatTablesBtn = document.getElementById("applyCatTablesBtn");
-  applyCatTablesBtn.addEventListener("click", applyCategoryTables);
 
 
   // Exportar Excel
@@ -325,6 +315,183 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// Helper para obtener el CMS IG principal y sanitizar para nombre de archivo
+function getCmsIg() {
+  let cmsIg = "";
+  for (const item of filteredItems) {
+    if (item["CMS IG"]) {
+      cmsIg = item["CMS IG"];
+      break;
+    }
+  }
+  // Sanitizar para nombre de archivo
+  return String(cmsIg).replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_").trim();
+}
+
+document.getElementById('exportAtributosBtn').addEventListener('click', function() {
+  // Generar y exportar la pestaña "Atributos"
+  const cmsIg = getCmsIg();
+
+  const cmsSet = new Set();
+  filteredItems.forEach(item => {
+    if (item["CMS IG"]) cmsSet.add(item["CMS IG"]);
+  });
+
+  const attributes = [];
+  document.querySelectorAll('.filter-order-input').forEach(input => {
+    const attr = input.getAttribute('data-attribute');
+    if (attr) attributes.push(attr);
+  });
+
+  const data = [];
+  cmsSet.forEach(cmsIgVal => {
+    attributes.forEach(attr => {
+      const filtroInput = document.querySelector(`.filter-order-input[data-attribute="${attr}"]`);
+      const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+      const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
+      data.push({
+        "CMS IG": cmsIgVal,          
+        "Atributo": attr,
+        "Filtros": filtroInput ? (filtroInput.value || "") : "",
+        "Web": webInput ? (webInput.value || "") : "",
+        "Cat": catInput ? (catInput.value || "") : ""
+      });
+    });
+  });
+
+  const atributosCols = ["CMS IG", "Atributo", "Filtros", "Web", "Cat"];
+  const wsAtributos = XLSX.utils.json_to_sheet(data.length ? data : [{}], { header: atributosCols });
+  XLSX.utils.sheet_add_aoa(wsAtributos, [atributosCols], { origin: "A1" });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsAtributos, "Atributos");
+  XLSX.writeFile(wb, `${cmsIg}_Atributos.xlsx`);
+});
+
+document.getElementById('exportOrdenGruposBtn').addEventListener('click', function() {
+  // Generar y exportar la pestaña "Orden Grupos"
+  const cmsIg = getCmsIg();
+
+  const originalOrderByGroup = {};
+  filteredItems.forEach(item => {
+    const igidStr = String(item["IG ID"]);
+    if (!originalOrderByGroup[igidStr]) originalOrderByGroup[igidStr] = [];
+    originalOrderByGroup[igidStr].push(item.SKU);
+  });
+
+  const ordenExportData = [];
+  if (typeof groupOrderMap.entries === "function") {
+    for (const [igid, currentOrder] of groupOrderMap.entries()) {
+      const igidStr = String(igid);
+      if (igidStr.startsWith('merged-')) continue;
+      if (!Array.isArray(currentOrder)) continue;
+      const originalOrder = originalOrderByGroup[igidStr] || [];
+      const changed = originalOrder.length === currentOrder.length &&
+        originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
+      if (!changed) continue;
+      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+      const titulo = groupObj && groupObj.name ? groupObj.name : "";
+      currentOrder.forEach(sku => {
+        ordenExportData.push({
+          "IG ID": igidStr,
+          "titulo": titulo,
+          "Sku": sku
+        });
+      });
+    }
+  }
+  const ordenCols = ["IG ID", "titulo", "Sku"];
+  const wsOrden = XLSX.utils.json_to_sheet(ordenExportData.length ? ordenExportData : [{}], { header: ordenCols });
+  XLSX.utils.sheet_add_aoa(wsOrden, [ordenCols], { origin: "A1" });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsOrden, "Orden Grupos");
+  XLSX.writeFile(wb, `${cmsIg}_OrdenGrupos.xlsx`);
+});
+
+document.getElementById('exportMergedBtn').addEventListener('click', function() {
+  // Generar y exportar la pestaña "Merged"
+  const cmsIg = getCmsIg();
+
+  const mergedExportData = [];
+  if (typeof groupOrderMap.entries === "function") {
+    for (const [igid, currentOrder] of groupOrderMap.entries()) {
+      const igidStr = String(igid);
+      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+      const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
+      if (!igidStr.startsWith('merged-') || !groupObj || !hasItems) continue;
+      if (!Array.isArray(currentOrder)) continue;
+      let titulo = "";
+      const titleInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .group-title-input`);
+      if (titleInput && titleInput.value) {
+        titulo = titleInput.value;
+      } else {
+        titulo = groupObj.name || "";
+      }
+      let detalles = "";
+      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+      if (detailsInput && detailsInput.value) {
+        detalles = detailsInput.value;
+      } else {
+        detalles = groupObj.detalles || groupObj.ventajas || groupObj.descripcion || "";
+      }
+      currentOrder.forEach(sku => {
+        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+        mergedExportData.push({
+          "ID": igidStr.replace('merged-', ''),
+          "IG ID Original": originalIGID,
+          "titulo": titulo,
+          "Detalles": detalles,
+          "Sku": sku
+        });
+      });
+    }
+  }
+  const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
+  const wsMerged = XLSX.utils.json_to_sheet(mergedExportData.length ? mergedExportData : [{}], { header: mergedCols });
+  XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
+  XLSX.writeFile(wb, `${cmsIg}_Merged.xlsx`);
+});
+
+document.getElementById('exportValoresNuevosBtn').addEventListener('click', function() {
+  // Generar y exportar la pestaña "Valores Nuevos"
+  const cmsIg = getCmsIg();
+
+  const filledByUser = {};
+  const allAttrsFilled = new Set();
+  for (const cellKey in editedCells) {
+    const { value, wasOriginallyEmpty } = editedCells[cellKey];
+    if (wasOriginallyEmpty && value && value.trim() !== "") {
+      const idx = cellKey.lastIndexOf("-");
+      if (idx > 0) {
+        const sku = cellKey.substring(0, idx);
+        const attr = cellKey.substring(idx + 1);
+        if (!filledByUser[sku]) filledByUser[sku] = {};
+        filledByUser[sku][attr] = value.trim();
+        allAttrsFilled.add(attr);
+      }
+    }
+  }
+  const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
+  const valoresExport = [];
+  if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
+    for (const sku in filledByUser) {
+      const row = { "SKU": sku };
+      for (const attr of allAttrsFilled) {
+        row[attr] = filledByUser[sku][attr] || "";
+      }
+      valoresExport.push(row);
+    }
+  }
+  const wsValores = XLSX.utils.json_to_sheet(valoresExport.length ? valoresExport : [{}], { header: valoresCols.length > 1 ? valoresCols : ["SKU"] });
+  XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
+  XLSX.writeFile(wb, `${cmsIg}_ValoresNuevos.xlsx`);
+});
+
 
 function clearAllChecks() {
   const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -1364,8 +1531,8 @@ function createStatsColumn(stats) {
   const colWidthAtributo = 'auto';
   const colMinWidthAtributo = '120px';
   const colWidthFiltro = '50px';
-  const colWidthWeb = '50px';
-  const colWidthCat = '50px';
+  const colWidthWeb = '55px';
+  const colWidthCat = '55px';
   const colWidthConValor = '40px';
   const colWidthSinValor = '40px';
 
@@ -1383,7 +1550,7 @@ function createStatsColumn(stats) {
           <div class="att-header-toggle-container">
             <button type="button" id="stats-toggleEmptyBtn" class="att-header-toggle-btn" title="Mostrar/Ocultar atributos vacíos">
               <span class="toggle-content">
-                Atributos Vacíos<br>
+                Vacíos  
                 <span class="toggle-state">${showEmptyAttributes ? 'On' : 'Off'}</span>
               </span>
             </button>
@@ -1874,14 +2041,16 @@ function toggleEmptyAttributes() {
   currentViewState.showEmpty = showEmptyAttributes;
   
   const toggleBtn = document.getElementById('toggleEmptyBtn');
-  const toggleState = toggleBtn.querySelector('.toggle-state');
-  
-  if (showEmptyAttributes) {
-    toggleBtn.classList.add('active'); // Clase para estado activo
-    toggleState.textContent = 'On';
-  } else {
-    toggleBtn.classList.remove('active'); // Clase para estado inactivo
-    toggleState.textContent = 'Off';
+  // Solo intenta actualizar el toggle si existe el botón en el DOM
+  if (toggleBtn) {
+    const toggleState = toggleBtn.querySelector('.toggle-state');
+    if (showEmptyAttributes) {
+      toggleBtn.classList.add('active'); // Clase para estado activo
+      if (toggleState) toggleState.textContent = 'On';
+    } else {
+      toggleBtn.classList.remove('active'); // Clase para estado inactivo
+      if (toggleState) toggleState.textContent = 'Off';
+    }
   }
 
   if (objectData.length && filteredItems.length) {
