@@ -1751,45 +1751,140 @@ html, body {
   margin-bottom: 10px;
 }
 
-/* Si quieres personalizar más el botón */
-#btn-cargar-categoria {
-  display: block;
-  margin-bottom: 10px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: #1976d2;
-  color: #fff;
+.filter-header-icons {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.filter-header-icon-btn {
+  background: none;
   border: none;
-  padding: 2px 2px;
-  border-radius: 4px;
-  font-weight: bold;
+  padding: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
+}
+.filter-header-icon-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+.filter-header-icon-btn:hover {
+  background: #eee;
+  border-radius: 2px;
+}
+.filter-header-divider {
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 2px;
 }
 
-#btn-cargar-categoria.btn.btn-primary:hover {
-  background: #1257a0;
+/* WEB */
+.web-header-icons {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.web-header-icon-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.web-header-icon-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+.web-header-icon-btn:hover {
+  background: #eee;
+  border-radius: 2px;
+}
+.web-header-divider {
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 2px;
 }
 
+/* CAT */
 .cat-header-icons {
   display: flex;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   margin-bottom: 2px;
 }
 .cat-header-icon-btn {
   background: none;
   border: none;
-  padding: 0px;
+  padding: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
-  border-radius: 4px;
+}
+.cat-header-icon-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
 }
 .cat-header-icon-btn:hover {
-  background: #f0f0f0;
+  background: #eee;
+  border-radius: 2px;
 }
 .cat-header-divider {
-  border-bottom: 1.5px solid #bbb;
+  border-bottom: 1px solid #ddd;
   margin-bottom: 2px;
+}
+
+/* TOGGLE ATRIBUTOS VACÍOS */
+.att-header-toggle-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 0;
+  margin-top: 2px;
+}
+.att-header-toggle-btn {
+  background: none;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  padding: 0 4px;
+  min-width: 38px;
+  min-height: 18px;
+  font-size: 11px;
+  line-height: 1.15;
+  cursor: pointer;
+  color: #666;
+  transition: background 0.15s, border 0.15s, color 0.15s;
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+.att-header-toggle-btn.active {
+  background: #e0f7fa;
+  color: #00796b;
+  border-color: #009688;
+}
+.att-header-toggle-btn .toggle-state {
+  font-weight: bold;
+  color: #009688;
+}
+.att-header-toggle-btn:not(.active) .toggle-state {
+  color: #bbb;
+}
+.att-header-toggle-btn:focus {
+  outline: 1px solid #009688;
+  outline-offset: 2px;
 }

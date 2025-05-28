@@ -1361,8 +1361,7 @@ function processAttributeStats(skuToObject) {
 }
 
 function createStatsColumn(stats) {
-  // Puedes editar estos valores para ajustar el ancho de cada columna
-  const colWidthAtributo = 'auto'; // flexible
+  const colWidthAtributo = 'auto';
   const colMinWidthAtributo = '120px';
   const colWidthFiltro = '50px';
   const colWidthWeb = '50px';
@@ -1375,12 +1374,20 @@ function createStatsColumn(stats) {
   
   const table = document.createElement("table");
   table.className = "table table-sm table-bordered attribute-stats-table";
-  table.style.tableLayout = "fixed"; // Importante para respetar anchos
+  table.style.tableLayout = "fixed";
 
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:${colWidthAtributo}; min-width:${colMinWidthAtributo};">
+        <th style="width:${colWidthAtributo}; min-width:${colMinWidthAtributo}; position:relative;">
+          <div class="att-header-toggle-container">
+            <button type="button" id="stats-toggleEmptyBtn" class="att-header-toggle-btn" title="Mostrar/Ocultar atributos vacíos">
+              <span class="toggle-content">
+                Atributos Vacíos<br>
+                <span class="toggle-state">${showEmptyAttributes ? 'On' : 'Off'}</span>
+              </span>
+            </button>
+          </div>
           <div class="attribute-header-wrapper">
             Atributo
             <button class="btn-clear-filter" title="Limpiar filtros" type="button">
@@ -1390,8 +1397,33 @@ function createStatsColumn(stats) {
             </button>
           </div>
         </th>
-        <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro};">Filtro</th>
-        <th style="width:${colWidthWeb}; min-width:${colWidthWeb};">Web</th>
+        <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro}; position:relative;">
+          <div class="filter-header-icons">
+            <button type="button" id="stats-loadDefaultFiltersBtn" class="filter-header-icon-btn" title="Aplicar Filtros Actuales">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="stats-clearFilterInputsBtn" class="filter-header-icon-btn" title="Limpiar Filtros Nuevos">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="filter-header-divider"></div>
+          Filtro
+        </th>
+        <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
+          <div class="web-header-icons">
+            <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="web-header-divider"></div>
+          Web
+        </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
           <div class="cat-header-icons">
             <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">
@@ -1472,14 +1504,14 @@ function createStatsColumn(stats) {
     </tbody>
   `;
 
-  // Asignar el evento de limpieza al/los botón/es btn-clear-filter
+  // --------- LISTENERS ---------
+  // Limpiar filtros generales
   table.querySelectorAll('.btn-clear-filter').forEach(btn => {
     btn.addEventListener('click', function() {
       clearAllFilters();
     });
   });
-
-  // Eventos para dropdowns de atributo
+  // Dropdowns de atributo
   table.querySelectorAll('.attribute-dropdown').forEach(dropdown => {
     dropdown.addEventListener('change', function() {
       const attribute = this.getAttribute('data-attribute');
@@ -1487,8 +1519,7 @@ function createStatsColumn(stats) {
       filterItemsByAttributeValue(attribute, value);
     });
   });
-
-  // Eventos para inputs de filtro
+  // Inputs de filtro
   table.querySelectorAll('.filter-order-input').forEach(input => {
     const attribute = input.getAttribute('data-attribute');
     attributeFilterInputs[attribute] = input;
@@ -1504,18 +1535,78 @@ function createStatsColumn(stats) {
       }
     });
   });
-
-  // Eventos para inputs de orden
+  // Inputs de orden
   table.querySelectorAll('.order-input, .order-cat-input').forEach(input => {
     input.addEventListener('change', saveAttributeOrder);
   });
-
-  // Eventos para celdas de click
+  // Celdas de click
   table.querySelectorAll('.clickable').forEach(cell => {
     cell.addEventListener('click', handleStatClick);
   });
 
-  // Eventos para los botones de iconos en el header Cat (¡importante!)
+  // --------- Toggle atributos vacíos (lógica CORRECTA) ---------
+  const statsToggleEmptyBtn = table.querySelector('#stats-toggleEmptyBtn');
+  if (statsToggleEmptyBtn) {
+    function setToggleUI() {
+      const toggleState = statsToggleEmptyBtn.querySelector('.toggle-state');
+      if (showEmptyAttributes) {
+        statsToggleEmptyBtn.classList.add('active');
+        toggleState.textContent = 'On';
+      } else {
+        statsToggleEmptyBtn.classList.remove('active');
+        toggleState.textContent = 'Off';
+      }
+    }
+    setToggleUI();
+    statsToggleEmptyBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof toggleEmptyAttributes === 'function') {
+        toggleEmptyAttributes();
+        setToggleUI();
+      }
+    });
+  }
+
+  // --------- Listeners Header Filtro ---------
+  const statsLoadDefaultFiltersBtn = table.querySelector('#stats-loadDefaultFiltersBtn');
+  if (statsLoadDefaultFiltersBtn) {
+    statsLoadDefaultFiltersBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof loadDefaultFilters === 'function') loadDefaultFilters();
+    });
+  }
+  const statsClearFilterInputsBtn = table.querySelector('#stats-clearFilterInputsBtn');
+  if (statsClearFilterInputsBtn) {
+    statsClearFilterInputsBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof clearFilterInputs === 'function') clearFilterInputs();
+    });
+  }
+
+  // --------- Listeners Header Web ---------
+  const statsLoadWebOrderBtn = table.querySelector('#stats-loadWebOrderBtn');
+  if (statsLoadWebOrderBtn) {
+    statsLoadWebOrderBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof loadWebOrder === 'function') loadWebOrder();
+    });
+  }
+  const statsApplyOrderBtn = table.querySelector('#stats-applyOrderBtn');
+  if (statsApplyOrderBtn) {
+    statsApplyOrderBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof applyOrder === 'function') applyOrder();
+    });
+  }
+  const statsClearOrderBtn = table.querySelector('#stats-clearOrderBtn');
+  if (statsClearOrderBtn) {
+    statsClearOrderBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof clearAttributeOrder === 'function') clearAttributeOrder();
+    });
+  }
+
+  // --------- Listeners Header Cat ---------
   const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
   if (statsApplyCatTablesBtn) {
     statsApplyCatTablesBtn.addEventListener('click', function(e) {
@@ -1536,46 +1627,6 @@ function createStatsColumn(stats) {
       e.preventDefault();
       if (typeof clearCatOrder === 'function') clearCatOrder();
     });
-  }
-
-  // CSS pequeño para los iconos (puedes moverlo a tu CSS global)
-  if (!document.getElementById('cat-header-icons-style')) {
-    const style = document.createElement('style');
-    style.id = 'cat-header-icons-style';
-    style.textContent = `
-      .cat-header-icons {
-        display: flex;
-        justify-content: center;
-        gap: 2px;
-        margin-bottom: 2px;
-      }
-      .cat-header-icon-btn {
-        background: none;
-        border: none;
-        padding: 0;
-        margin: 0;
-        width: 16px;
-        height: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-      }
-      .cat-header-icon-btn svg {
-        width: 12px;
-        height: 12px;
-        display: block;
-      }
-      .cat-header-icon-btn:hover {
-        background: #eee;
-        border-radius: 2px;
-      }
-      .cat-header-divider {
-        border-bottom: 1px solid #ddd;
-        margin-bottom: 2px;
-      }
-    `;
-    document.head.appendChild(style);
   }
 
   column.appendChild(table);
@@ -3435,13 +3486,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   }
   
   // Filtrar atributos según showEmptyAttributes
-  const filteredAttributes = orderedAttributes.filter(attr => {
-    if (showEmptyAttributes) return true;
-    return groupItems.some(item => {
-      const details = skuToObject[item.SKU] || {};
-      return details[attr.attribute]?.toString().trim();
-    });
+const filteredAttributes = orderedAttributes.filter(attr => {
+  if (showEmptyAttributes) return true; // ON: mostrar todos, vacíos incluidos
+  // OFF: solo los que tengan algún valor
+  return groupItems.some(item => {
+    const details = skuToObject[item.SKU] || {};
+    return details[attr.attribute]?.toString().trim();
   });
+});
 
   // Crear THEAD
   let theadHtml = "<thead><tr>";
