@@ -93,6 +93,29 @@ document.addEventListener('DOMContentLoaded', function() {
   clearOrderBtn.addEventListener("click", clearAttributeOrder);
   document.getElementById('combinedFile').addEventListener('change', handleCombinedExcel);
   combinedFileInput.addEventListener("change", handleCombinedExcel);
+  // Listeners para los iconos del header Cat
+const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
+if (statsApplyCatTablesBtn) {
+  statsApplyCatTablesBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (typeof applyCategoryTables === 'function') applyCategoryTables();
+  });
+}
+const statsApplyCatOrderBtn = table.querySelector('#stats-applyCatOrderBtn');
+if (statsApplyCatOrderBtn) {
+  statsApplyCatOrderBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (typeof applyCatOrder === 'function') applyCatOrder();
+  });
+}
+const statsClearCatOrderBtn = table.querySelector('#stats-clearCatOrderBtn');
+if (statsClearCatOrderBtn) {
+  statsClearCatOrderBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (typeof clearCatOrder === 'function') clearCatOrder();
+  });
+}
+
   clearCatOrderBtn.addEventListener("click", clearCatOrder);
   addMergeStyles();
   
@@ -395,6 +418,8 @@ function createProductImageElement(rawImagePath) {
 function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
 }
+
+
 
 function handleCombinedExcel(event) {
   const file = event.target.files[0];
@@ -1388,7 +1413,21 @@ function createStatsColumn(stats) {
         </th>
         <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro};">Filtro</th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb};">Web</th>
-        <th style="width:${colWidthCat}; min-width:${colWidthCat};">Cat</th>
+              <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
+        <div class="cat-header-icons">
+          <button id="stats-applyCatTablesBtn" title="Aplicar Catálogo Actual" class="cat-header-icon-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="stats-applyCatOrderBtn" title="Aplicar Catálogo Nuevas" class="cat-header-icon-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="stats-clearCatOrderBtn" title="Limpiar Catálogo Nuevas" class="cat-header-icon-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="cat-header-divider"></div>
+        Cat
+      </th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
       </tr>
