@@ -93,28 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
   clearOrderBtn.addEventListener("click", clearAttributeOrder);
   document.getElementById('combinedFile').addEventListener('change', handleCombinedExcel);
   combinedFileInput.addEventListener("change", handleCombinedExcel);
-  // Listeners para los iconos del header Cat
-const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
-if (statsApplyCatTablesBtn) {
-  statsApplyCatTablesBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    if (typeof applyCategoryTables === 'function') applyCategoryTables();
-  });
-}
-const statsApplyCatOrderBtn = table.querySelector('#stats-applyCatOrderBtn');
-if (statsApplyCatOrderBtn) {
-  statsApplyCatOrderBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    if (typeof applyCatOrder === 'function') applyCatOrder();
-  });
-}
-const statsClearCatOrderBtn = table.querySelector('#stats-clearCatOrderBtn');
-if (statsClearCatOrderBtn) {
-  statsClearCatOrderBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    if (typeof clearCatOrder === 'function') clearCatOrder();
-  });
-}
+ 
 
   clearCatOrderBtn.addEventListener("click", clearCatOrder);
   addMergeStyles();
@@ -1413,21 +1392,21 @@ function createStatsColumn(stats) {
         </th>
         <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro};">Filtro</th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb};">Web</th>
-              <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-        <div class="cat-header-icons">
-          <button id="stats-applyCatTablesBtn" title="Aplicar Catálogo Actual" class="cat-header-icon-btn">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button id="stats-applyCatOrderBtn" title="Aplicar Catálogo Nuevas" class="cat-header-icon-btn">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button id="stats-clearCatOrderBtn" title="Limpiar Catálogo Nuevas" class="cat-header-icon-btn">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-        <div class="cat-header-divider"></div>
-        Cat
-      </th>
+        <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
+          <div class="cat-header-icons">
+            <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="cat-header-divider"></div>
+          Cat
+        </th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
       </tr>
@@ -1535,6 +1514,69 @@ function createStatsColumn(stats) {
   table.querySelectorAll('.clickable').forEach(cell => {
     cell.addEventListener('click', handleStatClick);
   });
+
+  // Eventos para los botones de iconos en el header Cat (¡importante!)
+  const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
+  if (statsApplyCatTablesBtn) {
+    statsApplyCatTablesBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof applyCategoryTables === 'function') applyCategoryTables();
+    });
+  }
+  const statsApplyCatOrderBtn = table.querySelector('#stats-applyCatOrderBtn');
+  if (statsApplyCatOrderBtn) {
+    statsApplyCatOrderBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof applyCatOrder === 'function') applyCatOrder();
+    });
+  }
+  const statsClearCatOrderBtn = table.querySelector('#stats-clearCatOrderBtn');
+  if (statsClearCatOrderBtn) {
+    statsClearCatOrderBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (typeof clearCatOrder === 'function') clearCatOrder();
+    });
+  }
+
+  // CSS pequeño para los iconos (puedes moverlo a tu CSS global)
+  if (!document.getElementById('cat-header-icons-style')) {
+    const style = document.createElement('style');
+    style.id = 'cat-header-icons-style';
+    style.textContent = `
+      .cat-header-icons {
+        display: flex;
+        justify-content: center;
+        gap: 2px;
+        margin-bottom: 2px;
+      }
+      .cat-header-icon-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .cat-header-icon-btn svg {
+        width: 12px;
+        height: 12px;
+        display: block;
+      }
+      .cat-header-icon-btn:hover {
+        background: #eee;
+        border-radius: 2px;
+      }
+      .cat-header-divider {
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 2px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   column.appendChild(table);
   return column;
