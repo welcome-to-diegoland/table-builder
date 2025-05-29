@@ -1859,7 +1859,7 @@ html, body {
   background: none;
   border: 1px solid #bbb;
   border-radius: 5px;
-  padding: 3px 14px !important;
+  padding: 3px 14px !important; 
   min-width: 38px;
   min-height: 18px;
   font-size: 11px;

@@ -1533,7 +1533,7 @@ function createStatsColumn(stats) {
   const colWidthFiltro = '50px';
   const colWidthWeb = '55px';
   const colWidthCat = '55px';
-  const colWidthConValor = '40px';
+  const colWidthConValor = '40px'; 
   const colWidthSinValor = '40px';
 
   const column = document.createElement("div");
