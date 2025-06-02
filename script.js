@@ -1533,31 +1533,31 @@ function processAttributeStats(skuToObject) {
 function fillSequentialOrder(columnType) {
   let selector, storagePrefix, label;
   if (columnType === 'web') {
-    // SOLO los inputs que tienen .order-input Y NO tienen .order-cat-input
     selector = 'input.order-input:not(.order-cat-input)';
     storagePrefix = 'order_';
     label = 'WEB';
   } else {
-    // SOLO los inputs que tienen .order-cat-input Y NO tienen .order-input
     selector = 'input.order-cat-input:not(.order-input)';
     storagePrefix = 'cat_order_';
     label = 'CAT';
   }
+  // Estos son los atributos que NO deben ser secuenciados
   const excludedAttributes = new Set(["titulo", "marca", "shop_by", "no_de_modelo"]);
-  const inputs = Array.from(document.querySelectorAll(selector));
+
+  // Solo selecciona los inputs que NO son de atributos excluidos
+  const inputs = Array.from(document.querySelectorAll(selector))
+    .filter(input => !excludedAttributes.has(input.getAttribute('data-attribute')));
+
   let count = 1;
-  let affected = 0;
   inputs.forEach(input => {
     const attr = input.getAttribute('data-attribute');
-    if (!excludedAttributes.has(attr)) {
-      input.value = count;
-      localStorage.setItem(storagePrefix + attr, String(count));
-      count++;
-      affected++;
-    }
+    input.value = count;
+    localStorage.setItem(storagePrefix + attr, String(count));
+    count++;
   });
+
   updateOrderInputs();
-  showTemporaryMessage(`Orden secuencial aplicado para ${label}: ${affected} atributos llenados`);
+  showTemporaryMessage(`Orden secuencial aplicado para ${label}: ${inputs.length} atributos llenados`);
 }
 
 function setupFillSequentialBtns() {
