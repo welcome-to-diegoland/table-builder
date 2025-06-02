@@ -1524,22 +1524,29 @@ function processAttributeStats(skuToObject) {
     
     attributeStatsDiv.appendChild(statsContainer);
     highlightActiveFilter();
+    setupFillSequentialBtns();
   } else {
     attributeStatsDiv.innerHTML = '<p>No hay atributos usados en las tablas</p>';
   }
 }
 
 function fillSequentialOrder(columnType) {
-  const selector = columnType === 'web' ? '.order-input' : '.order-cat-input';
-  const storagePrefix = columnType === 'web' ? 'order_' : 'cat_order_';
-  const label = columnType.toUpperCase();
-
+  let selector, storagePrefix, label;
+  if (columnType === 'web') {
+    // SOLO los inputs que tienen .order-input Y NO tienen .order-cat-input
+    selector = 'input.order-input:not(.order-cat-input)';
+    storagePrefix = 'order_';
+    label = 'WEB';
+  } else {
+    // SOLO los inputs que tienen .order-cat-input Y NO tienen .order-input
+    selector = 'input.order-cat-input:not(.order-input)';
+    storagePrefix = 'cat_order_';
+    label = 'CAT';
+  }
   const excludedAttributes = new Set(["titulo", "marca", "shop_by", "no_de_modelo"]);
   const inputs = Array.from(document.querySelectorAll(selector));
-
   let count = 1;
   let affected = 0;
-
   inputs.forEach(input => {
     const attr = input.getAttribute('data-attribute');
     if (!excludedAttributes.has(attr)) {
@@ -1549,8 +1556,7 @@ function fillSequentialOrder(columnType) {
       affected++;
     }
   });
-
-  updateOrderInputs(); // Re-renderiza desde localStorage
+  updateOrderInputs();
   showTemporaryMessage(`Orden secuencial aplicado para ${label}: ${affected} atributos llenados`);
 }
 
@@ -1625,21 +1631,21 @@ function createStatsColumn(stats) {
         </th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
           <div class="web-header-icons grid-2x2">
-    <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">✓</button>
-    <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn" title="Autoordenar Web">○</button>
-    <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">+</button>
-    <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">x</button>
-  </div>
+            <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">✓</button>
+            <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn" title="Autoordenar Web">○</button>
+            <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">+</button>
+            <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">x</button>
+          </div>
           <div class="web-header-divider"></div>
           Web
         </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-  <div class="cat-header-icons grid-2x2">
-    <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
-    <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn" title="Autoordenar Catálogo">○</button>
-    <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
-    <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
-  </div>
+          <div class="cat-header-icons grid-2x2">
+            <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
+            <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn" title="Autoordenar Catálogo">○</button>
+            <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
+            <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
+          </div>
           <div class="cat-header-divider"></div>
           Cat
         </th>
@@ -1748,7 +1754,7 @@ function createStatsColumn(stats) {
     cell.addEventListener('click', handleStatClick);
   });
 
-  // --------- Toggle atributos vacíos (lógica CORRECTA) ---------
+  // --------- Toggle atributos vacíos ---------
   const statsToggleEmptyBtn = table.querySelector('#stats-toggleEmptyBtn');
   if (statsToggleEmptyBtn) {
     function setToggleUI() {
