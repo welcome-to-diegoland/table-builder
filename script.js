@@ -1541,10 +1541,7 @@ function fillSequentialOrder(columnType) {
     storagePrefix = 'cat_order_';
     label = 'CAT';
   }
-  // Estos son los atributos que NO deben ser secuenciados
   const excludedAttributes = new Set(["titulo", "marca", "shop_by", "no_de_modelo"]);
-
-  // Solo selecciona los inputs que NO son de atributos excluidos
   const inputs = Array.from(document.querySelectorAll(selector))
     .filter(input => !excludedAttributes.has(input.getAttribute('data-attribute')));
 
@@ -1553,10 +1550,11 @@ function fillSequentialOrder(columnType) {
     const attr = input.getAttribute('data-attribute');
     input.value = count;
     localStorage.setItem(storagePrefix + attr, String(count));
+    console.log('Asignando', attr, 'valor', count, 'en', label);
     count++;
   });
 
-  updateOrderInputs();
+  // updateOrderInputs(); // Descomenta sólo si sabes que no sincroniza ambas columnas
   showTemporaryMessage(`Orden secuencial aplicado para ${label}: ${inputs.length} atributos llenados`);
 }
 
@@ -1617,38 +1615,38 @@ function createStatsColumn(stats) {
             </button>
           </div>
         </th>
-        <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro}; position:relative;">
-          <div class="filter-header-icons">
-            <button type="button" id="stats-loadDefaultFiltersBtn" class="filter-header-icon-btn" title="Aplicar Filtros Actuales">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="stats-clearFilterInputsBtn" class="filter-header-icon-btn" title="Limpiar Filtros Nuevos">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-          <div class="filter-header-divider"></div>
-          Filtro
-        </th>
+ <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro}; position:relative;">
+  <div class="filter-header-icons">
+    <button type="button" id="stats-loadDefaultFiltersBtn" class="web-header-icon-btn" title="Aplicar Filtros Actuales">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button type="button" id="stats-clearFilterInputsBtn" class="web-header-icon-btn" title="Limpiar Filtros Nuevos">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="filter-header-divider"></div>
+  Filtro
+</th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
-          <div class="web-header-icons grid-2x2">
-            <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">✓</button>
-            <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn" title="Autoordenar Web">○</button>
-            <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">+</button>
-            <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">x</button>
-          </div>
-          <div class="web-header-divider"></div>
-          Web
-        </th>
+  <div class="web-header-icons grid-2x2">
+    <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Actual">✓</button>
+    <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn filter-header-icon-btn" title="Autoordenar Web">○</button>
+    <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Nuevas">+</button>
+    <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">x</button>
+  </div>
+  <div class="web-header-divider"></div>
+  Web
+</th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-          <div class="cat-header-icons grid-2x2">
-            <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
-            <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn" title="Autoordenar Catálogo">○</button>
-            <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
-            <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
-          </div>
-          <div class="cat-header-divider"></div>
-          Cat
-        </th>
+  <div class="cat-header-icons grid-2x2">
+    <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
+    <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">○</button>
+    <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
+    <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
+  </div>
+  <div class="cat-header-divider"></div>
+  Cat
+</th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
       </tr>
