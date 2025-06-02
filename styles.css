@@ -1886,3 +1886,18 @@ html, body {
   outline: 1px solid #009688;
   outline-offset: 2px;
 }
+
+.grid-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px;
+  justify-items: center;
+}
+
+.web-header-label,
+.cat-header-label {
+  text-align: center;
+  font-weight: bold;
+  margin-top: 2px;
+}

@@ -1086,6 +1086,8 @@ function applyWebFiltersVisualUpdate() {
 function render() {
   attributeStatsDiv.innerHTML = "<p>Generando estadísticas...</p>";
   output.innerHTML = "<p>Preparando visualización...</p>";
+  setupFillSequentialBtns();
+
 
   setTimeout(() => {
     try {
@@ -1527,6 +1529,51 @@ function processAttributeStats(skuToObject) {
   }
 }
 
+function fillSequentialOrder(columnType) {
+  const selector = columnType === 'web' ? '.order-input' : '.order-cat-input';
+  const storagePrefix = columnType === 'web' ? 'order_' : 'cat_order_';
+  const label = columnType.toUpperCase();
+
+  const excludedAttributes = new Set(["titulo", "marca", "shop_by", "no_de_modelo"]);
+  const inputs = Array.from(document.querySelectorAll(selector));
+
+  let count = 1;
+  let affected = 0;
+
+  inputs.forEach(input => {
+    const attr = input.getAttribute('data-attribute');
+    if (!excludedAttributes.has(attr)) {
+      input.value = count;
+      localStorage.setItem(storagePrefix + attr, String(count));
+      count++;
+      affected++;
+    }
+  });
+
+  updateOrderInputs(); // Re-renderiza desde localStorage
+  showTemporaryMessage(`Orden secuencial aplicado para ${label}: ${affected} atributos llenados`);
+}
+
+function setupFillSequentialBtns() {
+  const fillWebBtn = document.getElementById('stats-fillWebSequentialBtn');
+  const fillCatBtn = document.getElementById('stats-fillCatSequentialBtn');
+
+  if (fillWebBtn) {
+    fillWebBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      fillSequentialOrder('web');
+    });
+  }
+
+  if (fillCatBtn) {
+    fillCatBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      fillSequentialOrder('cat');
+    });
+  }
+}
+
+
 function createStatsColumn(stats) {
   const colWidthAtributo = 'auto';
   const colMinWidthAtributo = '120px';
@@ -1577,32 +1624,22 @@ function createStatsColumn(stats) {
           Filtro
         </th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
-          <div class="web-header-icons">
-            <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
+          <div class="web-header-icons grid-2x2">
+    <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn" title="Aplicar Web Actual">✓</button>
+    <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn" title="Autoordenar Web">○</button>
+    <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn" title="Aplicar Web Nuevas">+</button>
+    <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn" title="Limpiar Web Nuevas">x</button>
+  </div>
           <div class="web-header-divider"></div>
           Web
         </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-          <div class="cat-header-icons">
-            <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
+  <div class="cat-header-icons grid-2x2">
+    <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
+    <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn" title="Autoordenar Catálogo">○</button>
+    <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
+    <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
+  </div>
           <div class="cat-header-divider"></div>
           Cat
         </th>
