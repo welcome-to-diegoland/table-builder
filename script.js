@@ -3678,6 +3678,28 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     container.classList.add('merged-group'); 
   }
 
+  // === AGREGAR BOTÓN "ORDENAR..." EN EL HEADER DERECHO DEL GRUPO ===
+  (function() {
+    // Busca el header del grupo
+    let headerDiv = container.querySelector('.group-header');
+    if (!headerDiv) return;
+    let headerRight = headerDiv.querySelector('.group-header-right');
+    if (!headerRight) {
+      headerRight = document.createElement('div');
+      headerRight.className = "group-header-right";
+      headerDiv.appendChild(headerRight);
+    }
+    // Evita duplicar el botón
+    if (!headerRight.querySelector('.group-sort-btn')) {
+      const sortBtn = document.createElement("button");
+      sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
+      sortBtn.textContent = "Ordenar...";
+      sortBtn.style.marginRight = "10px";
+      sortBtn.addEventListener('click', () => openGroupSortModal(groupId, groupItems));
+      headerRight.insertBefore(sortBtn, headerRight.firstChild);
+    }
+  })();
+
   const table = document.createElement("table");
   table.className = "table table-striped table-bordered attribute-table";
   table.style.width = "100%";
@@ -3696,14 +3718,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   }
   
   // Filtrar atributos según showEmptyAttributes
-const filteredAttributes = orderedAttributes.filter(attr => {
-  if (showEmptyAttributes) return true; // ON: mostrar todos, vacíos incluidos
-  // OFF: solo los que tengan algún valor
-  return groupItems.some(item => {
-    const details = skuToObject[item.SKU] || {};
-    return details[attr.attribute]?.toString().trim();
+  const filteredAttributes = orderedAttributes.filter(attr => {
+    if (showEmptyAttributes) return true; // ON: mostrar todos, vacíos incluidos
+    // OFF: solo los que tengan algún valor
+    return groupItems.some(item => {
+      const details = skuToObject[item.SKU] || {};
+      return details[attr.attribute]?.toString().trim();
+    });
   });
-});
 
   // Crear THEAD
   let theadHtml = "<thead><tr>";
@@ -3942,31 +3964,126 @@ const filteredAttributes = orderedAttributes.filter(attr => {
   }
 }
 
-function resetGroupOrder(groupId) {
-  // Obtener los SKUs en el orden original (como aparecen en filteredItems)
-  const originalSkus = filteredItems
-    .filter(item => item["IG ID"] === groupId)
-    .map(item => item.SKU);
-  
-  // Actualizar el orden en groupOrderMap
-  groupOrderMap.set(groupId, originalSkus);
-  
-  // Volver a renderizar el grupo
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  const groupItems = filteredItems.filter(item => item["IG ID"] === groupId);
-  
-  // Encontrar el contenedor del grupo
-  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-  if (groupContainer) {
-    // Eliminar la tabla existente
-    const existingTable = groupContainer.querySelector('.table-responsive');
-    if (existingTable) existingTable.remove();
-    
-    // Crear nueva tabla con el orden original
-    createItemsTable(groupContainer, groupItems, skuToObject);
-  }
-  
-  showTemporaryMessage(`Orden del grupo ${groupId} restaurado`);
+// === POPUP/MODAL PARA ORDENAR GRUPO POR ATRIBUTOS ===
+function injectGroupSortModal() {
+  if (document.getElementById('groupSortModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'groupSortModal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="group-sort-modal-backdrop"></div>
+    <div class="group-sort-modal-content">
+      <h3>Ordenar grupo por atributos</h3>
+      <div id="groupSortAttrList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button id="groupSortConfirmBtn" class="btn btn-primary btn-sm">Confirmar</button>
+        <button id="groupSortCancelBtn" class="btn btn-outline-secondary btn-sm">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // CSS rápido (puedes llevarlo a tu stylesheet)
+  const style = document.createElement('style');
+  style.innerHTML = `
+    #groupSortModal { position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;display:none; }
+    .group-sort-modal-backdrop {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.2);}
+    .group-sort-modal-content {
+      background:white;max-width:400px;padding:24px 18px 18px 18px;border-radius:8px;
+      box-shadow:0 6px 32px 0 #2222;position:fixed;top:50%;left:50%;
+      transform:translate(-50%,-50%);
+    }
+    .group-sort-attr-row {display:flex;align-items:center;gap:8px;padding:3px 0;}
+    .group-sort-attr-row.selected {background:#e6f7ff;}
+    .group-sort-attr-row .move-btn {font-size:1.2em;cursor:pointer;background:none;border:none;}
+    .group-sort-attr-row .move-btn:disabled {opacity:0.2;}
+    .group-sort-attr-row label {flex:1;}
+  `;
+  document.head.appendChild(style);
+
+  // Cancel
+  document.getElementById('groupSortCancelBtn').onclick = closeGroupSortModal;
+}
+injectGroupSortModal();
+
+// Estado temporal del modal (por grupo)
+let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
+
+function openGroupSortModal(groupId, groupItems) {
+  groupSortModalState.groupId = groupId;
+  groupSortModalState.groupItems = groupItems;
+
+  // 1. Lista de atributos presentes en este grupo
+  const attrs = new Set();
+  groupItems.forEach(item => Object.keys(item).forEach(k => {
+    if (!excludedAttributes.has(k) && k !== 'SKU' && k !== 'IG ID') attrs.add(k);
+  }));
+  const attrsArr = Array.from(attrs);
+
+  // 2. Construir UI de selección y orden
+  const listDiv = document.getElementById('groupSortAttrList');
+  listDiv.innerHTML = '';
+  groupSortModalState.orderedAttrs = attrsArr.map(attr => ({ attr, selected: false }));
+
+  groupSortModalState.orderedAttrs.forEach((obj, idx) => {
+    const row = document.createElement('div');
+    row.className = 'group-sort-attr-row';
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <input type="checkbox" class="group-sort-attr-check" data-attr="${obj.attr}">
+      <label>${obj.attr}</label>
+      <button class="move-btn move-up" title="Subir" ${idx===0?'disabled':''}>↑</button>
+      <button class="move-btn move-down" title="Bajar" ${idx===attrsArr.length-1?'disabled':''}>↓</button>
+    `;
+    listDiv.appendChild(row);
+  });
+
+  // Listeners para mover
+  listDiv.querySelectorAll('.move-up').forEach(btn => {
+    btn.onclick = function() {
+      const idx = parseInt(this.parentNode.dataset.idx);
+      if (idx > 0) {
+        const tmp = groupSortModalState.orderedAttrs[idx];
+        groupSortModalState.orderedAttrs[idx] = groupSortModalState.orderedAttrs[idx-1];
+        groupSortModalState.orderedAttrs[idx-1] = tmp;
+        openGroupSortModal(groupId, groupItems);
+        // Mantener seleccionados
+        const checks = listDiv.querySelectorAll('.group-sort-attr-check');
+        groupSortModalState.orderedAttrs.forEach((a,i) => checks[i].checked = !!a.selected);
+      }
+    }
+  });
+  listDiv.querySelectorAll('.move-down').forEach(btn => {
+    btn.onclick = function() {
+      const idx = parseInt(this.parentNode.dataset.idx);
+      if (idx < groupSortModalState.orderedAttrs.length-1) {
+        const tmp = groupSortModalState.orderedAttrs[idx];
+        groupSortModalState.orderedAttrs[idx] = groupSortModalState.orderedAttrs[idx+1];
+        groupSortModalState.orderedAttrs[idx+1] = tmp;
+        openGroupSortModal(groupId, groupItems);
+        // Mantener seleccionados
+        const checks = listDiv.querySelectorAll('.group-sort-attr-check');
+        groupSortModalState.orderedAttrs.forEach((a,i) => checks[i].checked = !!a.selected);
+      }
+    }
+  });
+  listDiv.querySelectorAll('.group-sort-attr-check').forEach(box => {
+    box.onchange = function() {
+      const idx = Array.from(listDiv.querySelectorAll('.group-sort-attr-check')).indexOf(this);
+      groupSortModalState.orderedAttrs[idx].selected = this.checked;
+      listDiv.children[idx].classList.toggle('selected', this.checked);
+    }
+  });
+
+  // Confirmar
+  document.getElementById('groupSortConfirmBtn').onclick = confirmGroupSortModal;
+
+  document.getElementById('groupSortModal').style.display = 'block';
+}
+
+function closeGroupSortModal() {
+  document.getElementById('groupSortModal').style.display = 'none';
+  groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
 }
 
 function setupRowSelection(table) {
