@@ -579,20 +579,28 @@ function handleCombinedExcel(event) {
       const workbook = XLSX.read(data, { type: "array" });
       const dataSheet = workbook.Sheets["data"];
       const catSheet = workbook.Sheets["category-data"];
+      const valueOrderSheet = workbook.Sheets["value order"]; // NUEVO
+
       if (!dataSheet || !catSheet) {
         alert("El archivo no contiene las hojas necesarias.");
         return;
       }
+
       // Guardar originales
       filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet);
       filteredItems = filteredItemsOriginal.slice();
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
+      // NUEVO: Leer value order si existe
+      if (valueOrderSheet) {
+        window.valueOrderList = XLSX.utils.sheet_to_json(valueOrderSheet);
+      } else {
+        window.valueOrderList = [];
+      }
+
       // Renderiza el árbol (con el botón)
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
-
       processCategoryDataFromSheet();
-
       // NO render() aquí, hasta elegir categoría
 
     } catch (error) {
@@ -928,9 +936,57 @@ function selectRange(startRow, endRow) {
 }
 
 function confirmGroupSortModal(orderedAttrs) {
-  // Por ahora solo cierra el modal, para que no dé error.
-  closeGroupSortModal();
-  // Aquí luego pondrás el código real del ordenamiento.
+  const { groupId, groupItems } = groupSortModalState;
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+
+  // Mapa para sort_order rápido
+  const valueOrderMap = new Map();
+  (window.valueOrderList || []).forEach(row => {
+    if (!row["Nombre atributo"] || !row["Valor de Atributo"]) return;
+    const key = `${row["Nombre atributo"]}|||${row["Valor de Atributo"]}`;
+    valueOrderMap.set(key, Number(row.sort_order));
+  });
+
+  const items = groupItems.slice();
+
+  items.sort((a, b) => {
+    for (const attr of orderedAttrs) {
+      const va = (skuToObject[a.SKU]?.[attr] || "").toString();
+      const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
+      const sortA = valueOrderMap.get(`${attr}|||${va}`);
+      const sortB = valueOrderMap.get(`${attr}|||${vb}`);
+      // Ambos con sort_order definido
+      if (sortA !== undefined && sortB !== undefined) {
+        if (sortA !== sortB) return sortA - sortB;
+      } else if (sortA !== undefined) {
+        return -1; // Los que tienen sort_order primero
+      } else if (sortB !== undefined) {
+        return 1;
+      } else {
+        // Fallback: ordena alfabéticamente
+        if (va < vb) return -1;
+        if (va > vb) return 1;
+      }
+      // Si iguales, sigue al siguiente atributo
+    }
+    return 0;
+  });
+
+  // Actualiza el orden en el groupOrderMap
+  groupOrderMap.set(groupId, items.map(it => it.SKU));
+
+  // Renderiza solo ese grupo
+  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+  if (groupContainer) {
+    // Elimina solo la tabla
+    const existingTable = groupContainer.querySelector('.table-responsive');
+    if (existingTable) existingTable.remove();
+
+    // Vuelve a insertar la tabla con el nuevo orden
+    createItemsTable(groupContainer, items, skuToObject);
+  }
+
+  showTemporaryMessage('Grupo ordenado por atributos seleccionados');
 }
 
 // Función para limpiar selecciones
