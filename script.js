@@ -927,7 +927,7 @@ function selectRange(startRow, endRow) {
   });
 }
 
-function confirmGroupSortModal() {
+function confirmGroupSortModal(orderedAttrs) {
   // Por ahora solo cierra el modal, para que no dé error.
   closeGroupSortModal();
   // Aquí luego pondrás el código real del ordenamiento.
@@ -3702,7 +3702,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
       sortBtn.textContent = "Ordenar...";
       sortBtn.style.marginRight = "10px";
-      sortBtn.addEventListener('click', () => openGroupSortModal(groupId, groupItems, skuToObject));
+      sortBtn.addEventListener('click', () =>
+  openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
+);
       headerRight.insertBefore(sortBtn, headerRight.firstChild);
     }
   })();
@@ -4016,77 +4018,220 @@ injectGroupSortModal();
 // Estado temporal del modal (por grupo)
 let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
 
-function openGroupSortModal(groupId, groupItems) {
+function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   groupSortModalState.groupId = groupId;
   groupSortModalState.groupItems = groupItems;
 
-  // 1. Lista de atributos presentes en este grupo
-const attrs = new Set();
-groupItems.forEach(item => {
-  const details = skuToObject[item.SKU] || {};
-  Object.keys(details).forEach(k => {
-    if (!excludedAttributes.has(k) && k !== 'SKU' && k !== 'IG ID') attrs.add(k);
-  });
-});
-const attrsArr = Array.from(attrs);
+  let available = attributeList.slice();
+  let selected = [];
 
-  // 2. Construir UI de selección y orden
+  // UI ajustada
   const listDiv = document.getElementById('groupSortAttrList');
-  listDiv.innerHTML = '';
-  groupSortModalState.orderedAttrs = attrsArr.map(attr => ({ attr, selected: false }));
+  listDiv.innerHTML = `
+    <div class="dual-list-modal compact">
+      <div class="dual-list-col">
+        <div class="dual-list-label">Atributos disponibles</div>
+        <ul id="attr-available" class="dual-list-box" tabindex="0"></ul>
+      </div>
+      <div class="dual-list-controls">
+        <button id="attr-add" title="Agregar seleccionados" class="dual-list-btn compact-btn">&rarr;</button>
+        <button id="attr-remove" title="Quitar seleccionados" class="dual-list-btn compact-btn">&larr;</button>
+      </div>
+      <div class="dual-list-col">
+        <div class="dual-list-label">Seleccionados</div>
+        <ul id="attr-selected" class="dual-list-box dual-list-selected" tabindex="0"></ul>
+      </div>
+    </div>
+  `;
 
-  groupSortModalState.orderedAttrs.forEach((obj, idx) => {
-    const row = document.createElement('div');
-    row.className = 'group-sort-attr-row';
-    row.dataset.idx = idx;
-    row.innerHTML = `
-      <input type="checkbox" class="group-sort-attr-check" data-attr="${obj.attr}">
-      <label>${obj.attr}</label>
-      <button class="move-btn move-up" title="Subir" ${idx===0?'disabled':''}>↑</button>
-      <button class="move-btn move-down" title="Bajar" ${idx===attrsArr.length-1?'disabled':''}>↓</button>
+  // Añade CSS compacto una sola vez
+  if (!document.getElementById('dual-list-css')) {
+    const style = document.createElement('style');
+    style.id = 'dual-list-css';
+    style.textContent = `
+      .dual-list-modal.compact {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        align-items: center;
+        padding: 8px 0 0 0;
+        font-size: 13px;
+      }
+      .dual-list-col {
+        flex:1; min-width:120px; max-width:170px;
+      }
+      .dual-list-label {
+        text-align: center;
+        font-weight: 500;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: #456;
+      }
+      .dual-list-box {
+        border: 1px solid #bbb;
+        background: #fafbfc;
+        border-radius: 4px;
+        min-height: 120px;
+        max-height: 160px;
+        overflow-y: auto;
+        list-style: none;
+        margin: 0; padding: 0;
+        font-size: 13px;
+      }
+      .dual-list-box li {
+        padding: 4px 7px;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.13s;
+        border-bottom: 1px solid #eee;
+        font-size: 13px;
+      }
+      .dual-list-box li:last-child { border-bottom: none;}
+      .dual-list-box li.selected, .dual-list-box li:focus {
+        background: #e6f1ff;
+        outline: none;
+      }
+      .dual-list-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        justify-content: center;
+        align-items: center;
+      }
+      .dual-list-btn {
+        font-size: 1.08em;
+        width: 30px; height: 30px;
+        border-radius: 50%; border: none;
+        background: #f1f4f7;
+        color: #456;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        padding: 0;
+      }
+      .dual-list-btn:active, .dual-list-btn:focus { background: #d6e8fd; color: #124;}
+      .dual-list-selected li {
+        cursor: grab;
+      }
+      @media (max-width:600px) {
+        .dual-list-modal.compact { flex-direction:column; gap:7px;}
+        .dual-list-controls { flex-direction:row; gap: 7px;}
+      }
     `;
-    listDiv.appendChild(row);
-  });
+    document.head.appendChild(style);
+  }
 
-  // Listeners para mover
-  listDiv.querySelectorAll('.move-up').forEach(btn => {
-    btn.onclick = function() {
-      const idx = parseInt(this.parentNode.dataset.idx);
-      if (idx > 0) {
-        const tmp = groupSortModalState.orderedAttrs[idx];
-        groupSortModalState.orderedAttrs[idx] = groupSortModalState.orderedAttrs[idx-1];
-        groupSortModalState.orderedAttrs[idx-1] = tmp;
-        openGroupSortModal(groupId, groupItems);
-        // Mantener seleccionados
-        const checks = listDiv.querySelectorAll('.group-sort-attr-check');
-        groupSortModalState.orderedAttrs.forEach((a,i) => checks[i].checked = !!a.selected);
+  // Render helpers
+  function renderLists() {
+    const availUl = listDiv.querySelector('#attr-available');
+    availUl.innerHTML = available.map(attr =>
+      `<li tabindex="0">${attr}</li>`
+    ).join('');
+    const selUl = listDiv.querySelector('#attr-selected');
+    selUl.innerHTML = selected.map(attr =>
+      `<li draggable="true" tabindex="0">${attr}</li>`
+    ).join('');
+  }
+  renderLists();
+
+  // Selection logic
+  function getSelectedIndices(ul) {
+    return Array.from(ul.querySelectorAll('li.selected')).map(li =>
+      Array.from(ul.children).indexOf(li)
+    );
+  }
+  function selectLi(li, multi=false) {
+    const ul = li.parentElement;
+    if (!multi) ul.querySelectorAll('li.selected').forEach(l => l.classList.remove('selected'));
+    li.classList.add('selected');
+    li.focus();
+  }
+  function clearSelection(ul) { ul.querySelectorAll('li.selected').forEach(l => l.classList.remove('selected')); }
+
+  function setupListClicks(ul, multiAllowed) {
+    ul.addEventListener('click', (e) => {
+      if (e.target.tagName === 'LI') {
+        selectLi(e.target, e.ctrlKey || e.metaKey);
       }
-    }
-  });
-  listDiv.querySelectorAll('.move-down').forEach(btn => {
-    btn.onclick = function() {
-      const idx = parseInt(this.parentNode.dataset.idx);
-      if (idx < groupSortModalState.orderedAttrs.length-1) {
-        const tmp = groupSortModalState.orderedAttrs[idx];
-        groupSortModalState.orderedAttrs[idx] = groupSortModalState.orderedAttrs[idx+1];
-        groupSortModalState.orderedAttrs[idx+1] = tmp;
-        openGroupSortModal(groupId, groupItems);
-        // Mantener seleccionados
-        const checks = listDiv.querySelectorAll('.group-sort-attr-check');
-        groupSortModalState.orderedAttrs.forEach((a,i) => checks[i].checked = !!a.selected);
+    });
+    ul.addEventListener('dblclick', (e) => {
+      if (e.target.tagName !== 'LI') return;
+      if (ul.id === 'attr-available') addAttrs();
+      else removeAttrs();
+    });
+    ul.addEventListener('keydown', (e) => {
+      const items = ul.querySelectorAll('li');
+      let idx = Array.from(items).findIndex(li => li.classList.contains('selected'));
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (idx < items.length - 1) {
+          clearSelection(ul);
+          selectLi(items[idx + 1]);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (idx > 0) {
+          clearSelection(ul);
+          selectLi(items[idx - 1]);
+        }
       }
-    }
+    });
+  }
+  setupListClicks(listDiv.querySelector('#attr-available'));
+  setupListClicks(listDiv.querySelector('#attr-selected'));
+
+  // Add to selected
+  function addAttrs() {
+    const ul = listDiv.querySelector('#attr-available');
+    const idxs = getSelectedIndices(ul);
+    const toAdd = idxs.map(i => available[i]);
+    selected = selected.concat(toAdd);
+    available = available.filter(attr => !toAdd.includes(attr));
+    renderLists(); setupListClicks(listDiv.querySelector('#attr-available')); setupListClicks(listDiv.querySelector('#attr-selected'));
+  }
+  // Remove from selected
+  function removeAttrs() {
+    const ul = listDiv.querySelector('#attr-selected');
+    const idxs = getSelectedIndices(ul);
+    const toRemove = idxs.map(i => selected[i]);
+    available = available.concat(toRemove);
+    selected = selected.filter(attr => !toRemove.includes(attr));
+    renderLists(); setupListClicks(listDiv.querySelector('#attr-available')); setupListClicks(listDiv.querySelector('#attr-selected'));
+  }
+  listDiv.querySelector('#attr-add').onclick = addAttrs;
+  listDiv.querySelector('#attr-remove').onclick = removeAttrs;
+
+  // Drag and drop para reordenar
+  const selUl = listDiv.querySelector('#attr-selected');
+  let dragIdx = null;
+  selUl.addEventListener('dragstart', e => {
+    dragIdx = Array.from(selUl.children).indexOf(e.target);
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.style.opacity = '0.5';
   });
-  listDiv.querySelectorAll('.group-sort-attr-check').forEach(box => {
-    box.onchange = function() {
-      const idx = Array.from(listDiv.querySelectorAll('.group-sort-attr-check')).indexOf(this);
-      groupSortModalState.orderedAttrs[idx].selected = this.checked;
-      listDiv.children[idx].classList.toggle('selected', this.checked);
-    }
+  selUl.addEventListener('dragend', e => { e.target.style.opacity = ''; });
+  selUl.addEventListener('dragover', e => e.preventDefault());
+  selUl.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragIdx === null) return;
+    const targetLi = e.target.closest('li');
+    if (!targetLi) return;
+    const dropIdx = Array.from(selUl.children).indexOf(targetLi);
+    if (dropIdx === dragIdx) return;
+    const moved = selected.splice(dragIdx, 1)[0];
+    selected.splice(dropIdx, 0, moved);
+    renderLists(); setupListClicks(listDiv.querySelector('#attr-available')); setupListClicks(listDiv.querySelector('#attr-selected'));
+    dragIdx = null;
   });
 
   // Confirmar
-  document.getElementById('groupSortConfirmBtn').onclick = confirmGroupSortModal;
+  document.getElementById('groupSortConfirmBtn').onclick = () => {
+    if (selected.length === 0) {
+      alert('Selecciona al menos un atributo para ordenar.');
+      return;
+    }
+    confirmGroupSortModal(selected);
+    closeGroupSortModal();
+  };
 
   document.getElementById('groupSortModal').style.display = 'block';
 }
