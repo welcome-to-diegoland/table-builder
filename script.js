@@ -21,6 +21,7 @@ const clearFilterInputsBtn = document.getElementById("clearFilterInputs");
 const loadDefaultFiltersBtn = document.getElementById("loadDefaultFilters");
 const combinedFileInput = document.getElementById("combinedFile");
 
+
 // Variables de estado
 let filteredItems = [];
 let editedCells = {};
@@ -924,6 +925,12 @@ function selectRange(startRow, endRow) {
       row.classList.add('selected');
     }
   });
+}
+
+function confirmGroupSortModal() {
+  // Por ahora solo cierra el modal, para que no dé error.
+  closeGroupSortModal();
+  // Aquí luego pondrás el código real del ordenamiento.
 }
 
 // Función para limpiar selecciones
@@ -4014,11 +4021,14 @@ function openGroupSortModal(groupId, groupItems) {
   groupSortModalState.groupItems = groupItems;
 
   // 1. Lista de atributos presentes en este grupo
-  const attrs = new Set();
-  groupItems.forEach(item => Object.keys(item).forEach(k => {
+const attrs = new Set();
+groupItems.forEach(item => {
+  const details = skuToObject[item.SKU] || {};
+  Object.keys(details).forEach(k => {
     if (!excludedAttributes.has(k) && k !== 'SKU' && k !== 'IG ID') attrs.add(k);
-  }));
-  const attrsArr = Array.from(attrs);
+  });
+});
+const attrsArr = Array.from(attrs);
 
   // 2. Construir UI de selección y orden
   const listDiv = document.getElementById('groupSortAttrList');
