@@ -936,7 +936,9 @@ function selectRange(startRow, endRow) {
 }
 
 function confirmGroupSortModal(orderedAttrs) {
-  const { groupId, groupItems } = groupSortModalState;
+  const { groupId } = groupSortModalState;
+  // SIEMPRE usa los items de filteredItems actuales del grupo
+  const groupItems = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
 
   // Mapa para sort_order rápido
@@ -947,27 +949,24 @@ function confirmGroupSortModal(orderedAttrs) {
     valueOrderMap.set(key, Number(row.sort_order));
   });
 
+  // Ordena según los atributos seleccionados y sort_order
   const items = groupItems.slice();
-
   items.sort((a, b) => {
     for (const attr of orderedAttrs) {
       const va = (skuToObject[a.SKU]?.[attr] || "").toString();
       const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
       const sortA = valueOrderMap.get(`${attr}|||${va}`);
       const sortB = valueOrderMap.get(`${attr}|||${vb}`);
-      // Ambos con sort_order definido
       if (sortA !== undefined && sortB !== undefined) {
         if (sortA !== sortB) return sortA - sortB;
       } else if (sortA !== undefined) {
-        return -1; // Los que tienen sort_order primero
+        return -1;
       } else if (sortB !== undefined) {
         return 1;
       } else {
-        // Fallback: ordena alfabéticamente
         if (va < vb) return -1;
         if (va > vb) return 1;
       }
-      // Si iguales, sigue al siguiente atributo
     }
     return 0;
   });
@@ -975,18 +974,62 @@ function confirmGroupSortModal(orderedAttrs) {
   // Actualiza el orden en el groupOrderMap
   groupOrderMap.set(groupId, items.map(it => it.SKU));
 
-  // Renderiza solo ese grupo
+  // Forzar que el render del grupo use el NUEVO ORDEN de groupOrderMap
   const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
   if (groupContainer) {
-    // Elimina solo la tabla
+    // Elimina solo la tabla previa
     const existingTable = groupContainer.querySelector('.table-responsive');
     if (existingTable) existingTable.remove();
 
-    // Vuelve a insertar la tabla con el nuevo orden
-    createItemsTable(groupContainer, items, skuToObject);
+    // OJO: aquí fuerza el orden usando groupOrderMap
+    const orderedSkus = groupOrderMap.get(groupId);
+    const orderedItems = orderedSkus
+      .map(sku => items.find(it => it.SKU === sku))
+      .filter(Boolean);
+
+    createItemsTable(groupContainer, orderedItems, skuToObject);
   }
 
   showTemporaryMessage('Grupo ordenado por atributos seleccionados');
+}
+
+// 1. Guarda el orden original de cada grupo al filtrar/cargar la categoría
+// (pon esto después de: filteredItems = filtered; en tu renderCategoryTree o donde filtras por CMS IG)
+window.originalGroupOrderMap = new Map();
+const groupMap = {};
+filteredItems.forEach(item => {
+  const groupId = String(item["IG ID"]);
+  if (!groupMap[groupId]) groupMap[groupId] = [];
+  groupMap[groupId].push(item.SKU);
+});
+Object.entries(groupMap).forEach(([groupId, skuList]) => {
+  window.originalGroupOrderMap.set(groupId, [...skuList]);
+});
+
+// 2. Modifica la función de reset para usar ese orden original
+function resetGroupOrder(groupId) {
+  // Usa el orden original guardado, o el de filteredItems si no existe
+  const originalSkus = (window.originalGroupOrderMap && window.originalGroupOrderMap.get(groupId))
+    || filteredItems.filter(item => String(item["IG ID"]) === String(groupId)).map(item => item.SKU);
+
+  groupOrderMap.set(groupId, originalSkus);
+
+  // Volver a renderizar el grupo
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  // Toma los items filtrados para el grupo
+  const groupItems = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
+  // Ordena los groupItems según el orden original
+  groupItems.sort((a, b) => originalSkus.indexOf(a.SKU) - originalSkus.indexOf(b.SKU));
+
+  // Buscar el contenedor del grupo en el DOM
+  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+  if (groupContainer) {
+    const existingTable = groupContainer.querySelector('.table-responsive');
+    if (existingTable) existingTable.remove();
+    createItemsTable(groupContainer, groupItems, skuToObject);
+  }
+
+  showTemporaryMessage(`Orden del grupo ${groupId} restaurado`);
 }
 
 // Función para limpiar selecciones
@@ -4078,7 +4121,7 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   groupSortModalState.groupId = groupId;
   groupSortModalState.groupItems = groupItems;
 
-  let available = attributeList.slice();
+let available = attributeList.filter(attr => attr === "marca" || !excludedAttributes.has(attr));
   let selected = [];
 
   // UI ajustada
