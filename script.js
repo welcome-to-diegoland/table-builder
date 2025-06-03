@@ -3702,7 +3702,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
       sortBtn.textContent = "Ordenar...";
       sortBtn.style.marginRight = "10px";
-      sortBtn.addEventListener('click', () => openGroupSortModal(groupId, groupItems));
+      sortBtn.addEventListener('click', () => openGroupSortModal(groupId, groupItems, skuToObject));
       headerRight.insertBefore(sortBtn, headerRight.firstChild);
     }
   })();
