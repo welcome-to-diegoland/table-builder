@@ -37,7 +37,7 @@ let showEmptyAttributes = false;
 let defaultAttributesOrder = {};
 let selectedGroups = new Set();
 let filteredItemsOriginal = [];
-
+let moveInfoUndoBackup = {};
 let objectDataOriginal = [];
 
 
@@ -4800,7 +4800,31 @@ function closeMoveInfoModal() {
   moveInfoModalState = { groupId: null, groupItems: [], attributes: [] };
 }
 
+function addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc) {
+  const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+  if (!groupDiv) return;
+  const headerRight = groupDiv.querySelector('.group-header-right');
+  if (!headerRight) return;
+
+  // Quita botón previo si existe
+  let existingBtn = headerRight.querySelector('.undo-move-info-btn');
+  if (existingBtn) existingBtn.remove();
+
+  // Crea botón
+  const undoBtn = document.createElement('button');
+  undoBtn.className = "btn btn-sm btn-warning undo-move-info-btn";
+  undoBtn.textContent = "Deshacer mover info";
+  undoBtn.title = `Deshace el último movimiento de info (${srcAttr} → ${dstAttr})`;
+
+  undoBtn.onclick = function() {
+    undoMoveInfo(groupId, srcAttr, dstAttr, clearSrc);
+  };
+
+  headerRight.insertBefore(undoBtn, headerRight.firstChild);
+}
+
 // ========== LÓGICA DEL MOVIMIENTO ==========
+
 
 function confirmMoveInfoModal() {
   const srcAttr = document.getElementById('moveInfoSource').value;
@@ -4817,6 +4841,13 @@ function confirmMoveInfoModal() {
   const items = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
 
+  // Backup antes de modificar
+  moveInfoUndoBackup[groupId] = items.map(item => ({
+    SKU: item.SKU,
+    srcAttrValue: skuToObject[item.SKU]?.[srcAttr],
+    dstAttrValue: skuToObject[item.SKU]?.[dstAttr]
+  }));
+
   let anyChange = false;
   items.forEach(item => {
     const obj = skuToObject[item.SKU];
@@ -4831,24 +4862,79 @@ function confirmMoveInfoModal() {
     }
   });
 
+  // --- GUARDAR LA POSICIÓN DE SCROLL ---
+  const output = document.getElementById('output');
+  const scrollTop = output ? output.scrollTop : 0;
+  console.log("ANTES DEL RENDER:");
+  console.log({ scrollTop, groupId });
+
   if (anyChange) {
     showTemporaryMessage('Información movida correctamente');
     render();
 
-    // Scroll al grupo después de render
-    setTimeout(() => {
+    // Polling para restaurar scroll y mostrar botón de deshacer
+    let attempts = 0;
+    const maxAttempts = 20;
+    const pollId = setInterval(() => {
+      const output = document.getElementById('output');
       const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-      const container = document.getElementById('output');
-      if (groupDiv && container) {
-        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-        // Ajusta este valor si necesitas dejar más espacio arriba
-        container.scrollTop -= 40;
+      if (output && groupDiv && output.scrollHeight > scrollTop + 100) {
+        output.scrollTop = scrollTop;
+        // --- Agrega el botón de deshacer al header del grupo ---
+        addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc);
+        clearInterval(pollId);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(pollId);
       }
-    }, 80); // Ajusta el tiempo si tu render es más lento
+      attempts++;
+    }, 50);
   } else {
     showTemporaryMessage('No hubo cambios');
   }
   closeMoveInfoModal();
+}
+
+function undoMoveInfo(groupId, srcAttr, dstAttr, clearSrc) {
+  const backup = moveInfoUndoBackup[groupId];
+  if (!backup) {
+    showTemporaryMessage('No hay nada que deshacer');
+    return;
+  }
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  backup.forEach(entry => {
+    if (skuToObject[entry.SKU]) {
+      skuToObject[entry.SKU][srcAttr] = entry.srcAttrValue;
+      skuToObject[entry.SKU][dstAttr] = entry.dstAttrValue;
+    }
+  });
+
+  // --- GUARDAR LA POSICIÓN DE SCROLL ---
+  const output = document.getElementById('output');
+  const scrollTop = output ? output.scrollTop : 0;
+  console.log("UNDO: ANTES DEL RENDER:", { scrollTop, groupId });
+
+  showTemporaryMessage('¡Movimiento de info deshecho!');
+  render();
+
+  // Polling para restaurar scroll y mostrar botón de deshacer (opcional)
+  let attempts = 0;
+  const maxAttempts = 20;
+  const pollId = setInterval(() => {
+    const output = document.getElementById('output');
+    const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+    if (output && groupDiv && output.scrollHeight > scrollTop + 100) {
+      output.scrollTop = scrollTop;
+      // Opcional: vuelve a agregar el botón de deshacer solo si quieres permitir varios deshacer
+      // addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc);
+      clearInterval(pollId);
+    } else if (attempts >= maxAttempts) {
+      clearInterval(pollId);
+    }
+    attempts++;
+  }, 50);
+
+  // Borra el backup para ese grupo
+  delete moveInfoUndoBackup[groupId];
 }
 
 function loadDefaultFilters() {
