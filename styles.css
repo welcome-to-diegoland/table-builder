@@ -1906,3 +1906,11 @@ html, body {
   height: 400px;     /* O el alto que uses */
   overflow-y: auto;
 }
+
+/* Destaca el header de la columna destino al mover info */
+.attribute-table th.destination-filled-th {
+  background: #fff7b2 !important;
+  color: #a17b00 !important;
+  font-weight: bold;
+  transition: background 0.3s;
+}
