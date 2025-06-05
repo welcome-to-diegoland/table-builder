@@ -39,7 +39,7 @@ let selectedGroups = new Set();
 let filteredItemsOriginal = [];
 let moveInfoUndoBackup = {};
 let objectDataOriginal = [];
-
+let groupDestHighlightAttr = {};
 
 
 let attributeFiltersState = {};
@@ -460,32 +460,43 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
   // Generar y exportar la pestaña "Valores Nuevos"
   const cmsIg = getCmsIg();
 
-  const filledByUser = {};
-  const allAttrsFilled = new Set();
-  for (const cellKey in editedCells) {
-    const { value, wasOriginallyEmpty } = editedCells[cellKey];
-    if (wasOriginallyEmpty && value && value.trim() !== "") {
-      const idx = cellKey.lastIndexOf("-");
-      if (idx > 0) {
-        const sku = cellKey.substring(0, idx);
-        const attr = cellKey.substring(idx + 1);
-        if (!filledByUser[sku]) filledByUser[sku] = {};
-        filledByUser[sku][attr] = value.trim();
-        allAttrsFilled.add(attr);
+  // Mapa SKU → objeto original
+  const originalMap = Object.fromEntries(objectDataOriginal.map(o => [o.SKU, o]));
+  const allAttrsChanged = new Set();
+  const changedByUser = {};
+
+  objectData.forEach(obj => {
+    const sku = obj.SKU;
+    const original = originalMap[sku] || {};
+    const changes = {};
+
+    // Solo para atributos que no estén en excludedAttributes y no sean "SKU"
+    Object.keys(obj).forEach(attr => {
+      if (attr === "SKU" || excludedAttributes.has(attr)) return;
+      const oldVal = (original[attr] || "").toString().trim();
+      const newVal = (obj[attr] || "").toString().trim();
+      if (oldVal !== newVal) {
+        changes[attr] = newVal;
+        allAttrsChanged.add(attr);
       }
+    });
+
+    if (Object.keys(changes).length > 0) {
+      changedByUser[sku] = changes;
     }
-  }
-  const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
+  });
+
+  // Generar columnas dinámicamente
+  const valoresCols = ["SKU", ...Array.from(allAttrsChanged)];
   const valoresExport = [];
-  if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
-    for (const sku in filledByUser) {
-      const row = { "SKU": sku };
-      for (const attr of allAttrsFilled) {
-        row[attr] = filledByUser[sku][attr] || "";
-      }
-      valoresExport.push(row);
-    }
-  }
+  Object.entries(changedByUser).forEach(([sku, attrs]) => {
+    const row = { "SKU": sku };
+    valoresCols.slice(1).forEach(attr => {
+      row[attr] = attrs[attr] || "";
+    });
+    valoresExport.push(row);
+  });
+
   const wsValores = XLSX.utils.json_to_sheet(valoresExport.length ? valoresExport : [{}], { header: valoresCols.length > 1 ? valoresCols : ["SKU"] });
   XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
   const wb = XLSX.utils.book_new();
@@ -3857,18 +3868,22 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     </th>
   `;
 
-  filteredAttributes.forEach(attr => {
-    let isAllEmpty = true;
-    for (const item of groupItems) {
-      const details = skuToObject[item.SKU] || {};
-      if (details[attr.attribute]?.toString().trim()) {
-        isAllEmpty = false;
-        break;
-      }
+filteredAttributes.forEach(attr => {
+  let isAllEmpty = true;
+  for (const item of groupItems) {
+    const details = skuToObject[item.SKU] || {};
+    if (details[attr.attribute]?.toString().trim()) {
+      isAllEmpty = false;
+      break;
     }
-    const isHighlighted = attr.attribute === highlightAttribute;
-    theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''}">${attr.attribute}</th>`;
-  });
+  }
+  const isHighlighted = attr.attribute === highlightAttribute;
+
+  // Aquí la línea IMPORTANTE:
+  const highlightClass = groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
+
+  theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
+});
 
   // Columnas forzadas con ancho
   forcedColumns.forEach(forced => {
@@ -4789,7 +4804,7 @@ function openMoveInfoModal(groupId, groupItems, attributeList) {
   // El warning oculto al principio
   document.getElementById('moveInfoWarning').textContent = '';
   // El checkbox desmarcado
-  document.getElementById('moveInfoClearSource').checked = false;
+  document.getElementById('moveInfoClearSource').checked = true;
 
   document.getElementById('moveInfoModal').style.display = 'block';
 
@@ -4806,16 +4821,15 @@ function addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc) {
   const headerRight = groupDiv.querySelector('.group-header-right');
   if (!headerRight) return;
 
-  // Quita botón previo si existe
+  // Quitar botón previo si existe
   let existingBtn = headerRight.querySelector('.undo-move-info-btn');
   if (existingBtn) existingBtn.remove();
 
-  // Crea botón
+  // Crea el botón de deshacer
   const undoBtn = document.createElement('button');
   undoBtn.className = "btn btn-sm btn-warning undo-move-info-btn";
   undoBtn.textContent = "Deshacer mover info";
   undoBtn.title = `Deshace el último movimiento de info (${srcAttr} → ${dstAttr})`;
-
   undoBtn.onclick = function() {
     undoMoveInfo(groupId, srcAttr, dstAttr, clearSrc);
   };
@@ -4841,7 +4855,7 @@ function confirmMoveInfoModal() {
   const items = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
 
-  // Backup antes de modificar
+  // Backup antes de modificar (para deshacer)
   moveInfoUndoBackup[groupId] = items.map(item => ({
     SKU: item.SKU,
     srcAttrValue: skuToObject[item.SKU]?.[srcAttr],
@@ -4862,31 +4876,30 @@ function confirmMoveInfoModal() {
     }
   });
 
-  // --- GUARDAR LA POSICIÓN DE SCROLL ---
-  const output = document.getElementById('output');
-  const scrollTop = output ? output.scrollTop : 0;
-  console.log("ANTES DEL RENDER:");
-  console.log({ scrollTop, groupId });
-
   if (anyChange) {
+    // Highlight header destino en tabla
+    groupDestHighlightAttr[groupId] = dstAttr;
+
     showTemporaryMessage('Información movida correctamente');
     render();
 
-    // Polling para restaurar scroll y mostrar botón de deshacer
+    // Espera a que el DOM esté renderizado y luego: scroll + resalta head + muestra botón deshacer
     let attempts = 0;
     const maxAttempts = 20;
     const pollId = setInterval(() => {
       const output = document.getElementById('output');
       const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-      if (output && groupDiv && output.scrollHeight > scrollTop + 100) {
-        output.scrollTop = scrollTop;
-        // --- Agrega el botón de deshacer al header del grupo ---
+      if (output && groupDiv) {
+        // Scroll
+        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+        output.scrollTop -= 40;
+
+        // Resalta header (el render de la tabla debe usar groupDestHighlightAttr[groupId])
+        // Muestra botón "Deshacer mover info"
         addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc);
         clearInterval(pollId);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(pollId);
       }
-      attempts++;
+      if (++attempts > maxAttempts) clearInterval(pollId);
     }, 50);
   } else {
     showTemporaryMessage('No hubo cambios');
@@ -4908,29 +4921,30 @@ function undoMoveInfo(groupId, srcAttr, dstAttr, clearSrc) {
     }
   });
 
-  // --- GUARDAR LA POSICIÓN DE SCROLL ---
-  const output = document.getElementById('output');
-  const scrollTop = output ? output.scrollTop : 0;
-  console.log("UNDO: ANTES DEL RENDER:", { scrollTop, groupId });
+  // Quita el highlight de columna destino al deshacer
+  delete groupDestHighlightAttr[groupId];
 
   showTemporaryMessage('¡Movimiento de info deshecho!');
   render();
 
-  // Polling para restaurar scroll y mostrar botón de deshacer (opcional)
+  // Después de render, scroll + limpia el botón de deshacer
   let attempts = 0;
   const maxAttempts = 20;
   const pollId = setInterval(() => {
     const output = document.getElementById('output');
     const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-    if (output && groupDiv && output.scrollHeight > scrollTop + 100) {
-      output.scrollTop = scrollTop;
-      // Opcional: vuelve a agregar el botón de deshacer solo si quieres permitir varios deshacer
-      // addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc);
-      clearInterval(pollId);
-    } else if (attempts >= maxAttempts) {
+    if (output && groupDiv) {
+      groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+      output.scrollTop -= 40;
+      // Quitar botón de deshacer
+      const headerRight = groupDiv.querySelector('.group-header-right');
+      if (headerRight) {
+        let existingBtn = headerRight.querySelector('.undo-move-info-btn');
+        if (existingBtn) existingBtn.remove();
+      }
       clearInterval(pollId);
     }
-    attempts++;
+    if (++attempts > maxAttempts) clearInterval(pollId);
   }, 50);
 
   // Borra el backup para ese grupo
