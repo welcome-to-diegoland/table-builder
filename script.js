@@ -40,7 +40,8 @@ let filteredItemsOriginal = [];
 let moveInfoUndoBackup = {};
 let objectDataOriginal = [];
 let groupDestHighlightAttr = {};
-
+// Copia de seguridad por grupo para "Deshacer mover info"
+let moveInfoBackups = {}; // { [groupId]: [array de copias de objetos] }
 
 let attributeFiltersState = {};
 let attributeFilterInputs = {};
@@ -470,13 +471,14 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
     const original = originalMap[sku] || {};
     const changes = {};
 
-    // Solo para atributos que no estén en excludedAttributes y no sean "SKU"
     Object.keys(obj).forEach(attr => {
       if (attr === "SKU" || excludedAttributes.has(attr)) return;
       const oldVal = (original[attr] || "").toString().trim();
       const newVal = (obj[attr] || "").toString().trim();
+
       if (oldVal !== newVal) {
-        changes[attr] = newVal;
+        // Si antes tenía valor y ahora está vacío, pon '<NULL>'
+        changes[attr] = (oldVal && !newVal) ? '<NULL>' : newVal;
         allAttrsChanged.add(attr);
       }
     });
@@ -486,7 +488,6 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
     }
   });
 
-  // Generar columnas dinámicamente
   const valoresCols = ["SKU", ...Array.from(allAttrsChanged)];
   const valoresExport = [];
   Object.entries(changedByUser).forEach(([sku, attrs]) => {
@@ -598,8 +599,8 @@ function handleCombinedExcel(event) {
       }
 
       // Guardar originales
-      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet);
-      filteredItems = filteredItemsOriginal.slice();
+filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
+filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
       // NUEVO: Leer value order si existe
@@ -629,8 +630,8 @@ function handleCSV(event) {
     header: true,
     skipEmptyLines: true,
     complete: (results) => {
-      objectDataOriginal = results.data.slice();
-      objectData = objectDataOriginal.slice();
+      objectDataOriginal = results.data.map(o => ({ ...o })); // copia profunda
+      objectData = objectDataOriginal.map(o => ({ ...o }));   // copia profunda
       // NO render() aquí: Espera a que elijan categoría
     },
     error: (error) => {
@@ -734,53 +735,59 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
   treeList.appendChild(treeHtml);
 
   cargarBtn.addEventListener('click', function() {
-    const selected = fileInfoDiv.querySelector('.category-tree-label.selected');
-    if (!selected) {
-      alert("Selecciona una categoría del árbol");
-      return;
-    }
-    const match = selected.textContent.match(/\[(.*?)\]/);
-    if (!match) {
-      alert("La categoría seleccionada no tiene código CMS válido");
-      return;
-    }
-    const cmsCode = match[1].trim();
+  const selected = fileInfoDiv.querySelector('.category-tree-label.selected');
+  if (!selected) {
+    alert("Selecciona una categoría del árbol");
+    return;
+  }
+  const match = selected.textContent.match(/\[(.*?)\]/);
+  if (!match) {
+    alert("La categoría seleccionada no tiene código CMS válido");
+    return;
+  }
+  const cmsCode = match[1].trim();
 
-    if (!filteredItemsOriginal.length || !objectDataOriginal.length) {
-      alert("Primero carga los archivos de datos.");
-      return;
-    }
+  if (!filteredItemsOriginal.length || !objectDataOriginal.length) {
+    alert("Primero carga los archivos de datos.");
+    return;
+  }
 
-    // 1. Filtra los SKUs del CMS
-    const filtered = filteredItemsOriginal.filter(x => (x["CMS IG"] || "").trim() === cmsCode);
+  // 1. Filtra los SKUs del CMS
+  const filtered = filteredItemsOriginal.filter(x => (x["CMS IG"] || "").trim() === cmsCode);
 
-    if (!filtered.length) {
-      alert("No hay SKUs para este código CMS en los datos cargados.");
-      return;
-    }
+  if (!filtered.length) {
+    alert("No hay SKUs para este código CMS en los datos cargados.");
+    return;
+  }
 
-    // 2. Calcula los IG ID únicos de los SKUs filtrados
-    const validSkus = new Set(filtered.map(x => x.SKU));
-    const groupIds = new Set(filtered.map(x => String(x["IG ID"])).filter(Boolean));
+  // 2. Calcula los IG ID únicos de los SKUs filtrados
+  const validSkus = new Set(filtered.map(x => x.SKU));
+  const groupIds = new Set(filtered.map(x => String(x["IG ID"])).filter(Boolean));
 
-    // 3. Incluye SKUs y también los objetos grupo (SKU == IG ID)
-    objectData = objectDataOriginal.filter(obj =>
-      validSkus.has(obj.SKU) || groupIds.has(String(obj.SKU))
-    );
+  // 3. Incluye SKUs y también los objetos grupo (SKU == IG ID)
+  // --- COPIA PROFUNDA! ---
+  // a) Crea un backup original SOLO de la categoría activa
+  const newObjectDataOriginal = objectDataOriginal.filter(obj =>
+    validSkus.has(obj.SKU) || groupIds.has(String(obj.SKU))
+  ).map(o => ({ ...o }));
 
-    // 4. Actualiza el array visible
-    filteredItems = filtered;
+  // b) Asigna el "original" y el "editable" a partir de ahí
+  objectDataOriginal = newObjectDataOriginal;
+  objectData = objectDataOriginal.map(o => ({ ...o }));
 
-    // 5. Limpia merges/selección si aplica (si existen esas variables)
-    if (typeof selectedGroups !== "undefined") selectedGroups.clear();
-    if (typeof mergedGroups !== "undefined") mergedGroups.clear();
+  // 4. Actualiza el array visible
+  filteredItems = filtered;
 
-    // 6. Procesar datos de categorías para orden/filtros
-    processCategoryDataFromSheet();
+  // 5. Limpia merges/selección si aplica (si existen esas variables)
+  if (typeof selectedGroups !== "undefined") selectedGroups.clear();
+  if (typeof mergedGroups !== "undefined") mergedGroups.clear();
 
-    // 7. Renderiza
-    render();
-  });
+  // 6. Procesar datos de categorías para orden/filtros
+  processCategoryDataFromSheet();
+
+  // 7. Renderiza
+  render();
+});
 }
 
 function processCategoryDataFromSheet() {
@@ -2863,6 +2870,29 @@ function processItemGroups(skuToObject) {
       });
       rightContainer.appendChild(unmergeBtn);
     }
+    if (moveInfoUndoBackup[groupIdStr]) {
+  const undoBtn = document.createElement("button");
+  undoBtn.textContent = "Deshacer mover info";
+  undoBtn.className = "btn btn-warning btn-sm";
+  undoBtn.style.marginLeft = "10px";
+  undoBtn.onclick = function() {
+    const backup = moveInfoUndoBackup[groupIdStr];
+    if (backup && backup.length) {
+      backup.forEach(b => {
+        const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
+        if (obj) {
+          // Restaurar ambos atributos
+          obj[b.srcAttr] = b.srcAttrValue;
+          obj[b.dstAttr] = b.dstAttrValue;
+        }
+      });
+    }
+    delete moveInfoUndoBackup[groupIdStr];
+    if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
+    render();
+  };
+  rightContainer.appendChild(undoBtn);
+}
     headerContentDiv.appendChild(rightContainer);
     headerDiv.appendChild(headerContentDiv);
 
