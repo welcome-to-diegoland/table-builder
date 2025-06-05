@@ -2875,17 +2875,8 @@ if (moveInfoUndoBackup[groupIdStr]) {
   undoBtn.textContent = "Deshacer mover info";
   undoBtn.className = "btn btn-warning btn-sm";
   undoBtn.style.marginLeft = "10px";
-  undoBtn.onclick = function() {
-  // Guarda la posición del grupo antes de renderizar
-  const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-  let scrollTop = 0;
-  if (groupDiv) {
-    const output = document.getElementById('output');
-    // Calcula scroll relativo al output
-    scrollTop = groupDiv.offsetTop - (output ? output.offsetTop : 0);
-  }
-
-  // ... tu código para restaurar backup ...
+ undoBtn.onclick = function() {
+  // Deshacer: restaura los valores previos
   const backup = moveInfoUndoBackup[groupIdStr];
   if (backup && backup.values && backup.values.length) {
     backup.values.forEach(b => {
@@ -2901,18 +2892,24 @@ if (moveInfoUndoBackup[groupIdStr]) {
 
   render();
 
-  // Después de renderizar, vuelve a hacer scroll al grupo
-  setTimeout(() => {
+  // Espera a que el DOM esté listo y luego haz scroll hasta el grupo
+  let attempts = 0;
+  const maxAttempts = 20;
+  const pollId = setInterval(() => {
     const output = document.getElementById('output');
     const newGroupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
     if (output && newGroupDiv) {
-      output.scrollTop = newGroupDiv.offsetTop - output.offsetTop;
-      // Opcional: resaltar el grupo por un momento
+      newGroupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+      output.scrollTop -= 40; // Ajusta este valor según tu header
+      // Efecto visual opcional
       newGroupDiv.classList.add('just-undone');
       setTimeout(() => newGroupDiv.classList.remove('just-undone'), 1200);
+      clearInterval(pollId);
     }
+    if (++attempts > maxAttempts) clearInterval(pollId);
   }, 50);
 };
+
   rightContainer.appendChild(undoBtn);
 }
     headerContentDiv.appendChild(rightContainer);
@@ -4952,7 +4949,7 @@ moveInfoUndoBackup[groupId] = {
 
         // Resalta header (el render de la tabla debe usar groupDestHighlightAttr[groupId])
         // Muestra botón "Deshacer mover info"
-        addUndoMoveInfoBtn(groupId, srcAttr, dstAttr, clearSrc);
+
         clearInterval(pollId);
       }
       if (++attempts > maxAttempts) clearInterval(pollId);
@@ -4963,49 +4960,7 @@ moveInfoUndoBackup[groupId] = {
   closeMoveInfoModal();
 }
 
-function undoMoveInfo(groupId, srcAttr, dstAttr, clearSrc) {
-  const backup = moveInfoUndoBackup[groupId];
-  if (!backup) {
-    showTemporaryMessage('No hay nada que deshacer');
-    return;
-  }
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  backup.forEach(entry => {
-    if (skuToObject[entry.SKU]) {
-      skuToObject[entry.SKU][srcAttr] = entry.srcAttrValue;
-      skuToObject[entry.SKU][dstAttr] = entry.dstAttrValue;
-    }
-  });
 
-  // Quita el highlight de columna destino al deshacer
-  delete groupDestHighlightAttr[groupId];
-
-  showTemporaryMessage('¡Movimiento de info deshecho!');
-  render();
-
-  // Después de render, scroll + limpia el botón de deshacer
-  let attempts = 0;
-  const maxAttempts = 20;
-  const pollId = setInterval(() => {
-    const output = document.getElementById('output');
-    const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-    if (output && groupDiv) {
-      groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-      output.scrollTop -= 40;
-      // Quitar botón de deshacer
-      const headerRight = groupDiv.querySelector('.group-header-right');
-      if (headerRight) {
-        let existingBtn = headerRight.querySelector('.undo-move-info-btn');
-        if (existingBtn) existingBtn.remove();
-      }
-      clearInterval(pollId);
-    }
-    if (++attempts > maxAttempts) clearInterval(pollId);
-  }, 50);
-
-  // Borra el backup para ese grupo
-  delete moveInfoUndoBackup[groupId];
-}
 
 function loadDefaultFilters() {
   if (defaultFilterAttributes.size === 0) {
