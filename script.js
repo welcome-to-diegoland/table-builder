@@ -3785,28 +3785,40 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   }
 
   // === AGREGAR BOTÓN "ORDENAR..." EN EL HEADER DERECHO DEL GRUPO ===
-  (function() {
-    // Busca el header del grupo
-    let headerDiv = container.querySelector('.group-header');
-    if (!headerDiv) return;
-    let headerRight = headerDiv.querySelector('.group-header-right');
-    if (!headerRight) {
-      headerRight = document.createElement('div');
-      headerRight.className = "group-header-right";
-      headerDiv.appendChild(headerRight);
-    }
-    // Evita duplicar el botón
-    if (!headerRight.querySelector('.group-sort-btn')) {
-      const sortBtn = document.createElement("button");
-      sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
-      sortBtn.textContent = "Ordenar...";
-      sortBtn.style.marginRight = "10px";
-      sortBtn.addEventListener('click', () =>
-  openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
-);
-      headerRight.insertBefore(sortBtn, headerRight.firstChild);
-    }
-  })();
+(function() {
+  // Busca el header del grupo
+  let headerDiv = container.querySelector('.group-header');
+  if (!headerDiv) return;
+  let headerRight = headerDiv.querySelector('.group-header-right');
+  if (!headerRight) {
+    headerRight = document.createElement('div');
+    headerRight.className = "group-header-right";
+    headerDiv.appendChild(headerRight);
+  }
+  // Botón "Ordenar..."
+  if (!headerRight.querySelector('.group-sort-btn')) {
+    const sortBtn = document.createElement("button");
+    sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
+    sortBtn.textContent = "Ordenar...";
+    sortBtn.style.marginRight = "10px";
+    sortBtn.addEventListener('click', () =>
+      openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
+    );
+    headerRight.insertBefore(sortBtn, headerRight.firstChild);
+  }
+  // Botón "Mover info"
+  if (!headerRight.querySelector('.move-info-btn')) {
+    const moveBtn = document.createElement("button");
+    moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
+    moveBtn.textContent = "Mover info";
+    moveBtn.style.marginRight = "10px";
+    moveBtn.addEventListener('click', () => {
+      let attributeList = filteredAttributes.map(a => a.attribute);
+      openMoveInfoModal(groupId, groupItems, attributeList);
+    });
+    headerRight.insertBefore(moveBtn, headerRight.firstChild);
+  }
+})();
 
   const table = document.createElement("table");
   table.className = "table table-striped table-bordered attribute-table";
@@ -4704,6 +4716,146 @@ function clearFilterInputs() {
     processItemGroups(skuToObject);
   }
 
+}
+// ========== MODAL "Mover Info" ==========
+
+function injectMoveInfoModal() {
+  if (document.getElementById('moveInfoModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'moveInfoModal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="group-sort-modal-backdrop"></div>
+    <div class="group-sort-modal-content">
+      <h3>Mover información entre atributos</h3>
+      <div style="margin-bottom:12px;">Selecciona un atributo de origen y uno de destino para mover/copiar la información.</div>
+      <div id="moveInfoSelects" style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:14px;">
+        <div>
+          <label>Origen<br>
+            <select id="moveInfoSource" class="form-control form-control-sm"></select>
+          </label>
+        </div>
+        <div>
+          <label>Destino<br>
+            <select id="moveInfoTarget" class="form-control form-control-sm"></select>
+          </label>
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <input type="checkbox" id="moveInfoClearSource" style="vertical-align:middle;"> 
+        <label for="moveInfoClearSource" style="font-size:12px;vertical-align:middle;">Vaciar origen después de copiar</label>
+      </div>
+      <div style="color:#8a2626;font-size:12px;margin-bottom:8px;" id="moveInfoWarning"></div>
+      <div style="display:flex;gap:8px;">
+        <button id="moveInfoConfirmBtn" class="btn btn-primary btn-sm">Confirmar</button>
+        <button id="moveInfoCancelBtn" class="btn btn-outline-secondary btn-sm">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  // Reutiliza CSS del modal de sort, no agregamos más aquí
+
+  document.getElementById('moveInfoCancelBtn').onclick = closeMoveInfoModal;
+}
+injectMoveInfoModal();
+
+let moveInfoModalState = {
+  groupId: null,
+  groupItems: [],
+  attributes: []
+};
+
+function openMoveInfoModal(groupId, groupItems, attributeList) {
+  moveInfoModalState.groupId = groupId;
+  moveInfoModalState.groupItems = groupItems;
+  moveInfoModalState.attributes = attributeList;
+
+  // Llena los select con los atributos visibles en la tabla
+  const sourceSel = document.getElementById('moveInfoSource');
+  const targetSel = document.getElementById('moveInfoTarget');
+  sourceSel.innerHTML = '';
+  targetSel.innerHTML = '';
+  attributeList.forEach(attr => {
+    const opt1 = document.createElement('option');
+    opt1.value = attr;
+    opt1.textContent = attr;
+    sourceSel.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = attr;
+    opt2.textContent = attr;
+    targetSel.appendChild(opt2);
+  });
+  // El warning oculto al principio
+  document.getElementById('moveInfoWarning').textContent = '';
+  // El checkbox desmarcado
+  document.getElementById('moveInfoClearSource').checked = false;
+
+  document.getElementById('moveInfoModal').style.display = 'block';
+
+  document.getElementById('moveInfoConfirmBtn').onclick = confirmMoveInfoModal;
+}
+function closeMoveInfoModal() {
+  document.getElementById('moveInfoModal').style.display = 'none';
+  moveInfoModalState = { groupId: null, groupItems: [], attributes: [] };
+}
+
+// ========== LÓGICA DEL MOVIMIENTO ==========
+
+function confirmMoveInfoModal() {
+  const srcAttr = document.getElementById('moveInfoSource').value;
+  const dstAttr = document.getElementById('moveInfoTarget').value;
+  const clearSrc = document.getElementById('moveInfoClearSource').checked;
+  const warningDiv = document.getElementById('moveInfoWarning');
+  if (!srcAttr || !dstAttr || srcAttr === dstAttr) {
+    warningDiv.textContent = 'Debes elegir atributos diferentes.';
+    return;
+  }
+  warningDiv.textContent = '';
+
+  // Solo sobre items de este grupo
+  const groupId = moveInfoModalState.groupId;
+  const items = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+
+  // === GUARDAR POSICIÓN DEL GRUPO RESPECTO AL CONTENEDOR (#box4) ===
+  const container = document.getElementById('box4');
+  let groupDiv = container ? container.querySelector(`.group-container[data-group-id="${groupId}"]`) : null;
+  let groupOffset = groupDiv ? groupDiv.offsetTop : 0;
+  let containerScroll = container ? container.scrollTop : 0;
+
+  let anyChange = false;
+  items.forEach(item => {
+    const obj = skuToObject[item.SKU];
+    if (!obj) return;
+    const srcVal = (obj[srcAttr] || '').toString().trim();
+    const dstVal = (obj[dstAttr] || '').toString().trim();
+    if (!srcVal && dstVal) return;
+    if (srcVal && (!dstVal || dstVal)) {
+      obj[dstAttr] = srcVal;
+      anyChange = true;
+      if (clearSrc) obj[srcAttr] = '';
+    }
+  });
+
+  if (anyChange) {
+    showTemporaryMessage('Información movida correctamente');
+    render();
+
+    // === RESTAURAR SCROLL DEL CONTENEDOR (#box4) ===
+    setTimeout(() => {
+      const newContainer = document.getElementById('box4');
+      let newGroupDiv = newContainer ? newContainer.querySelector(`.group-container[data-group-id="${groupId}"]`) : null;
+      if (newContainer && newGroupDiv) {
+        // Calcula la diferencia en offset y ajusta scrollTop
+        let newOffset = newGroupDiv.offsetTop;
+        newContainer.scrollTop = newOffset - groupOffset + containerScroll;
+      }
+    }, 10);
+  } else {
+    showTemporaryMessage('No hubo cambios');
+  }
+  closeMoveInfoModal();
 }
 
 function loadDefaultFilters() {
