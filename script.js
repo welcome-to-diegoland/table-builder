@@ -2870,27 +2870,49 @@ function processItemGroups(skuToObject) {
       });
       rightContainer.appendChild(unmergeBtn);
     }
-    if (moveInfoUndoBackup[groupIdStr]) {
+if (moveInfoUndoBackup[groupIdStr]) {
   const undoBtn = document.createElement("button");
   undoBtn.textContent = "Deshacer mover info";
   undoBtn.className = "btn btn-warning btn-sm";
   undoBtn.style.marginLeft = "10px";
   undoBtn.onclick = function() {
-    const backup = moveInfoUndoBackup[groupIdStr];
-    if (backup && backup.length) {
-      backup.forEach(b => {
-        const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
-        if (obj) {
-          // Restaurar ambos atributos
-          obj[b.srcAttr] = b.srcAttrValue;
-          obj[b.dstAttr] = b.dstAttrValue;
-        }
-      });
+  // Guarda la posición del grupo antes de renderizar
+  const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+  let scrollTop = 0;
+  if (groupDiv) {
+    const output = document.getElementById('output');
+    // Calcula scroll relativo al output
+    scrollTop = groupDiv.offsetTop - (output ? output.offsetTop : 0);
+  }
+
+  // ... tu código para restaurar backup ...
+  const backup = moveInfoUndoBackup[groupIdStr];
+  if (backup && backup.values && backup.values.length) {
+    backup.values.forEach(b => {
+      const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
+      if (obj) {
+        obj[backup.srcAttr] = b.srcAttrValue;
+        obj[backup.dstAttr] = b.dstAttrValue;
+      }
+    });
+  }
+  delete moveInfoUndoBackup[groupIdStr];
+  if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
+
+  render();
+
+  // Después de renderizar, vuelve a hacer scroll al grupo
+  setTimeout(() => {
+    const output = document.getElementById('output');
+    const newGroupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+    if (output && newGroupDiv) {
+      output.scrollTop = newGroupDiv.offsetTop - output.offsetTop;
+      // Opcional: resaltar el grupo por un momento
+      newGroupDiv.classList.add('just-undone');
+      setTimeout(() => newGroupDiv.classList.remove('just-undone'), 1200);
     }
-    delete moveInfoUndoBackup[groupIdStr];
-    if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
-    render();
-  };
+  }, 50);
+};
   rightContainer.appendChild(undoBtn);
 }
     headerContentDiv.appendChild(rightContainer);
@@ -4886,11 +4908,15 @@ function confirmMoveInfoModal() {
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
 
   // Backup antes de modificar (para deshacer)
-  moveInfoUndoBackup[groupId] = items.map(item => ({
+moveInfoUndoBackup[groupId] = {
+  srcAttr,
+  dstAttr,
+  values: items.map(item => ({
     SKU: item.SKU,
     srcAttrValue: skuToObject[item.SKU]?.[srcAttr],
     dstAttrValue: skuToObject[item.SKU]?.[dstAttr]
-  }));
+  }))
+};
 
   let anyChange = false;
   items.forEach(item => {
