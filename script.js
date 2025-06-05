@@ -4813,16 +4813,9 @@ function confirmMoveInfoModal() {
   }
   warningDiv.textContent = '';
 
-  // Solo sobre items de este grupo
   const groupId = moveInfoModalState.groupId;
   const items = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-
-  // === GUARDAR POSICIÓN DEL GRUPO RESPECTO AL CONTENEDOR (#box4) ===
-  const container = document.getElementById('box4');
-  let groupDiv = container ? container.querySelector(`.group-container[data-group-id="${groupId}"]`) : null;
-  let groupOffset = groupDiv ? groupDiv.offsetTop : 0;
-  let containerScroll = container ? container.scrollTop : 0;
 
   let anyChange = false;
   items.forEach(item => {
@@ -4842,16 +4835,16 @@ function confirmMoveInfoModal() {
     showTemporaryMessage('Información movida correctamente');
     render();
 
-    // === RESTAURAR SCROLL DEL CONTENEDOR (#box4) ===
+    // Scroll al grupo después de render
     setTimeout(() => {
-      const newContainer = document.getElementById('box4');
-      let newGroupDiv = newContainer ? newContainer.querySelector(`.group-container[data-group-id="${groupId}"]`) : null;
-      if (newContainer && newGroupDiv) {
-        // Calcula la diferencia en offset y ajusta scrollTop
-        let newOffset = newGroupDiv.offsetTop;
-        newContainer.scrollTop = newOffset - groupOffset + containerScroll;
+      const groupDiv = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+      const container = document.getElementById('output');
+      if (groupDiv && container) {
+        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+        // Ajusta este valor si necesitas dejar más espacio arriba
+        container.scrollTop -= 40;
       }
-    }, 10);
+    }, 80); // Ajusta el tiempo si tu render es más lento
   } else {
     showTemporaryMessage('No hubo cambios');
   }

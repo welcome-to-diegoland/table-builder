@@ -1901,3 +1901,8 @@ html, body {
   font-weight: bold;
   margin-top: 2px;
 }
+
+#output {
+  height: 400px;     /* O el alto que uses */
+  overflow-y: auto;
+}
