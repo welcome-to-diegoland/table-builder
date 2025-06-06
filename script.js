@@ -61,14 +61,14 @@ let currentViewState = {
 
 // Configuración
 const forcedColumns = ["marca", "item_code", "precio"];
-const priorityStatsAttributes = ["titulo", "marca", "shop_by"];
+const priorityStatsAttributes = ["titulo", "marca", "orden_tabla", "shop_by"];
 const excludedAttributes = new Set([
   "product.type", "url_key", "product.attribute_set", "product.websites",
   "product.required_options", "stock.manage_stock", "stock.qty", "Price", "Status",
   "Tax_class_id", "Visibility", "name", "category.name", "leaf_name_filter",
   "image", "small_image", "thumbnail", "pdp_display_attribute",
   "pdp_description_attribute", "pdp_short_description_attribute", "icon_order",
-  "orden_tabla", "orden_cms", "aplicaciones", "cms_web", "incluye", 
+  "orden_cms", "aplicaciones", "cms_web", "incluye", 
   "paginadecatalogo", "seccion", "ventajas", "brand_logo",
   "item_group_id", "categoria", "item_codeunspcweb_search_term",
   "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web",
@@ -302,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     XLSX.writeFile(wb, finalFileName);
   });
   
+
 
   
   document.querySelectorAll('input[type="file"]').forEach(input => {
@@ -586,6 +587,249 @@ function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
 }
 
+// Llama a esto una vez al inicio
+function injectAddStatsAttributeModal() {
+  if (document.getElementById('addStatsAttributeModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'addStatsAttributeModal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="group-sort-modal-backdrop"></div>
+    <div class="group-sort-modal-content">
+      <h3>Agregar atributos a la tabla</h3>
+      <div id="addStatsAttrList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button id="addStatsAttrConfirmBtn" class="btn btn-primary btn-sm">Agregar</button>
+        <button id="addStatsAttrCancelBtn" class="btn btn-outline-secondary btn-sm">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Reutiliza el mismo CSS que el otro modal (solo se añade si no existe)
+  if (!document.getElementById('dual-list-css')) {
+    const style = document.createElement('style');
+    style.id = 'dual-list-css';
+    style.textContent = `
+      #addStatsAttributeModal, #groupSortModal { position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;display:none; }
+      .group-sort-modal-backdrop {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.2);}
+      .group-sort-modal-content {
+        background:white;max-width:400px;padding:24px 18px 18px 18px;border-radius:8px;
+        box-shadow:0 6px 32px 0 #2222;position:fixed;top:50%;left:50%;
+        transform:translate(-50%,-50%);
+      }
+      .dual-list-modal.compact {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        align-items: center;
+        padding: 8px 0 0 0;
+        font-size: 13px;
+      }
+      .dual-list-col {
+        flex:1; min-width:120px; max-width:170px;
+      }
+      .dual-list-label {
+        text-align: center;
+        font-weight: 500;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: #456;
+      }
+      .dual-list-box {
+        border: 1px solid #bbb;
+        background: #fafbfc;
+        border-radius: 4px;
+        min-height: 120px;
+        max-height: 160px;
+        overflow-y: auto;
+        list-style: none;
+        margin: 0; padding: 0;
+        font-size: 13px;
+      }
+      .dual-list-box li {
+        padding: 4px 7px;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.13s;
+        border-bottom: 1px solid #eee;
+        font-size: 13px;
+      }
+      .dual-list-box li:last-child { border-bottom: none;}
+      .dual-list-box li.selected, .dual-list-box li:focus {
+        background: #e6f1ff;
+        outline: none;
+      }
+      .dual-list-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        justify-content: center;
+        align-items: center;
+      }
+      .dual-list-btn {
+        font-size: 1.08em;
+        width: 30px; height: 30px;
+        border-radius: 50%; border: none;
+        background: #f1f4f7;
+        color: #456;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        padding: 0;
+      }
+      .dual-list-btn:active, .dual-list-btn:focus { background: #d6e8fd; color: #124;}
+      .dual-list-selected li {
+        cursor: grab;
+      }
+      @media (max-width:600px) {
+        .dual-list-modal.compact { flex-direction:column; gap:7px;}
+        .dual-list-controls { flex-direction:row; gap: 7px;}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.getElementById('addStatsAttrCancelBtn').onclick = closeAddStatsAttributeModal;
+}
+injectAddStatsAttributeModal();
+
+let addStatsModalState = { available: [], selected: [] };
+
+function openAddStatsAttributeModal() {
+  // Blacklist proporcionada
+  const blacklist = new Set([
+    "SKU", "product.type", "url_key", "product.attribute_set", "product.websites",
+    "product.required_options", "stock.manage_stock", "stock.qty", "Price", "Price_View",
+    "Short_Description", "Status", "Tax_class_id", "Visibility", "Weight", "name",
+    "category.name", "leaf_name_filter", "item_group_id", "catalog_page_number",
+    "catalog_cover_image", "image", "small_image", "thumbnail", "ShortDescription",
+    "description", "pdp_display_attribute", "pdp_description_attribute", "pdp_short_description_attribute",
+    "icon_order", "orden_cms", "algolia_synced_ids", "cost", "manufactuer", "on_order_qty"
+  ]);
+  // Todos los keys de objectData
+  let allAttrs = new Set();
+  objectData.forEach(obj => Object.keys(obj).forEach(k => allAttrs.add(k)));
+  // Excluye los atributos ya visibles en la tabla de stats
+  document.querySelectorAll('.attribute-stats-table tbody tr').forEach(row => {
+    const attr = row.querySelector('td select')?.getAttribute('data-attribute');
+    if (attr) blacklist.add(attr);
+  });
+  // Si es la primera vez o tras cerrar: reconstruye el estado
+  if (!addStatsModalState.available.length && !addStatsModalState.selected.length) {
+    addStatsModalState.available = Array.from(allAttrs).filter(attr => !blacklist.has(attr));
+    addStatsModalState.selected = [];
+  }
+
+  // Render dual-list
+  const listDiv = document.getElementById('addStatsAttrList');
+  listDiv.innerHTML = `
+    <div class="dual-list-modal compact">
+      <div class="dual-list-col">
+        <div class="dual-list-label">Disponibles</div>
+        <ul id="addStats-available" class="dual-list-box" tabindex="0">
+          ${addStatsModalState.available.map(attr => `<li tabindex="0">${attr}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="dual-list-controls">
+        <button id="addStats-add" class="dual-list-btn compact-btn">&rarr;</button>
+        <button id="addStats-remove" class="dual-list-btn compact-btn">&larr;</button>
+      </div>
+      <div class="dual-list-col">
+        <div class="dual-list-label">Seleccionados</div>
+        <ul id="addStats-selected" class="dual-list-box dual-list-selected" tabindex="0">
+          ${addStatsModalState.selected.map(attr => `<li tabindex="0">${attr}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+
+  // --- Dual-list logic ---
+  const availUl = document.getElementById('addStats-available');
+  const selUl = document.getElementById('addStats-selected');
+  let selectedAvailable = null, selectedSelected = null;
+
+  // Seleccionar disponible (click)
+  availUl.onclick = e => {
+    if (e.target.tagName === "LI") {
+      selectedAvailable = e.target;
+      availUl.querySelectorAll('.selected').forEach(li => li.classList.remove('selected'));
+      e.target.classList.add('selected');
+    }
+  };
+  // Seleccionar seleccionado (click)
+  selUl.onclick = e => {
+    if (e.target.tagName === "LI") {
+      selectedSelected = e.target;
+      selUl.querySelectorAll('.selected').forEach(li => li.classList.remove('selected'));
+      e.target.classList.add('selected');
+    }
+  };
+  // Pasar a la derecha (flecha o doble click)
+  document.getElementById('addStats-add').onclick = () => {
+    if (!selectedAvailable) return;
+    const attr = selectedAvailable.textContent;
+    addStatsModalState.available = addStatsModalState.available.filter(a => a !== attr);
+    addStatsModalState.selected.push(attr);
+    openAddStatsAttributeModal(); // rerender visual
+  };
+  availUl.ondblclick = e => {
+    if (e.target.tagName === "LI") {
+      const attr = e.target.textContent;
+      addStatsModalState.available = addStatsModalState.available.filter(a => a !== attr);
+      addStatsModalState.selected.push(attr);
+      openAddStatsAttributeModal();
+    }
+  };
+
+  // Quitar de la derecha (flecha o doble click)
+  document.getElementById('addStats-remove').onclick = () => {
+    if (!selectedSelected) return;
+    const attr = selectedSelected.textContent;
+    addStatsModalState.selected = addStatsModalState.selected.filter(a => a !== attr);
+    addStatsModalState.available.push(attr);
+    openAddStatsAttributeModal();
+  };
+  selUl.ondblclick = e => {
+    if (e.target.tagName === "LI") {
+      const attr = e.target.textContent;
+      addStatsModalState.selected = addStatsModalState.selected.filter(a => a !== attr);
+      addStatsModalState.available.push(attr);
+      openAddStatsAttributeModal();
+    }
+  };
+
+  document.getElementById('addStatsAttributeModal').style.display = 'block';
+  document.getElementById('addStatsAttrConfirmBtn').onclick = confirmAddStatsAttributesModal;
+}
+
+function closeAddStatsAttributeModal() {
+  document.getElementById('addStatsAttributeModal').style.display = 'none';
+  // Limpiar el estado para que siempre empiece fresh
+  addStatsModalState = { available: [], selected: [] };
+}
+
+// Al confirmar, agrega los atributos seleccionados a window.extraStatsAttributes y refresca la tabla
+function confirmAddStatsAttributesModal() {
+  const attrsToAdd = addStatsModalState.selected;
+  if (!window.extraStatsAttributes) window.extraStatsAttributes = new Set();
+  attrsToAdd.forEach(attr => window.extraStatsAttributes.add(attr));
+  closeAddStatsAttributeModal();
+  render();
+}
+
+function closeAddStatsAttributeModal() {
+  document.getElementById('addStatsAttributeModal').style.display = 'none';
+  addStatsModalState = { available: [], selected: [] };
+}
+
+// Al confirmar, agrega los atributos seleccionados a window.extraStatsAttributes y refresca la tabla
+function confirmAddStatsAttributesModal() {
+  const attrsToAdd = addStatsModalState.selected;
+  if (!window.extraStatsAttributes) window.extraStatsAttributes = new Set();
+  attrsToAdd.forEach(attr => window.extraStatsAttributes.add(attr));
+  closeAddStatsAttributeModal();
+  render();
+}
 
 
 function handleCombinedExcel(event) {
@@ -1628,6 +1872,21 @@ function processAttributeStats(skuToObject) {
     }
   });
 
+  // ----------- INICIO CAMBIO: incluir atributos extras seleccionados manualmente -----------
+  if (window.extraStatsAttributes) {
+    window.extraStatsAttributes.forEach(attr => {
+      if (!priorityStats.find(s => s.attribute === attr) && !otherStats.find(s => s.attribute === attr)) {
+        otherStats.push({
+          attribute: attr,
+          withValue: 0,
+          withoutValue: filteredItems.length,
+          uniqueValues: new Map(),
+        });
+      }
+    });
+  }
+  // ----------- FIN CAMBIO -----------
+
   // Ordenar los prioritarios según el orden definido y los otros por frecuencia
   const sortedPriorityStats = priorityStats.sort((a, b) => 
     priorityStatsAttributes.indexOf(a.attribute) - priorityStatsAttributes.indexOf(b.attribute)
@@ -1740,6 +1999,12 @@ function createStatsColumn(stats) {
           </div>
           <div class="attribute-header-wrapper">
             Atributo
+            <button type="button" id="stats-addAttributeBtn" class="btn-clear-filter" title="Agregar atributos">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <line x1="12" y1="5" x2="12" y2="19"/>
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+</button>
             <button class="btn-clear-filter" title="Limpiar filtros" type="button">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 6L6 18M6 6l12 12"/>
@@ -1843,6 +2108,15 @@ function createStatsColumn(stats) {
       }).join('')}
     </tbody>
   `;
+
+  // --- Listener para el botón "+" ---
+const statsAddAttributeBtn = table.querySelector('#stats-addAttributeBtn');
+if (statsAddAttributeBtn) {
+  statsAddAttributeBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    openAddStatsAttributeModal();
+  });
+}
 
   // --------- LISTENERS ---------
   // Limpiar filtros generales
@@ -1972,6 +2246,85 @@ function createStatsColumn(stats) {
   column.appendChild(table);
   return column;
 }
+
+function injectAddAttributesModal() {
+  if (document.getElementById('addAttributesModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'addAttributesModal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="group-sort-modal-backdrop"></div>
+    <div class="group-sort-modal-content">
+      <h3>Agregar atributos a la tabla</h3>
+      <div id="addAttrDualList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button id="addAttrConfirmBtn" class="btn btn-primary btn-sm">Agregar</button>
+        <button id="addAttrCancelBtn" class="btn btn-outline-secondary btn-sm">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  // Reutiliza el mismo CSS del modal dual-list/sort
+  document.getElementById('addAttrCancelBtn').onclick = closeAddAttributesModal;
+}
+injectAddAttributesModal();
+
+let addAttributesModalState = { available: [], selected: [] };
+
+function openAddAttributesModal() {
+  // 1. Obtener todos los atributos posibles de objectData excluyendo los de la lista negra
+  const blacklist = new Set([
+    "SKU", "product.type", "url_key", "product.attribute_set", "product.websites",
+    "product.required_options", "stock.manage_stock", "stock.qty", "Price", "Price_View",
+    "Short_Description", "Status", "Tax_class_id", "Visibility", "Weight", "name",
+    "category.name", "leaf_name_filter", "item_group_id", "catalog_page_number",
+    "catalog_cover_image", "image", "small_image", "thumbnail", "ShortDescription",
+    "description", "pdp_display_attribute", "pdp_description_attribute", "pdp_short_description_attribute",
+    "icon_order", "orden_cms", "algolia_synced_ids", "cost", "manufactuer", "on_order_qty"
+  ]);
+  // Todos los keys de objectData
+  let allAttrs = new Set();
+  objectData.forEach(obj => Object.keys(obj).forEach(k => allAttrs.add(k)));
+  // Excluye ya los de la tabla de stats actual
+  document.querySelectorAll('.attribute-stats-table tbody tr').forEach(row => {
+    const attr = row.querySelector('td select')?.getAttribute('data-attribute');
+    if (attr) blacklist.add(attr);
+  });
+  const available = Array.from(allAttrs).filter(attr => !blacklist.has(attr));
+  addAttributesModalState.available = available;
+  addAttributesModalState.selected = [];
+
+  // 2. Render dual-list
+  const dualListDiv = document.getElementById('addAttrDualList');
+  dualListDiv.innerHTML = `
+    <div class="dual-list-modal compact">
+      <div class="dual-list-col">
+        <div class="dual-list-label">Disponibles</div>
+        <ul id="addAttr-available" class="dual-list-box" tabindex="0">
+          ${available.map(attr => `<li tabindex="0">${attr}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="dual-list-controls">
+        <button id="addAttr-add" class="dual-list-btn compact-btn">&rarr;</button>
+        <button id="addAttr-remove" class="dual-list-btn compact-btn">&larr;</button>
+      </div>
+      <div class="dual-list-col">
+        <div class="dual-list-label">Seleccionados</div>
+        <ul id="addAttr-selected" class="dual-list-box dual-list-selected" tabindex="0"></ul>
+      </div>
+    </div>
+  `;
+  // Listeners para dual-list
+  setupDualListEvents('addAttr');
+  document.getElementById('addAttributesModal').style.display = 'block';
+  document.getElementById('addAttrConfirmBtn').onclick = confirmAddAttributesModal;
+}
+function closeAddAttributesModal() {
+  document.getElementById('addAttributesModal').style.display = 'none';
+  addAttributesModalState = { available: [], selected: [] };
+}
+
+
 
 function syncAllFilterInputsToLocalStorage() {
   document.querySelectorAll('.filter-order-input').forEach(input => {
@@ -4331,8 +4684,16 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   groupSortModalState.groupId = groupId;
   groupSortModalState.groupItems = groupItems;
 
-let available = attributeList.filter(attr => attr === "marca" || !excludedAttributes.has(attr));
+  let available = attributeList.filter(attr => attr === "marca" || !excludedAttributes.has(attr));
   let selected = [];
+
+  // AÑADIDO: Forzar que "orden_tabla" SIEMPRE esté disponible si no está seleccionado ni en la lista
+  if (
+    !available.includes("orden_tabla") &&
+    !selected.includes("orden_tabla")
+  ) {
+    available.push("orden_tabla");
+  }
 
   // UI ajustada
   const listDiv = document.getElementById('groupSortAttrList');
