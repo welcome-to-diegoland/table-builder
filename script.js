@@ -115,6 +115,13 @@ document.addEventListener('DOMContentLoaded', function() {
       if (attr) attributes.push(attr);
     });
   
+      const mergeBtn = document.getElementById('mergeSelectedGroupsBtn');
+  if (mergeBtn) {
+    mergeBtn.addEventListener('click', mergeSelectedGroups);
+  }
+
+
+
     const data = [];
     cmsSet.forEach(cmsIg => {
       attributes.forEach(attr => {
