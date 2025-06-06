@@ -1673,6 +1673,7 @@ function displayFilteredResults(filteredItems) {
       const details = objectData.find(o => o.SKU === item.SKU);
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
+
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
@@ -1681,7 +1682,7 @@ function displayFilteredResults(filteredItems) {
     }
     if (isMergedGroup) {
       const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
+      mergedBadge.className = "btn btn-primary btn-sm";
       mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
     }
@@ -2935,7 +2936,7 @@ function handleStatClick(event) {
       mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
       rightContainer.appendChild(mergedBadge);
       const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.className = "btn btn-sm btn-outline-danger";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
       unmergeBtn.dataset.groupIdStr = groupIdStr;
@@ -3213,7 +3214,7 @@ function processItemGroups(skuToObject) {
     const editAllBtn = document.createElement("button");
 editAllBtn.textContent = "Editar";
 editAllBtn.className = "btn btn-sm btn-outline-primary";
-editAllBtn.style.marginLeft = "10px";
+
 editAllBtn.dataset.editing = "false";
 editAllBtn.onclick = function() {
   if (editAllBtn.dataset.editing === "false") {
@@ -3262,7 +3263,7 @@ rightContainer.appendChild(editAllBtn);
       rightContainer.appendChild(mergedBadge);
 
       const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.className = "btn btn-sm btn-outline-danger";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
       unmergeBtn.dataset.groupIdStr = groupIdStr;
@@ -3275,7 +3276,6 @@ if (moveInfoUndoBackup[groupIdStr]) {
   const undoBtn = document.createElement("button");
   undoBtn.textContent = "Deshacer mover info";
   undoBtn.className = "btn btn-warning btn-sm";
-  undoBtn.style.marginLeft = "10px";
  undoBtn.onclick = function() {
   // Deshacer: restaura los valores previos
   const backup = moveInfoUndoBackup[groupIdStr];
@@ -3487,7 +3487,7 @@ function renderMergedGroups(skuToObject) {
       rightContainer.appendChild(mergedBadge);
 
       const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.className = "btn btn-sm btn-outline-danger";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
       unmergeBtn.dataset.groupId = groupId;
@@ -3904,7 +3904,7 @@ function renderMergedGroups(skuToObject) {
 
       // Botón para desagrupar
       const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.className = "btn btn-sm btn-outline-danger";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
       unmergeBtn.dataset.groupId = groupId;
@@ -4097,7 +4097,7 @@ groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU
 
       // Botón para desagrupar
       const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+      unmergeBtn.className = "btn btn-sm btn-outline-danger";
       unmergeBtn.textContent = "Desagrupar";
       unmergeBtn.title = "Revertir esta unión de grupos";
       unmergeBtn.dataset.groupId = groupId;
@@ -4211,16 +4211,7 @@ function addMergeStyles() {
             gap: 10px;
             min-width: 0;
         }
-        
-        .group-header-right {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 5px;
-            position: absolute;
-            right: 10px;
-            top: 10px;
-        }
+    
       
         
         .merged-badge {
@@ -4232,10 +4223,7 @@ function addMergeStyles() {
             font-size: 0.8em;
         }
         
-        .unmerge-btn {
-            font-size: 0.7em;
-            padding: 0.15rem 0.5rem;
-        }
+
         
         .product-img {
             max-width: 80px;
@@ -4347,7 +4335,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const sortBtn = document.createElement("button");
     sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
     sortBtn.textContent = "Ordenar";
-    sortBtn.style.marginRight = "10px";
     sortBtn.addEventListener('click', () =>
       openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
     );
@@ -4358,7 +4345,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const moveBtn = document.createElement("button");
     moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
     moveBtn.textContent = "Mover info";
-    moveBtn.style.marginRight = "10px";
     moveBtn.addEventListener('click', () => {
       let attributeList = filteredAttributes.map(a => a.attribute);
       openMoveInfoModal(groupId, groupItems, attributeList);

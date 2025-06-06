@@ -291,12 +291,7 @@ html, body {
   min-width: 0;
 }
 
-.group-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-}
+
 
 .group-details-container {
   width: 100%;
@@ -1180,13 +1175,7 @@ tr[data-original-ig-id]:hover {
 }
 
 
-.unmerge-btn {
-  font-size: 0.8em;
-  padding: 0.25rem 0.5rem;
-  align-self: flex-end; /* Alinea a la derecha */
-  margin-top: 5px;
-  order: 2; /* Asegura que esté debajo del badge */
-}
+
 
 /* Estilo para items originales dentro de grupos unidos */
 .item-origin-label {
@@ -1353,14 +1342,16 @@ tr[data-original-igid]:nth-child(even) {
   margin-top: 5px;
   width: 100%;
 }
+
 .group-header-right {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 5px;
-  min-width: 150px; /* Asegura espacio suficiente */
+  gap: 10px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
 }
-
 
 /* Para resaltar filas al pasar el mouse */
 tr[data-original-igid]:hover {
