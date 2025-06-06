@@ -2855,19 +2855,17 @@ editAllBtn.className = "btn btn-sm btn-outline-primary";
 editAllBtn.style.marginLeft = "10px";
 editAllBtn.dataset.editing = "false";
 editAllBtn.onclick = function() {
-  const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-  if (!groupDiv) return;
-
   if (editAllBtn.dataset.editing === "false") {
     editAllBtn.textContent = "Guardar cambios";
     editAllBtn.dataset.editing = "true";
     makeGroupItemsEditable(groupDiv, groupIdStr);
   } else {
-    // Guardar cambios
+    // ¡PRIMERO GUARDA!
     saveGroupItemEdits(groupDiv, groupIdStr);
+    // ¡LUEGO renderiza!
     editAllBtn.textContent = "Editar todo";
     editAllBtn.dataset.editing = "false";
-    render(); // Para refrescar la vista
+    render(); // Esta línea debe ir DESPUÉS del guardado
   }
 };
 rightContainer.appendChild(editAllBtn);
@@ -3228,56 +3226,74 @@ function saveGroupDetails(groupId, updatedDetails) {
 
 // Convierte todas las celdas del grupo a inputs (solo si no son ya input)
 function makeGroupItemsEditable(groupDiv, groupId) {
-  // Busca la tabla de items (ajusta el selector si tu tabla tiene otra clase)
+  // Busca la tabla de items dentro del grupo
   const table = groupDiv.querySelector('table');
   if (!table) return;
 
-  // Recorrer todas las filas menos el header
+  // Recorre todas las filas del tbody (omite el thead)
   Array.from(table.tBodies[0].rows).forEach(row => {
-    // Por cada celda, si no tiene input, lo convierte
-    Array.from(row.cells).forEach((cell, i) => {
-      // No editar checkbox ni acciones; ajusta el índice si tu tabla tiene columnas de selección/acción
+    Array.from(row.cells).forEach(cell => {
+      // Evita volver a poner input si ya hay uno o si la celda no es editable
       if (cell.querySelector('input,select') || cell.classList.contains('not-editable')) return;
 
-      // Guarda valor actual
       const prevVal = cell.textContent.trim();
       const input = document.createElement("input");
       input.type = "text";
       input.value = prevVal;
-      input.className = "form-control form-control-sm";
+      input.className = "form-control form-control-sm table-input"; // Agrega 'table-input'
       input.style.minWidth = "80px";
-      cell.textContent = ""; // Limpia celda
+      cell.textContent = "";
       cell.appendChild(input);
     });
   });
 }
 
 function saveGroupItemEdits(groupDiv, groupIdStr) {
-  // Busca TODOS los inputs de la tabla de este grupo
+  // Encuentra todos los inputs editables del grupo
   const inputs = groupDiv.querySelectorAll('.table-input');
-  let cambios = 0;
+  console.log('Inputs encontrados:', inputs.length);
 
+  // Por cada input, actualiza el objeto correspondiente en objectData o filteredItems
   inputs.forEach(input => {
-    const sku = input.dataset.sku;
-    const attr = input.dataset.attribute;
-    const value = input.value.trim();
+    // Encuentra la fila y columna para saber qué SKU y atributo es
+    // Si usaste dataset en los inputs (¡recomendado!), úsalo:
+    const cell = input.closest('td');
+    const row = input.closest('tr');
+    let sku = null;
+    let attribute = null;
 
-    // Actualiza objectData con el nuevo valor
-    const obj = objectData.find(o => o.SKU === sku);
-    if (obj && obj[attr] !== value) {
-      obj[attr] = value;
-      cambios++;
+    // Intenta obtener el SKU y atributo desde dataset
+    if (input.dataset.sku && input.dataset.attribute) {
+      sku = input.dataset.sku;
+      attribute = input.dataset.attribute;
+    } else {
+      // Fallback si no tienes dataset:
+      // Busca el SKU en una celda específica de la fila (ajusta el índice según tu tabla)
+      sku = row.dataset.sku || row.getAttribute('data-sku'); // o busca en la primera celda de la fila
+      // Atributo: usa el encabezado de la columna
+      const table = groupDiv.querySelector('table');
+      const colIndex = Array.from(row.cells).indexOf(cell);
+      const th = table.querySelectorAll('th')[colIndex];
+      attribute = th ? th.textContent.trim() : null;
     }
 
-    // Marca la celda como editada en editedCells
-    const cellKey = `${sku}-${attr}`;
-    editedCells[cellKey] = {
-      value: value,
-      wasOriginallyEmpty: input.dataset.originallyEmpty === 'true'
-    };
+    // Actualiza en objectData
+    if (sku && attribute) {
+      // Busca el objeto correspondiente
+      const obj = objectData.find(o => String(o.SKU) === String(sku));
+      if (obj) {
+        obj[attribute] = input.value;
+      }
+      // También en filteredItems, si aplica
+      const item = filteredItems.find(o => String(o.SKU) === String(sku));
+      if (item) {
+        item[attribute] = input.value;
+      }
+    }
   });
 
-  showTemporaryMessage(`Guardado: ${cambios} cambios en el grupo ${groupIdStr}`);
+  // Mensaje de éxito
+  showTemporaryMessage('Cambios guardados correctamente');
 }
 
 function loadSavedChanges() {
