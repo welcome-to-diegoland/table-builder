@@ -3253,22 +3253,31 @@ function makeGroupItemsEditable(groupDiv, groupId) {
 }
 
 function saveGroupItemEdits(groupDiv, groupIdStr) {
-  // Busca todos los inputs editables dentro de este grupo
+  // Busca TODOS los inputs de la tabla de este grupo
   const inputs = groupDiv.querySelectorAll('.table-input');
-  console.log("Buscando inputs:", inputs.length);
+  let cambios = 0;
+
   inputs.forEach(input => {
     const sku = input.dataset.sku;
-    const attribute = input.dataset.attribute;
-    const value = input.value;
-    // Debug activo:
-    console.log('Guardando', sku, attribute, value);
-    const item = objectData.find(o => o.SKU == sku);
-    if (item && attribute) {
-      item[attribute] = value;
+    const attr = input.dataset.attribute;
+    const value = input.value.trim();
+
+    // Actualiza objectData con el nuevo valor
+    const obj = objectData.find(o => o.SKU === sku);
+    if (obj && obj[attr] !== value) {
+      obj[attr] = value;
+      cambios++;
     }
+
+    // Marca la celda como editada en editedCells
+    const cellKey = `${sku}-${attr}`;
+    editedCells[cellKey] = {
+      value: value,
+      wasOriginallyEmpty: input.dataset.originallyEmpty === 'true'
+    };
   });
-  // Debug activo:
-  console.log('objectData después del guardado:', objectData);
+
+  showTemporaryMessage(`Guardado: ${cambios} cambios en el grupo ${groupIdStr}`);
 }
 
 function loadSavedChanges() {
