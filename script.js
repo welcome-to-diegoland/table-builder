@@ -3252,18 +3252,23 @@ function makeGroupItemsEditable(groupDiv, groupId) {
   });
 }
 
-// Guarda los cambios en objectData y regresa a modo texto
 function saveGroupItemEdits(groupDiv, groupIdStr) {
+  // Busca todos los inputs editables dentro de este grupo
   const inputs = groupDiv.querySelectorAll('.table-input');
+  console.log("Buscando inputs:", inputs.length);
   inputs.forEach(input => {
     const sku = input.dataset.sku;
     const attribute = input.dataset.attribute;
     const value = input.value;
+    // Debug activo:
+    console.log('Guardando', sku, attribute, value);
     const item = objectData.find(o => o.SKU == sku);
-    if (item) {
+    if (item && attribute) {
       item[attribute] = value;
     }
   });
+  // Debug activo:
+  console.log('objectData después del guardado:', objectData);
 }
 
 function loadSavedChanges() {
