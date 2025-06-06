@@ -3253,25 +3253,16 @@ function makeGroupItemsEditable(groupDiv, groupId) {
 }
 
 // Guarda los cambios en objectData y regresa a modo texto
-function saveGroupItemEdits(groupDiv, groupId) {
-  const table = groupDiv.querySelector('table');
-  if (!table) return;
-
-  // Consigue los headers (th) para saber qué campo es cada columna
-  const headers = Array.from(table.tHead.rows[0].cells).map(th => th.textContent.trim());
-  Array.from(table.tBodies[0].rows).forEach(row => {
-    // Asumiendo que la primera columna es SKU o algo único
-    const sku = row.cells[0].textContent.trim() || (row.cells[0].querySelector('input') ? row.cells[0].querySelector('input').value : '');
-    const obj = objectData.find(o => String(o.SKU) === String(sku));
-    if (!obj) return;
-
-    Array.from(row.cells).forEach((cell, i) => {
-      const input = cell.querySelector('input');
-      if (input) {
-        const field = headers[i];
-        obj[field] = input.value;
-      }
-    });
+function saveGroupItemEdits(groupDiv, groupIdStr) {
+  const inputs = groupDiv.querySelectorAll('.table-input');
+  inputs.forEach(input => {
+    const sku = input.dataset.sku;
+    const attribute = input.dataset.attribute;
+    const value = input.value;
+    const item = objectData.find(o => o.SKU == sku);
+    if (item) {
+      item[attribute] = value;
+    }
   });
 }
 
