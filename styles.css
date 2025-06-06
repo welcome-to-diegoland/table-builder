@@ -1914,3 +1914,10 @@ html, body {
   font-weight: bold;
   transition: background 0.3s;
 }
+
+.cell-edited-new {
+  background-color: #d4f8e8 !important; /* verde claro */
+}
+.cell-edited-modified {
+  background-color: #fff3cd !important; /* amarillo claro */
+}

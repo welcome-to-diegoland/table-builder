@@ -2848,6 +2848,30 @@ function processItemGroups(skuToObject) {
       const details = skuToObject[item.SKU];
       return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
     });
+    
+    const editAllBtn = document.createElement("button");
+editAllBtn.textContent = "Editar todo";
+editAllBtn.className = "btn btn-sm btn-outline-primary";
+editAllBtn.style.marginLeft = "10px";
+editAllBtn.dataset.editing = "false";
+editAllBtn.onclick = function() {
+  const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+  if (!groupDiv) return;
+
+  if (editAllBtn.dataset.editing === "false") {
+    editAllBtn.textContent = "Guardar cambios";
+    editAllBtn.dataset.editing = "true";
+    makeGroupItemsEditable(groupDiv, groupIdStr);
+  } else {
+    // Guardar cambios
+    saveGroupItemEdits(groupDiv, groupIdStr);
+    editAllBtn.textContent = "Editar todo";
+    editAllBtn.dataset.editing = "false";
+    render(); // Para refrescar la vista
+  }
+};
+rightContainer.appendChild(editAllBtn);
+
     if (hasNewItem) {
       const newBadge = document.createElement("span");
       newBadge.className = "new-badge";
@@ -3200,6 +3224,55 @@ function saveGroupDetails(groupId, updatedDetails) {
       objectData,
       mergedGroups: Array.from(mergedGroups.entries())
   }));
+}
+
+// Convierte todas las celdas del grupo a inputs (solo si no son ya input)
+function makeGroupItemsEditable(groupDiv, groupId) {
+  // Busca la tabla de items (ajusta el selector si tu tabla tiene otra clase)
+  const table = groupDiv.querySelector('table');
+  if (!table) return;
+
+  // Recorrer todas las filas menos el header
+  Array.from(table.tBodies[0].rows).forEach(row => {
+    // Por cada celda, si no tiene input, lo convierte
+    Array.from(row.cells).forEach((cell, i) => {
+      // No editar checkbox ni acciones; ajusta el índice si tu tabla tiene columnas de selección/acción
+      if (cell.querySelector('input,select') || cell.classList.contains('not-editable')) return;
+
+      // Guarda valor actual
+      const prevVal = cell.textContent.trim();
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = prevVal;
+      input.className = "form-control form-control-sm";
+      input.style.minWidth = "80px";
+      cell.textContent = ""; // Limpia celda
+      cell.appendChild(input);
+    });
+  });
+}
+
+// Guarda los cambios en objectData y regresa a modo texto
+function saveGroupItemEdits(groupDiv, groupId) {
+  const table = groupDiv.querySelector('table');
+  if (!table) return;
+
+  // Consigue los headers (th) para saber qué campo es cada columna
+  const headers = Array.from(table.tHead.rows[0].cells).map(th => th.textContent.trim());
+  Array.from(table.tBodies[0].rows).forEach(row => {
+    // Asumiendo que la primera columna es SKU o algo único
+    const sku = row.cells[0].textContent.trim() || (row.cells[0].querySelector('input') ? row.cells[0].querySelector('input').value : '');
+    const obj = objectData.find(o => String(o.SKU) === String(sku));
+    if (!obj) return;
+
+    Array.from(row.cells).forEach((cell, i) => {
+      const input = cell.querySelector('input');
+      if (input) {
+        const field = headers[i];
+        obj[field] = input.value;
+      }
+    });
+  });
 }
 
 function loadSavedChanges() {
