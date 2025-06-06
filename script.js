@@ -488,7 +488,15 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
     }
   });
 
-  const valoresCols = ["SKU", ...Array.from(allAttrsChanged)];
+  // --- FILTRO DE SEGURIDAD ---
+  // Solo atributos que existen en objectDataOriginal (por si hay basura)
+  const validKeys = new Set(
+    Object.keys(objectDataOriginal[0] || {}).filter(k => k !== "SKU" && !excludedAttributes.has(k))
+  );
+  const safeAttrsChanged = Array.from(allAttrsChanged).filter(attr => validKeys.has(attr));
+  const valoresCols = ["SKU", ...safeAttrsChanged];
+
+  // --- Armado de las filas ---
   const valoresExport = [];
   Object.entries(changedByUser).forEach(([sku, attrs]) => {
     const row = { "SKU": sku };
@@ -2850,7 +2858,7 @@ function processItemGroups(skuToObject) {
     });
     
     const editAllBtn = document.createElement("button");
-editAllBtn.textContent = "Editar todo";
+editAllBtn.textContent = "Editar";
 editAllBtn.className = "btn btn-sm btn-outline-primary";
 editAllBtn.style.marginLeft = "10px";
 editAllBtn.dataset.editing = "false";
@@ -2863,9 +2871,27 @@ editAllBtn.onclick = function() {
     // ¡PRIMERO GUARDA!
     saveGroupItemEdits(groupDiv, groupIdStr);
     // ¡LUEGO renderiza!
-    editAllBtn.textContent = "Editar todo";
+    editAllBtn.textContent = "Editar";
     editAllBtn.dataset.editing = "false";
-    render(); // Esta línea debe ir DESPUÉS del guardado
+    render();
+
+    // -- Mantener scroll y highlight al grupo editado --
+    let attempts = 0;
+    const maxAttempts = 20;
+    const pollId = setInterval(() => {
+      const output = document.getElementById('output');
+      const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+      if (output && groupDiv) {
+        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+        output.scrollTop -= 40; // Ajusta la posición si hace falta
+        // Opcional: resalta el header
+        // const header = groupDiv.querySelector('.group-header');
+        // if (header) header.classList.add('highlighted');
+        clearInterval(pollId);
+      } else if (++attempts > maxAttempts) {
+        clearInterval(pollId);
+      }
+    }, 40);
   }
 };
 rightContainer.appendChild(editAllBtn);
@@ -3226,21 +3252,35 @@ function saveGroupDetails(groupId, updatedDetails) {
 
 // Convierte todas las celdas del grupo a inputs (solo si no son ya input)
 function makeGroupItemsEditable(groupDiv, groupId) {
-  // Busca la tabla de items dentro del grupo
   const table = groupDiv.querySelector('table');
   if (!table) return;
 
-  // Recorre todas las filas del tbody (omite el thead)
+  // Saca los atributos válidos de objectData (excepto marca y item_code)
+  const validAttrs = new Set(
+    Object.keys(objectData[0] || {}).filter(k => k !== "marca" && k !== "item_code" && k !== "SKU")
+  );
+
+  // Encuentra el índice de cada columna por nombre
+  const headerCells = table.tHead ? table.tHead.rows[0].cells : [];
+  const skipColumns = new Set(["×", "Origen", "marca", "item_code"]);
+
   Array.from(table.tBodies[0].rows).forEach(row => {
-    Array.from(row.cells).forEach(cell => {
-      // Evita volver a poner input si ya hay uno o si la celda no es editable
+    Array.from(row.cells).forEach((cell, i) => {
+      // No editable si ya tiene input, select, o si es "not-editable"
       if (cell.querySelector('input,select') || cell.classList.contains('not-editable')) return;
 
+      // Si hay encabezado, revisa si es columna bloqueada
+      let colName = headerCells[i]?.textContent?.trim();
+      if (skipColumns.has(colName)) return;
+      // Si es atributo no válido (accidental), tampoco
+      if (colName && !validAttrs.has(colName)) return;
+
+      // Si llegaste aquí, SÍ es editable
       const prevVal = cell.textContent.trim();
       const input = document.createElement("input");
       input.type = "text";
       input.value = prevVal;
-      input.className = "form-control form-control-sm table-input"; // Agrega 'table-input'
+      input.className = "form-control form-control-sm table-input";
       input.style.minWidth = "80px";
       cell.textContent = "";
       cell.appendChild(input);
@@ -3953,7 +3993,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   if (!headerRight.querySelector('.group-sort-btn')) {
     const sortBtn = document.createElement("button");
     sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
-    sortBtn.textContent = "Ordenar...";
+    sortBtn.textContent = "Ordenar";
     sortBtn.style.marginRight = "10px";
     sortBtn.addEventListener('click', () =>
       openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
