@@ -86,6 +86,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initHorizontalDrag(e, 'box1', 'box3');
   });
 
+  const mergeHeaderBtn = document.getElementById('mergeSelectedGroupsBtn');
+  if (mergeHeaderBtn) {
+    mergeHeaderBtn.addEventListener('click', mergeSelectedGroups);
+  }
+
   //xlsxFileInput.addEventListener("change", handleXLSX);
   csvFileInput.addEventListener("change", handleCSV);
   //categoryDataFileInput.addEventListener("change", handleCategoryData);
@@ -284,6 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   
+    
     // Si hay valores, usa los atributos editados; si no, pon solo el encabezado SKU
     const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
     const valoresExport = [];
