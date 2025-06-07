@@ -95,7 +95,7 @@ html, body {
 .input-group {
   display: flex;
   flex-direction: column;
-  min-width: 140px; /* Ancho mínimo para contener el label más largo */
+  min-width: 100px; /* Ancho mínimo para contener el label más largo */
   width: auto;
 }
 
@@ -1639,7 +1639,7 @@ html, body {
   font-size: 1.1rem;
   border: 1px solid #ddd;
   background: white;
-  width: 100%;
+  width: 300px;
   padding: 5px;
   margin-bottom: 5px;
   border-radius: 4px;
