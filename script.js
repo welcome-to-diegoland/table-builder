@@ -594,7 +594,169 @@ function createProductImageElement(rawImagePath) {
   return img;
 }
 
+function getDynamicAttributeOrder(objectData) {
+  // 1. Intenta leer orden personalizado del usuario (si existe en localStorage)
+  let savedOrder = localStorage.getItem('attributeOrder');
+  if (savedOrder) {
+    try {
+      const arr = JSON.parse(savedOrder);
+      if (Array.isArray(arr)) return arr;
+    } catch(e) {}
+  }
+  // 2. Si no hay guardado, usa el orden del primer objeto de los datos (dinámico)
+  if (objectData && objectData.length > 0) {
+    return Object.keys(objectData[0]);
+  }
+  return [];
+}
 
+const attributeOrder = getDynamicAttributeOrder(objectData);
+const orderedAttributes = getOrderedAttributes(groupItems, attributeOrder);
+const filteredAttributes = orderedAttributes.filter(attr => {
+  if (showEmptyAttributes) return true;
+  return groupItems.some(item => {
+    const details = skuToObject[item.SKU] || {};
+    return details[attr.attribute]?.toString().trim();
+  });
+});
+
+function renderGroupHeaderRight({
+  groupDiv,
+  groupId,
+  groupItems,
+  skuToObject,
+  isMergedGroup,
+  mergedGroups,
+  moveInfoUndoBackup,
+  filteredAttributes,
+  options = {}
+}) {
+  // 1. Limpia el header derecho si existe
+  let headerRight = groupDiv.querySelector('.group-header-right');
+  if (headerRight) headerRight.remove();
+
+  // 2. Crea nuevo contenedor
+  headerRight = document.createElement('div');
+  headerRight.className = 'group-header-right';
+
+  // -------- BOTONES --------
+  // Botón Ordenar
+  if (options.showSortBtn) {
+    const sortBtn = document.createElement("button");
+    sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
+    sortBtn.textContent = "Ordenar";
+    sortBtn.addEventListener('click', () =>
+      openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes || [])
+    );
+    headerRight.appendChild(sortBtn);
+  }
+
+  // Botón Mover info
+  if (options.showMoveInfoBtn) {
+    const moveBtn = document.createElement("button");
+    moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
+    moveBtn.textContent = "Mover info";
+    moveBtn.addEventListener('click', () => {
+      openMoveInfoModal(groupId, groupItems, filteredAttributes || []);
+    });
+    headerRight.appendChild(moveBtn);
+  }
+
+  // Botón Editar/Guardar
+  if (options.showEditBtn) {
+    const editAllBtn = document.createElement("button");
+    editAllBtn.textContent = "Editar";
+    editAllBtn.className = "btn btn-sm btn-outline-primary";
+    editAllBtn.dataset.editing = "false";
+    editAllBtn.onclick = function() {
+      if (editAllBtn.dataset.editing === "false") {
+        editAllBtn.textContent = "Guardar cambios";
+        editAllBtn.dataset.editing = "true";
+        makeGroupItemsEditable(groupDiv, groupId);
+      } else {
+        saveGroupItemEdits(groupDiv, groupId);
+        editAllBtn.textContent = "Editar";
+        editAllBtn.dataset.editing = "false";
+        if (options.onAfterEditSave) options.onAfterEditSave(groupDiv, groupId);
+      }
+    };
+    headerRight.appendChild(editAllBtn);
+  }
+
+  // Botón Deshacer mover info
+  if (moveInfoUndoBackup && moveInfoUndoBackup[groupId]) {
+    const btn = document.createElement("button");
+    btn.className = "btn btn-warning btn-sm undo-move-info-btn";
+    btn.textContent = "Deshacer mover info";
+    btn.onclick = function() {
+      const backup = moveInfoUndoBackup[groupId];
+      if (backup && backup.values && backup.values.length) {
+        backup.values.forEach(b => {
+          const obj = skuToObject[b.SKU];
+          if (obj) {
+            obj[backup.srcAttr] = b.srcAttrValue;
+            obj[backup.dstAttr] = b.dstAttrValue;
+          }
+        });
+      }
+      delete moveInfoUndoBackup[groupId];
+      if (options.onAfterUndoMoveInfo) options.onAfterUndoMoveInfo(groupDiv, groupId);
+    };
+    headerRight.appendChild(btn);
+  }
+
+  // Botón Desagrupar (solo si es merged)
+  if (isMergedGroup && options.showUnmergeBtn) {
+    const unmergeBtn = document.createElement("button");
+    unmergeBtn.className = "btn btn-sm btn-outline-danger unmerge-btn";
+    unmergeBtn.textContent = "Desagrupar";
+    unmergeBtn.title = "Revertir esta unión de grupos";
+    unmergeBtn.onclick = function() {
+      unmergeGroup(groupId);
+      if (options.onAfterUnmerge) options.onAfterUnmerge(groupDiv, groupId);
+    };
+    headerRight.appendChild(unmergeBtn);
+  }
+
+  // -------- BADGES --------
+  // Badge "New"
+  const hasNewItem = groupItems.some(item => {
+    const details = skuToObject[item.SKU];
+    return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+  });
+  if (hasNewItem) {
+    const newBadge = document.createElement("span");
+    newBadge.className = "new-badge";
+    newBadge.textContent = "New";
+    headerRight.appendChild(newBadge);
+  }
+
+  // Badge "merged"
+  if (isMergedGroup && mergedGroups && mergedGroups.get(groupId)) {
+    const mergedBadge = document.createElement("span");
+    mergedBadge.className = "merged-badge";
+    mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
+    headerRight.appendChild(mergedBadge);
+  }
+
+  // 3. Inserta el headerRight en el header del grupo
+  const headerDiv = groupDiv.querySelector('.group-header');
+  if (headerDiv) headerDiv.appendChild(headerRight);
+}
+
+function scrollToGroup(groupDiv) {
+  let attempts = 0;
+  const maxAttempts = 20;
+  const pollId = setInterval(() => {
+    const output = document.getElementById('output');
+    if (output && groupDiv) {
+      groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+      output.scrollTop -= 40; // Ajusta si hace falta
+      clearInterval(pollId);
+    }
+    if (++attempts > maxAttempts) clearInterval(pollId);
+  }, 40);
+}
 
 function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
@@ -3216,117 +3378,35 @@ function processItemGroups(skuToObject) {
     leftContainer.appendChild(infoDiv);
     headerContentDiv.appendChild(leftContainer);
 
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-    
-    const editAllBtn = document.createElement("button");
-editAllBtn.textContent = "Editar";
-editAllBtn.className = "btn btn-sm btn-outline-primary";
+    const attributeOrder = getDynamicAttributeOrder(objectData);
+    const orderedAttributes = getOrderedAttributes(groupItems, attributeOrder);
+    const filteredAttributes = orderedAttributes.filter(attr => {
+  if (showEmptyAttributes) return true;
+  return groupItems.some(item => {
+    const details = skuToObject[item.SKU] || {};
+    return details[attr.attribute]?.toString().trim();
+  });
+});
 
-editAllBtn.dataset.editing = "false";
-editAllBtn.onclick = function() {
-  if (editAllBtn.dataset.editing === "false") {
-    editAllBtn.textContent = "Guardar cambios";
-    editAllBtn.dataset.editing = "true";
-    makeGroupItemsEditable(groupDiv, groupIdStr);
-  } else {
-    // ¡PRIMERO GUARDA!
-    saveGroupItemEdits(groupDiv, groupIdStr);
-    // ¡LUEGO renderiza!
-    editAllBtn.textContent = "Editar";
-    editAllBtn.dataset.editing = "false";
-    render();
-
-    // -- Mantener scroll y highlight al grupo editado --
-    let attempts = 0;
-    const maxAttempts = 20;
-    const pollId = setInterval(() => {
-      const output = document.getElementById('output');
-      const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-      if (output && groupDiv) {
-        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-        output.scrollTop -= 40; // Ajusta la posición si hace falta
-        // Opcional: resalta el header
-        // const header = groupDiv.querySelector('.group-header');
-        // if (header) header.classList.add('highlighted');
-        clearInterval(pollId);
-      } else if (++attempts > maxAttempts) {
-        clearInterval(pollId);
-      }
-    }, 40);
+   // botones centralizados
+   renderGroupHeaderRight({
+  groupDiv,
+  groupId: groupIdStr,
+  groupItems,
+  skuToObject,
+  isMergedGroup,
+  mergedGroups,
+  moveInfoUndoBackup,
+  filteredAttributes,
+  options: {
+    showSortBtn: true,
+    showMoveInfoBtn: true,
+    showEditBtn: true,
+    showUnmergeBtn: true,
+    onAfterEditSave: scrollToGroup
   }
-};
-rightContainer.appendChild(editAllBtn);
+}); 
 
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupIdStr = groupIdStr;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupIdStr);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-if (moveInfoUndoBackup[groupIdStr]) {
-  const undoBtn = document.createElement("button");
-  undoBtn.textContent = "Deshacer mover info";
-  undoBtn.className = "btn btn-warning btn-sm";
- undoBtn.onclick = function() {
-  // Deshacer: restaura los valores previos
-  const backup = moveInfoUndoBackup[groupIdStr];
-  if (backup && backup.values && backup.values.length) {
-    backup.values.forEach(b => {
-      const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
-      if (obj) {
-        obj[backup.srcAttr] = b.srcAttrValue;
-        obj[backup.dstAttr] = b.dstAttrValue;
-      }
-    });
-  }
-  delete moveInfoUndoBackup[groupIdStr];
-  if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
-
-  render();
-
-  // Espera a que el DOM esté listo y luego haz scroll hasta el grupo
-  let attempts = 0;
-  const maxAttempts = 20;
-  const pollId = setInterval(() => {
-    const output = document.getElementById('output');
-    const newGroupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-    if (output && newGroupDiv) {
-      newGroupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-      output.scrollTop -= 40; // Ajusta este valor según tu header
-      // Efecto visual opcional
-      newGroupDiv.classList.add('just-undone');
-      setTimeout(() => newGroupDiv.classList.remove('just-undone'), 1200);
-      clearInterval(pollId);
-    }
-    if (++attempts > maxAttempts) clearInterval(pollId);
-  }, 50);
-};
-
-  rightContainer.appendChild(undoBtn);
-}
-    headerContentDiv.appendChild(rightContainer);
     headerDiv.appendChild(headerContentDiv);
 
     // Contenedor de detalles (pleca)
