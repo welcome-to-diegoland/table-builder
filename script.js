@@ -38,6 +38,8 @@ let defaultAttributesOrder = {};
 let selectedGroups = new Set();
 let filteredItemsOriginal = [];
 let moveInfoUndoBackup = {};
+let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
+let moveInfoModalState = { groupId: null, groupItems: [], attributes: [] };
 let objectDataOriginal = [];
 let groupDestHighlightAttr = {};
 // Copia de seguridad por grupo para "Deshacer mover info"
@@ -4756,9 +4758,6 @@ function injectGroupSortModal() {
 }
 injectGroupSortModal();
 
-// Estado temporal del modal (por grupo)
-let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
-
 function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   groupSortModalState.groupId = groupId;
   groupSortModalState.groupItems = groupItems;
@@ -5397,11 +5396,6 @@ function injectMoveInfoModal() {
 }
 injectMoveInfoModal();
 
-let moveInfoModalState = {
-  groupId: null,
-  groupItems: [],
-  attributes: []
-};
 
 function openMoveInfoModal(groupId, groupItems, attributeList) {
   moveInfoModalState.groupId = groupId;
