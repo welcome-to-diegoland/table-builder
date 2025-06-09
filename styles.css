@@ -837,6 +837,22 @@ h2 a:hover {
   line-height: 1.4;
 }
 
+.header-group-btn{
+  padding: 5px 10px;
+  background-color: #2576da !important;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem !important;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  line-height: 1.4;
+}
+
 .header-excel-btn {
   background-color: #3d5a99;
   transform: translateY(-1px);
