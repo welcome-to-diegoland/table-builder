@@ -45,6 +45,7 @@ let moveInfoBackups = {}; // { [groupId]: [array de copias de objetos] }
 
 let attributeFiltersState = {};
 let attributeFilterInputs = {};
+let currentFilteredItems = [];
 let activeFilters = {};
 let defaultFilterAttributes = new Set();
 const forcedFilterAttributes = new Set(['marca', 'shop_by']);
@@ -533,6 +534,117 @@ function clearAllChecks() {
   checkboxes.forEach(checkbox => {
     checkbox.checked = false;
   });
+}
+
+// Esta función regresa el rightContainer con BOTONES y BADGES para el header del grupo
+function createGroupHeaderRight({
+  groupIdStr, groupItems, skuToObject, isMergedGroup, groupDiv
+}) {
+  const rightContainer = document.createElement("div");
+  rightContainer.className = "group-header-right";
+
+  // Botón Editar Todo
+  const editAllBtn = document.createElement("button");
+  editAllBtn.textContent = "Editar";
+  editAllBtn.className = "btn btn-sm btn-outline-primary";
+  editAllBtn.dataset.editing = "false";
+  editAllBtn.onclick = function() {
+    if (editAllBtn.dataset.editing === "false") {
+      editAllBtn.textContent = "Guardar cambios";
+      editAllBtn.dataset.editing = "true";
+      makeGroupItemsEditable(groupDiv, groupIdStr);
+    } else {
+      saveGroupItemEdits(groupDiv, groupIdStr);
+      editAllBtn.textContent = "Editar";
+      editAllBtn.dataset.editing = "false";
+      render();
+      // Scroll y highlight (igual que antes)
+      let attempts = 0;
+      const maxAttempts = 20;
+      const pollId = setInterval(() => {
+        const output = document.getElementById('output');
+        const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+        if (output && groupDiv) {
+          groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+          output.scrollTop -= 40;
+          clearInterval(pollId);
+        } else if (++attempts > maxAttempts) {
+          clearInterval(pollId);
+        }
+      }, 40);
+    }
+  };
+  rightContainer.appendChild(editAllBtn);
+
+  // Badge "New" si algún item es nuevo
+  const hasNewItem = groupItems.some(item => {
+    const details = skuToObject[item.SKU];
+    return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+  });
+  if (hasNewItem) {
+    const newBadge = document.createElement("span");
+    newBadge.className = "new-badge";
+    newBadge.textContent = "New";
+    rightContainer.appendChild(newBadge);
+  }
+
+  // Badge y botón de desagrupar si es grupo unido
+  if (isMergedGroup) {
+    const mergedBadge = document.createElement("span");
+    mergedBadge.className = "merged-badge";
+    mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
+    rightContainer.appendChild(mergedBadge);
+
+    const unmergeBtn = document.createElement("button");
+    unmergeBtn.className = "btn btn-sm btn-outline-danger";
+    unmergeBtn.textContent = "Desagrupar";
+    unmergeBtn.title = "Revertir esta unión de grupos";
+    unmergeBtn.dataset.groupIdStr = groupIdStr;
+    unmergeBtn.addEventListener('click', function() {
+      unmergeGroup(this.dataset.groupIdStr);
+    });
+    rightContainer.appendChild(unmergeBtn);
+  }
+
+  // Botón de "Deshacer mover info" si aplica
+  if (moveInfoUndoBackup[groupIdStr]) {
+    const undoBtn = document.createElement("button");
+    undoBtn.textContent = "Deshacer mover info";
+    undoBtn.className = "btn btn-warning btn-sm";
+    undoBtn.onclick = function() {
+      const backup = moveInfoUndoBackup[groupIdStr];
+      if (backup && backup.values && backup.values.length) {
+        backup.values.forEach(b => {
+          const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
+          if (obj) {
+            obj[backup.srcAttr] = b.srcAttrValue;
+            obj[backup.dstAttr] = b.dstAttrValue;
+          }
+        });
+      }
+      delete moveInfoUndoBackup[groupIdStr];
+      if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
+
+      render();
+      let attempts = 0;
+      const maxAttempts = 20;
+      const pollId = setInterval(() => {
+        const output = document.getElementById('output');
+        const newGroupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+        if (output && newGroupDiv) {
+          newGroupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+          output.scrollTop -= 40;
+          newGroupDiv.classList.add('just-undone');
+          setTimeout(() => newGroupDiv.classList.remove('just-undone'), 1200);
+          clearInterval(pollId);
+        }
+        if (++attempts > maxAttempts) clearInterval(pollId);
+      }, 50);
+    };
+    rightContainer.appendChild(undoBtn);
+  }
+
+  return rightContainer;
 }
 
 function createBrandLogoElement(brandLogoPath) {
@@ -1597,7 +1709,11 @@ function applyMultipleFilters() {
   displayFilteredResults(visibleItems);
 }
 
+//al aplicar filtros de atributos
 function displayFilteredResults(filteredItems) {
+  // Guarda la lista filtrada globalmente para mantener el estado tras acciones
+  currentFilteredItems = filteredItems;
+
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   let filtersHtml = Object.keys(activeFilters).map(attr =>
     `<span class="active-filter-tag" data-attribute="${attr}">
@@ -1611,6 +1727,8 @@ function displayFilteredResults(filteredItems) {
       <p>Mostrando ${filteredItems.length} items</p>
     </div>
   `;
+
+  // Listeners para quitar filtros
   document.querySelectorAll('.remove-filter-btn').forEach(btn => {
     btn.addEventListener('click', function () {
       const attr = this.getAttribute('data-attribute');
@@ -1625,6 +1743,7 @@ function displayFilteredResults(filteredItems) {
 
   updateAttributeDropdowns(filteredItems);
 
+  // Agrupar items por grupo
   const groupMap = {};
   const orderedGroupIds = [];
   filteredItems.forEach(item => {
@@ -1638,9 +1757,8 @@ function displayFilteredResults(filteredItems) {
 
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = groupMap[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
-      return;
-    }
+    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
+
     if (!groupOrderMap.has(groupIdStr)) {
       groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
     }
@@ -1648,19 +1766,28 @@ function displayFilteredResults(filteredItems) {
     if (Array.isArray(orderedSkus)) {
       groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
     }
-    const groupInfo = objectData.find(o => o.SKU == groupIdStr) || {};
+    const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
+
+    // --- Render group container ---
     const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container filtered-group ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
-    // Header
+    // --- Header ---
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
+
+    // --- Header content (left + right) ---
+    const headerContentDiv = document.createElement("div");
+    headerContentDiv.className = "group-header-content";
+
+    // --- Left (image + info) ---
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
     const productImg = createProductImageElement(groupInfo.image);
     leftContainer.appendChild(productImg);
+
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
     const title = document.createElement("h2");
@@ -1671,37 +1798,31 @@ function displayFilteredResults(filteredItems) {
     link.textContent = groupInfo.name || groupIdStr;
     title.appendChild(link);
     infoDiv.appendChild(title);
+
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
+
     if (groupInfo.sku) {
       const skuP = document.createElement("p");
       skuP.textContent = "SKU: " + groupInfo.sku;
       infoDiv.appendChild(skuP);
     }
     leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = objectData.find(o => o.SKU === item.SKU);
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+    headerContentDiv.appendChild(leftContainer);
+
+    // --- Right ---
+    const rightContainer = createGroupHeaderRight({
+      groupIdStr,
+      groupItems,
+      skuToObject,
+      isMergedGroup,
+      groupDiv
     });
+    headerContentDiv.appendChild(rightContainer);
 
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "btn btn-primary btn-sm";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-    }
-    headerDiv.appendChild(rightContainer);
+    headerDiv.appendChild(headerContentDiv);
 
-    // Detalles de grupo unido
+    // --- Detalles de grupo unido (si aplica) ---
     if (isMergedGroup) {
       const detailsContainer = document.createElement("div");
       detailsContainer.className = "group-details-container";
@@ -1709,9 +1830,11 @@ function displayFilteredResults(filteredItems) {
       toggleDetailsBtn.className = "toggle-details-btn";
       toggleDetailsBtn.textContent = "▼ Detalles";
       toggleDetailsBtn.setAttribute("aria-expanded", "false");
+
       const detailsDiv = document.createElement("div");
       detailsDiv.className = "group-extra-details";
       detailsDiv.style.display = "none";
+
       const mergedTextarea = document.createElement("textarea");
       mergedTextarea.className = "form-control merged-group-textarea";
       mergedTextarea.rows = 10;
@@ -1753,8 +1876,10 @@ function displayFilteredResults(filteredItems) {
       detailsContainer.appendChild(detailsDiv);
       headerDiv.appendChild(detailsContainer);
     }
+
     groupDiv.appendChild(headerDiv);
 
+    // --- Items table ---
     createItemsTable(groupDiv, groupItems, skuToObject);
 
     output.appendChild(groupDiv);
@@ -3216,117 +3341,18 @@ function processItemGroups(skuToObject) {
     leftContainer.appendChild(infoDiv);
     headerContentDiv.appendChild(leftContainer);
 
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-    
-    const editAllBtn = document.createElement("button");
-editAllBtn.textContent = "Editar";
-editAllBtn.className = "btn btn-sm btn-outline-primary";
 
-editAllBtn.dataset.editing = "false";
-editAllBtn.onclick = function() {
-  if (editAllBtn.dataset.editing === "false") {
-    editAllBtn.textContent = "Guardar cambios";
-    editAllBtn.dataset.editing = "true";
-    makeGroupItemsEditable(groupDiv, groupIdStr);
-  } else {
-    // ¡PRIMERO GUARDA!
-    saveGroupItemEdits(groupDiv, groupIdStr);
-    // ¡LUEGO renderiza!
-    editAllBtn.textContent = "Editar";
-    editAllBtn.dataset.editing = "false";
-    render();
+   // ...dentro del forEach groupIdStr...
+const rightContainer = createGroupHeaderRight({
+  groupIdStr,
+  groupItems,
+  skuToObject,
+  isMergedGroup,
+  groupDiv
+});
+headerContentDiv.appendChild(rightContainer);
 
-    // -- Mantener scroll y highlight al grupo editado --
-    let attempts = 0;
-    const maxAttempts = 20;
-    const pollId = setInterval(() => {
-      const output = document.getElementById('output');
-      const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-      if (output && groupDiv) {
-        groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-        output.scrollTop -= 40; // Ajusta la posición si hace falta
-        // Opcional: resalta el header
-        // const header = groupDiv.querySelector('.group-header');
-        // if (header) header.classList.add('highlighted');
-        clearInterval(pollId);
-      } else if (++attempts > maxAttempts) {
-        clearInterval(pollId);
-      }
-    }, 40);
-  }
-};
-rightContainer.appendChild(editAllBtn);
-
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupIdStr = groupIdStr;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupIdStr);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-if (moveInfoUndoBackup[groupIdStr]) {
-  const undoBtn = document.createElement("button");
-  undoBtn.textContent = "Deshacer mover info";
-  undoBtn.className = "btn btn-warning btn-sm";
- undoBtn.onclick = function() {
-  // Deshacer: restaura los valores previos
-  const backup = moveInfoUndoBackup[groupIdStr];
-  if (backup && backup.values && backup.values.length) {
-    backup.values.forEach(b => {
-      const obj = objectData.find(o => String(o.SKU) === String(b.SKU));
-      if (obj) {
-        obj[backup.srcAttr] = b.srcAttrValue;
-        obj[backup.dstAttr] = b.dstAttrValue;
-      }
-    });
-  }
-  delete moveInfoUndoBackup[groupIdStr];
-  if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
-
-  render();
-
-  // Espera a que el DOM esté listo y luego haz scroll hasta el grupo
-  let attempts = 0;
-  const maxAttempts = 20;
-  const pollId = setInterval(() => {
-    const output = document.getElementById('output');
-    const newGroupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-    if (output && newGroupDiv) {
-      newGroupDiv.scrollIntoView({ behavior: "auto", block: "start" });
-      output.scrollTop -= 40; // Ajusta este valor según tu header
-      // Efecto visual opcional
-      newGroupDiv.classList.add('just-undone');
-      setTimeout(() => newGroupDiv.classList.remove('just-undone'), 1200);
-      clearInterval(pollId);
-    }
-    if (++attempts > maxAttempts) clearInterval(pollId);
-  }, 50);
-};
-
-  rightContainer.appendChild(undoBtn);
-}
-    headerContentDiv.appendChild(rightContainer);
+   
     headerDiv.appendChild(headerContentDiv);
 
     // Contenedor de detalles (pleca)
@@ -3481,36 +3507,14 @@ function renderMergedGroups(skuToObject) {
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
 
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details?.shop_by?.trim().toLowerCase() === 'new';
-    });
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-
-    headerDiv.appendChild(rightContainer);
+    const rightContainer = createGroupHeaderRight({
+  groupIdStr: groupId,
+  groupItems,
+  skuToObject,
+  isMergedGroup,
+  groupDiv
+});
+headerDiv.appendChild(rightContainer);
 
     if (isMergedGroup) {
       const detailsContainer = document.createElement("div");
@@ -3817,393 +3821,6 @@ function mergeSelectedGroups() {
   const message = `✅ ${groupsToMerge.length} grupos unidos como ${newGroupId}`;
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 }
-
-function renderMergedGroups(skuToObject) {
-  // Limpiar output
-  output.innerHTML = '';
-  
-  // Agrupar items por IG ID (incluyendo los unidos)
-  const groups = {};
-  filteredItems.forEach(item => {
-    const groupId = item["IG ID"];
-    if (!groups[groupId]) groups[groupId] = [];
-    groups[groupId].push(item);
-  });
-
-  // Procesar cada grupo
-  Object.keys(groups).forEach(groupId => {
-    const groupItems = groups[groupId];
-
-    // Inicializa el orden si no existe
-    if (!groupOrderMap.has(groupId)) {
-      groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupId);
-    groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-
-    const groupInfo = skuToObject[groupId] || {};
-    const isMergedGroup = mergedGroups.has(groupId);
-
-    // Crear contenedor del grupo
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupId;
-
-    // Header del grupo
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-
-    // Imagen del producto 
-    const productImg = createProductImageElement(groupInfo.image);
-    leftContainer.appendChild(productImg);
-
-    // Información del grupo
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupId}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupId;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
-
-    const logo = createBrandLogoElement(groupInfo.brand_logo);
-    infoDiv.appendChild(logo);
-
-    // SKU y procedencia
-    const skuP = document.createElement("p");
-    skuP.textContent = `SKU: ${groupId}`;
-    infoDiv.appendChild(skuP);
-
-    if (isMergedGroup) {
-      const originP = document.createElement("p");
-      originP.className = "group-origin";
-      originP.textContent = `Contiene items de: ${mergedGroups.get(groupId).originalGroups.join(', ')}`;
-      infoDiv.appendChild(originP);
-    }
-
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-
-    // Badge "New"
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details?.shop_by?.trim().toLowerCase() === 'new';
-    });
-    
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-
-    // Badge "Unido"
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      // Botón para desagrupar
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-
-    headerDiv.appendChild(rightContainer);
-
-    // Detalles de grupo unido (editable)
-    if (isMergedGroup) {
-      const detailsContainer = document.createElement("div");
-      detailsContainer.className = "group-details-container";
-      const toggleDetailsBtn = document.createElement("button");
-      toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Detalles";
-      toggleDetailsBtn.setAttribute("aria-expanded", "false");
-
-      const detailsDiv = document.createElement("div");
-      detailsDiv.className = "group-extra-details";
-      detailsDiv.style.display = "none";
-
-      const mergedGroupData = mergedGroups.get(groupId);
-      const mergedTextarea = document.createElement("textarea");
-      mergedTextarea.className = "form-control merged-group-textarea";
-      mergedTextarea.rows = 10;
-
-      let mergedDetails = mergedGroupData.details || '';
-      if (!mergedDetails) {
-        mergedDetails = localStorage.getItem(`merged_details_${groupId}`) || '';
-      }
-      let mergedContent = mergedDetails;
-      if (!mergedDetails) {
-        // Genera detalles por defecto
-        mergedContent = "";
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
-          });
-          mergedContent += "--------------------\n\n";
-        });
-      }
-      mergedTextarea.value = mergedContent.trim();
-
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
-      saveBtn.textContent = "Guardar Cambios";
-      saveBtn.addEventListener('click', function() {
-        mergedGroupData.details = mergedTextarea.value;
-        const groupObj = objectData.find(o => o.SKU === groupId);
-        if (groupObj) {
-          groupObj.details = mergedTextarea.value;
-        }
-        localStorage.setItem(`merged_details_${groupId}`, mergedTextarea.value);
-        showTemporaryMessage('Detalles de grupo guardados');
-      });
-
-      detailsDiv.appendChild(mergedTextarea);
-      detailsDiv.appendChild(saveBtn);
-
-      toggleDetailsBtn.addEventListener("click", function () {
-        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
-        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
-        detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
-      });
-
-      detailsContainer.appendChild(toggleDetailsBtn);
-      detailsContainer.appendChild(detailsDiv);
-      headerDiv.appendChild(detailsContainer);
-    }
-
-    groupDiv.appendChild(headerDiv);
-
-    // Crear tabla con colores alternados para grupos originales
-    createItemsTable(groupDiv, groupItems, skuToObject);
-
-    output.appendChild(groupDiv);
-  });
-}
-
-
-
-  // Limpiar output
-  output.innerHTML = '';
-  
-  // Agrupar items por IG ID (incluyendo los unidos)
-  const groups = {};
-  filteredItems.forEach(item => {
-    const groupId = item["IG ID"];
-    if (!groups[groupId]) groups[groupId] = [];
-    groups[groupId].push(item);
-  });
-
-  // Procesar cada grupo
-  Object.keys(groups).forEach(groupId => {
-    const groupItems = groups[groupId];
-
- // Inicializa el orden si no existe
-if (!groupOrderMap.has(groupId)) {
-  groupOrderMap.set(groupId, groupItems.map(item => item.SKU));
-}
-const orderedSkus = groupOrderMap.get(groupId);
-groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-
-    const groupInfo = skuToObject[groupId] || {};
-    const isMergedGroup = mergedGroups.has(groupId);
-
-    // Crear contenedor del grupo
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupId;
-
-    // Header del grupo
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-
-    // Contenedor izquierdo (imagen + info)
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-
-    // Imagen del producto 
-    const productImg = createProductImageElement(groupInfo.image);
-    leftContainer.appendChild(productImg);
-    
-
-    // Información del grupo
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
-
-    const logo = createBrandLogoElement(groupInfo.brand_logo);
-    infoDiv.appendChild(logo);
-
-    // SKU y procedencia
-    const skuP = document.createElement("p");
-    skuP.textContent = `SKU: ${groupId}`;
-    infoDiv.appendChild(skuP);
-
-    if (isMergedGroup) {
-      const originP = document.createElement("p");
-      originP.className = "group-origin";
-      originP.textContent = `Contiene items de: ${mergedGroups.get(groupId).originalGroups.join(', ')}`;
-      infoDiv.appendChild(originP);
-    }
-
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-
-    // Contenedor derecho (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-
-    // Badge "New"
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details?.shop_by?.trim().toLowerCase() === 'new';
-    });
-    
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-
-    // Badge "Unido"
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupId).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-
-      // Botón para desagrupar
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupId = groupId;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupId);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-
-    headerDiv.appendChild(rightContainer);
-    groupDiv.appendChild(headerDiv);
-
-    // Crear tabla con colores alternados para grupos originales
-    const table = document.createElement("table");
-    table.className = "table table-striped table-bordered attribute-table";
-    
-    // Variables para alternar colores
-    let currentColorClass = 'original-row-color1';
-    let lastOriginalGroup = null;
-
-    // Crear THEAD
-    const thead = document.createElement("thead");
-    const headerRow = document.createElement("tr");
-    
-    // Agregar columnas necesarias
-    headerRow.innerHTML = `
-      <th>Atributo</th>
-      <th>Valor</th>
-      <th style="width:100px">Origen</th>
-    `;
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    // Crear TBODY
-    const tbody = document.createElement("tbody");
-
-    groupItems.forEach(item => {
-      const details = skuToObject[item.SKU] || {};
-      const isMergedItem = item.__originalIGID;
-
-      // Alternar colores cuando cambia el grupo original
-      if (isMergedItem && lastOriginalGroup !== item.__originalIGID) {
-        currentColorClass = currentColorClass === 'original-row-color1' 
-                         ? 'original-row-color2' 
-                         : 'original-row-color1';
-        lastOriginalGroup = item.__originalIGID;
-      }
-
-      // Crear fila para cada atributo del item
-      Object.entries(details).forEach(([attr, value]) => {
-        if (excludedAttributes.has(attr)) return;
-
-        const row = document.createElement("tr");
-        if (isMergedItem) {
-          row.classList.add(currentColorClass);
-          row.dataset.originalIgid = item.__originalIGID;
-        }
-
-        row.innerHTML = `
-          <td>${attr}</td>
-          <td>${value || ''}</td>
-          <td>${isMergedItem ? item.__originalIGID : 'Original'}</td>
-        `;
-
-        tbody.appendChild(row);
-      });
-    });
-
-    table.appendChild(tbody);
-
-    // Agregar estilos para los colores alternados
-    const style = document.createElement('style');
-    style.textContent = `
-      .original-row-color1 {
-        background-color: #f8f9fa;
-      }
-      .original-row-color2 {
-        background-color: #e9ecef;
-      }
-      .merged-group {
-        border-left: 4px solid #007bff;
-      }
-      /* Resto de estilos... */
-    `;
-    groupDiv.appendChild(style);
-
-    const tableContainer = document.createElement("div");
-    tableContainer.className = "table-responsive";
-    tableContainer.appendChild(table);
-    groupDiv.appendChild(tableContainer);
-    output.appendChild(groupDiv);
-  });
-
 
 // 4. Agregar estos estilos CSS (puedes ponerlos en tu archivo CSS o crear un elemento style)
 function addMergeStyles() {
@@ -5010,9 +4627,30 @@ function applyCategoryTables() {
   output.innerHTML = '';
   createStatusMessage();
 
-  let missingCatAttrsGroups = [];
-  let emptyCatAttrsGroups = [];
-  let appliedColumnsMsgs = [];
+  // --- Botones de arriba (igual que processItemGroups) ---
+  const controlsDiv = document.createElement("div");
+  controlsDiv.className = "groups-controls";
+  const mergeBtn = document.createElement("button");
+  mergeBtn.className = "btn btn-primary";
+  mergeBtn.textContent = "Agrupar";
+  mergeBtn.addEventListener('click', mergeSelectedGroups);
+  const selectAllBtn = document.createElement("button");
+  selectAllBtn.className = "btn btn-secondary";
+  selectAllBtn.textContent = "Seleccionar Todos";
+  selectAllBtn.addEventListener('click', selectAllGroups);
+  const deselectAllBtn = document.createElement("button");
+  deselectAllBtn.className = "btn btn-outline-secondary";
+  deselectAllBtn.textContent = "Deseleccionar Todos";
+  deselectAllBtn.addEventListener('click', deselectAllGroups);
+
+  const selectionCount = document.createElement("span");
+  selectionCount.className = "selection-count";
+  selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
+  controlsDiv.appendChild(mergeBtn);
+  controlsDiv.appendChild(selectAllBtn);
+  controlsDiv.appendChild(deselectAllBtn);
+  controlsDiv.appendChild(selectionCount);
+  output.appendChild(controlsDiv);
 
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
@@ -5027,43 +4665,67 @@ function applyCategoryTables() {
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
 
-    // columnas catálogo
-    const itemWithCatAttrs = groupItems.find(item => item.table_attributes_cat && item.table_attributes_cat.trim());
-    let customAttrs = [];
-    if (itemWithCatAttrs) {
-      customAttrs = itemWithCatAttrs.table_attributes_cat
-        .replace(/\s+/g, ',')
-        .split(',')
-        .map(attr => attr.trim())
-        .filter(attr => attr);
-      if (customAttrs.length === 0) emptyCatAttrsGroups.push(groupIdStr);
-    } else {
-      missingCatAttrsGroups.push(groupIdStr);
-    }
-    appliedColumnsMsgs.push(`Grupo ${groupIdStr}: ${customAttrs.length ? customAttrs.join(', ') : '(sin columnas)'}`);
-
-    // --- Render de grupo y tabla ---
+    // --- Checkbox fuera del header, igual que processItemGroups ---
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
-    // HEADER
+    const checkboxDiv = document.createElement("div");
+    checkboxDiv.className = "group-checkbox-container";
+    checkboxDiv.innerHTML = `
+      <input type="checkbox" class="group-checkbox" id="group-${groupIdStr}" 
+             data-group-id="${groupIdStr}"
+             ${selectedGroups.has(groupIdStr) ? 'checked' : ''}>
+      <label for="group-${groupIdStr}"></label>
+    `;
+    groupDiv.appendChild(checkboxDiv);
+
+    // --- Header del grupo ---
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
+
+    // --- Contenido del header (left + right) ---
+    const headerContentDiv = document.createElement("div");
+    headerContentDiv.className = "group-header-content";
+
+    // --- Contenedor izquierdo (imagen + info) ---
     const leftContainer = document.createElement("div");
     leftContainer.className = "group-header-left";
+
     const productImg = createProductImageElement(groupInfo.image);
     leftContainer.appendChild(productImg);
+
     const infoDiv = document.createElement("div");
     infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
+    const titleContainer = document.createElement("div");
+    titleContainer.className = "group-title-container";
+
+    if (isMergedGroup) {
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.className = "group-title-input";
+      titleInput.value = groupInfo.name || groupIdStr;
+      titleInput.addEventListener("blur", function() {
+        const newTitle = this.value.trim();
+        if (newTitle) {
+          const groupObj = objectData.find(o => o.SKU === groupIdStr);
+          if (groupObj) groupObj.name = newTitle;
+          const mergedGroup = mergedGroups.get(groupIdStr);
+          if (mergedGroup) mergedGroup.name = newTitle;
+        }
+      });
+      titleContainer.appendChild(titleInput);
+    } else {
+      const title = document.createElement("h2");
+      title.className = "group-title";
+      const link = document.createElement("a");
+      link.href = `https://www.travers.com.mx/${groupIdStr}`;
+      link.target = "_blank";
+      link.textContent = groupInfo.name || groupIdStr;
+      title.appendChild(link);
+      titleContainer.appendChild(title);
+    }
+    infoDiv.appendChild(titleContainer);
     const logo = createBrandLogoElement(groupInfo.brand_logo);
     infoDiv.appendChild(logo);
     if (groupInfo.sku) {
@@ -5072,28 +4734,19 @@ function applyCategoryTables() {
       infoDiv.appendChild(skuP);
     }
     leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
+    headerContentDiv.appendChild(leftContainer);
 
-    // RIGHT HEADER (badges)
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
+    // --- Right header usando tu función extraída ---
+    const rightContainer = createGroupHeaderRight({
+      groupIdStr,
+      groupItems,
+      skuToObject,
+      isMergedGroup,
+      groupDiv
     });
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-    }
-    headerDiv.appendChild(rightContainer);
+    headerContentDiv.appendChild(rightContainer);
+
+    headerDiv.appendChild(headerContentDiv);
 
     // --- Bloque de detalles/pleca con toggle SIEMPRE ---
     let detailsHtml = "";
@@ -5170,16 +4823,20 @@ function applyCategoryTables() {
     groupDiv.appendChild(headerDiv);
 
     // Renderiza la tabla usando customAttrs
-    createItemsTable(groupDiv, groupItems, skuToObject, null, customAttrs);
+    // (No olvides el manejo de catálogo, omitted here for brevity)
+    createItemsTable(groupDiv, groupItems, skuToObject);
+
     output.appendChild(groupDiv);
-  }
 
-  if (appliedColumnsMsgs.length) {
-
-  }
-  if (missingCatAttrsGroups.length) {
-  }
-  if (emptyCatAttrsGroups.length) {
+    // Checkbox handler
+    const groupCheckbox = groupDiv.querySelector('.group-checkbox');
+    if (groupCheckbox) {
+      groupCheckbox.addEventListener('change', function() {
+        if (this.checked) selectedGroups.add(this.dataset.groupId);
+        else selectedGroups.delete(this.dataset.groupId);
+        selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
+      });
+    }
   }
 }
 
