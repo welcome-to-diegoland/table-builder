@@ -1637,9 +1637,10 @@ function updateOrderInputs() {
 
 // Función corregida: applyMultipleFilters
 function applyMultipleFilters() {
-  // Si NO hay filtros activos, regresamos a la UI principal
   if (Object.keys(activeFilters).length === 0) {
-    render();
+    // Mostrar todos los items agrupados, como render()
+    const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+    processItemGroups(skuToObject);
     return;
   }
 
@@ -1734,7 +1735,6 @@ function displayFilteredResults(filteredItems) {
       const attr = this.getAttribute('data-attribute');
       delete activeFilters[attr];
       if (Object.keys(activeFilters).length === 0) {
-        render();
       } else {
         applyMultipleFilters();
       }
