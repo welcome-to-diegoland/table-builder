@@ -1190,6 +1190,14 @@ function handleCSV(event) {
     complete: (results) => {
       objectDataOriginal = results.data.map(o => ({ ...o })); // copia profunda
       objectData = objectDataOriginal.map(o => ({ ...o }));   // copia profunda
+
+      // --- HABILITA EL BOTÓN ---
+      const btn = document.getElementById('btn-cargar-categoria');
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+      }
       // NO render() aquí: Espera a que elijan categoría
     },
     error: (error) => {
@@ -1278,11 +1286,12 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
   header.className = 'category-tree-header';
   fileInfoDiv.appendChild(header);
 
-  let cargarBtn = document.createElement('button');
-  cargarBtn.id = 'btn-cargar-categoria';
-  cargarBtn.className = 'btn btn-primary';
-  cargarBtn.textContent = 'Cargar categoría';
-  header.appendChild(cargarBtn);
+let cargarBtn = document.createElement('button');
+cargarBtn.id = 'btn-cargar-categoria';
+cargarBtn.className = 'btn btn-secondary'; // gris de Bootstrap
+cargarBtn.textContent = 'Cargar categoría';
+cargarBtn.disabled = true; // Deshabilitado al inicio
+header.appendChild(cargarBtn);
 
   // Contenedor para el árbol (hace scroll, no el header)
   let treeList = document.createElement('div');
