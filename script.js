@@ -746,26 +746,8 @@ function renderWithStatClick() {
   displayFilteredGroups(filteredGroupIds, attribute, type);
 }
 
-function handleStatClick(event) {
-  const attribute = event.target.getAttribute('data-attribute');
-  const type = event.target.getAttribute('data-type');
-  const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-
-  // Guarda el filtro global
-  currentStatClickFilter = { attribute: filterAttribute, type };
-
-  // Toggle: si ya estaba activo, limpiar filtro
-  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
-    clearFilter();
-    return;
-  }
-  currentFilter = { attribute: filterAttribute, type };
-  highlightActiveFilter();
-  renderStatClick();
-}
-
 function renderStatClick() {
-  if (!currentStatClickFilter || !currentStatClickFilter.attribute || !currentStatClickFilter.type) {
+  if (!currentStatClickFilter) {
     render();
     return;
   }
@@ -773,6 +755,7 @@ function renderStatClick() {
   currentFilter = { attribute, type };
   highlightActiveFilter();
 
+  // Filtra grupos
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const filteredGroupIds = new Set();
   const filteredItemsMap = {};
@@ -788,6 +771,7 @@ function renderStatClick() {
     }
   });
 
+  // Limpiar output y mostrar contador
   output.innerHTML = `
     <div class="filter-results">
       <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
@@ -801,7 +785,7 @@ function renderStatClick() {
   `;
   output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
 
-  // Renderizar cada grupo
+  // Renderiza cada grupo real
   Array.from(filteredGroupIds).forEach(groupIdStr => {
     const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
@@ -818,6 +802,7 @@ function renderStatClick() {
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
+    // Usa tu función de header y tabla
     createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
     createItemsTable(groupDiv, groupItems, skuToObject, attribute);
     output.appendChild(groupDiv);
@@ -826,6 +811,34 @@ function renderStatClick() {
   highlightActiveFilter();
 }
 
+/**
+ * Evento de click en stat ("con valor"/"sin valor").
+ */
+function handleStatClick(event) {
+  const attribute = event.target.getAttribute('data-attribute');
+  const type = event.target.getAttribute('data-type');
+  const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
+
+  // Toggle: si ya está activo, limpia
+  if (
+    currentStatClickFilter &&
+    currentStatClickFilter.attribute === filterAttribute &&
+    currentStatClickFilter.type === type
+  ) {
+    currentStatClickFilter = null;
+    clearFilter();
+    return;
+  }
+
+  currentStatClickFilter = { attribute: filterAttribute, type };
+  currentFilter = { attribute: filterAttribute, type };
+  highlightActiveFilter();
+  renderStatClick();
+}
+
+/**
+ * Siempre usa esta para refrescar la vista tras guardar, mover info, etc.
+ */
 function refreshView() {
   if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
     renderStatClick();
