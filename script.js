@@ -549,16 +549,17 @@ function createGroupHeaderRight({
   editAllBtn.textContent = "Editar";
   editAllBtn.className = "btn btn-sm btn-outline-primary";
   editAllBtn.dataset.editing = "false";
-  editAllBtn.onclick = function() {
-    if (editAllBtn.dataset.editing === "false") {
-      editAllBtn.textContent = "Guardar cambios";
-      editAllBtn.dataset.editing = "true";
-      makeGroupItemsEditable(groupDiv, groupIdStr);
-    } else {
-      saveGroupItemEdits(groupDiv, groupIdStr);
-      editAllBtn.textContent = "Editar";
-      editAllBtn.dataset.editing = "false";
-      refreshView();
+ editAllBtn.onclick = function() {
+  if (editAllBtn.dataset.editing === "false") {
+    editAllBtn.textContent = "Guardar cambios";
+    editAllBtn.dataset.editing = "true";
+    makeGroupItemsEditable(groupDiv, groupIdStr);
+  } else {
+    saveGroupItemEdits(groupDiv, groupIdStr);
+    editAllBtn.textContent = "Editar";
+    editAllBtn.dataset.editing = "false";
+    // Al guardar, SIEMPRE refresca la vista (esto limpia los inputs)
+    refreshView();
       // Asegura el highlight después de refrescar la vista
       setTimeout(() => highlightActiveFilter(), 0);
 
@@ -713,7 +714,8 @@ function createProductImageElement(rawImagePath) {
 }
 
 function refreshView() {
-  if (currentStatClickFilter) {
+  // Si hay stat-click activo, reaplica ese filtro especial
+  if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
     handleStatClickFromState();
   } else if (Object.keys(activeFilters).length > 0) {
     applyMultipleFilters();
@@ -723,7 +725,15 @@ function refreshView() {
 }
 
 function handleStatClickFromState() {
-  if (!currentStatClickFilter) return render();
+  if (!currentStatClickFilter || !currentStatClickFilter.attribute || !currentStatClickFilter.type) {
+    render();
+    return;
+  }
+  // Mantener currentFilter sincronizado para el highlight
+  currentFilter = { 
+    attribute: currentStatClickFilter.attribute, 
+    type: currentStatClickFilter.type 
+  };
   handleStatClick({
     target: {
       getAttribute: (attr) => {
@@ -2862,6 +2872,7 @@ function clearFilter() {
   currentStatClickFilter = null;
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
+  refreshView();
 }
 
 
@@ -2994,8 +3005,10 @@ function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-  // GUARDAR
+
+  // GUARDAR el stat-click global
   currentStatClickFilter = { attribute: filterAttribute, type };
+
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
