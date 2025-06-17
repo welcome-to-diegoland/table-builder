@@ -559,6 +559,9 @@ function createGroupHeaderRight({
       editAllBtn.textContent = "Editar";
       editAllBtn.dataset.editing = "false";
       refreshView();
+      // Asegura el highlight después de refrescar la vista
+      setTimeout(() => highlightActiveFilter(), 0);
+
       // Scroll y highlight (igual que antes)
       let attempts = 0;
       const maxAttempts = 20;
@@ -627,6 +630,8 @@ function createGroupHeaderRight({
       if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
 
       refreshView();
+      setTimeout(() => highlightActiveFilter(), 0);
+
       let attempts = 0;
       const maxAttempts = 20;
       const pollId = setInterval(() => {
