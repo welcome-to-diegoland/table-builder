@@ -714,13 +714,20 @@ function createProductImageElement(rawImagePath) {
 }
 
 function refreshView() {
-  // Si hay stat-click activo, reaplica ese filtro especial
+  // Si hay stat-click activo, reaplica el filtro especial
   if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
-    renderWithStatClick();
-  } else if (Object.keys(activeFilters).length > 0) {
-    applyMultipleFilters();
+    // Simula un click virtual sobre el stat-click actual
+    handleStatClick({
+      target: {
+        getAttribute: (attr) => {
+          if (attr === 'data-attribute') return currentStatClickFilter.attribute;
+          if (attr === 'data-type') return currentStatClickFilter.type;
+          return undefined;
+        }
+      }
+    });
   } else {
-    render();
+    render(); // Fallback a render normal
   }
 }
 
@@ -760,13 +767,15 @@ function handleStatClick(event) {
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
 
+  // Guarda el filtro global
+  currentStatClickFilter = { attribute: filterAttribute, type };
+
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
-    // Limpiar SOLO si el usuario da click de nuevo en el mismo filtro
     clearFilter();
     return;
   }
-  // Activar stat-click
-  currentStatClickFilter = { attribute: filterAttribute, type };
+  currentFilter = { attribute: filterAttribute, type };
+  highlightActiveFilter();
   refreshView();
 }
 
@@ -2894,10 +2903,13 @@ function applyCatOrder() {
 }
 
 function clearFilter() {
-  currentStatClickFilter = null; // Limpia el stat-click
+  currentStatClickFilter = null;
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
-  refreshView();
+  if (objectData.length && filteredItems.length) {
+    const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+    processItemGroups(skuToObject);
+  }
 }
 
 
