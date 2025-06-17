@@ -27,6 +27,7 @@ let filteredItems = [];
 let editedCells = {};
 let objectData = [];
 let categoryData = [];
+let currentStatClickFilter = null;
 let isVerticalDragging = false;
 let startX, startLeftWidth;
 let currentFilter = {
@@ -720,7 +721,11 @@ function handleStatClickFromState() {
   if (!currentStatClickFilter) return render();
   handleStatClick({
     target: {
-      getAttribute: (attr) => currentStatClickFilter[attr]
+      getAttribute: (attr) => {
+        if (attr === 'data-attribute') return currentStatClickFilter.attribute;
+        if (attr === 'data-type') return currentStatClickFilter.type;
+        return undefined;
+      }
     }
   });
 }
@@ -2849,11 +2854,12 @@ function applyCatOrder() {
 }
 
 function clearFilter() {
+  currentStatClickFilter = null; // LIMPIAR
   currentFilter = { attribute: null, type: null };
-  currentStatClickFilter = null; // Limpia también el filtro de stat-click
   highlightActiveFilter();
-  refreshView(); // Usa tu función central de refresco
+  refreshView();
 }
+
 
 // Función para seleccionar todos los grupos
 function selectAllGroups() {
@@ -2984,8 +2990,8 @@ function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-  currentStatClickFilter = { attribute: filterAttribute, type }; // <--- esto es clave
-
+  // GUARDAR
+  currentStatClickFilter = { attribute: filterAttribute, type };
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
