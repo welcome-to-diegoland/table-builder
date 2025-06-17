@@ -707,7 +707,9 @@ function createProductImageElement(rawImagePath) {
 }
 
 function refreshView() {
-  if (Object.keys(activeFilters).length > 0) {
+  if (currentStatClickFilter) {
+    handleStatClickFromState();
+  } else if (Object.keys(activeFilters).length > 0) {
     applyMultipleFilters();
   } else {
     render();
@@ -2848,11 +2850,9 @@ function applyCatOrder() {
 
 function clearFilter() {
   currentFilter = { attribute: null, type: null };
+  currentStatClickFilter = null; // Limpia también el filtro de stat-click
   highlightActiveFilter();
-  if (objectData.length && filteredItems.length) {
-    const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-    processItemGroups(skuToObject);
-  }
+  refreshView(); // Usa tu función central de refresco
 }
 
 // Función para seleccionar todos los grupos
@@ -2984,6 +2984,8 @@ function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
+  currentStatClickFilter = { attribute: filterAttribute, type }; // <--- esto es clave
+
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
