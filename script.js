@@ -1047,8 +1047,8 @@ function handleCombinedExcel(event) {
       }
 
       // Guardar originales
-filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
-filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
+      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
+      filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
       // NUEVO: Leer value order si existe
@@ -1057,6 +1057,23 @@ filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
       } else {
         window.valueOrderList = [];
       }
+
+      // ----- AQUI AGREGA LECTURA DE product ranking -----
+      const productRankingSheet = workbook.Sheets["product ranking"];
+      let productRankingMap = {};
+      if (productRankingSheet) {
+        const rankingData = XLSX.utils.sheet_to_json(productRankingSheet);
+        rankingData.forEach(row => {
+          // Cambia "SKU" y "product_ranking" al nombre exacto de las columnas en tu Excel si es diferente
+          if (row.SKU && row.product_ranking !== undefined) {
+            productRankingMap[row.SKU] = Number(row.product_ranking);
+          }
+        });
+        window.productRankingMap = productRankingMap;
+      } else {
+        window.productRankingMap = {};
+      }
+      // ---------------------------------------------------
 
       // Renderiza el árbol (con el botón)
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
@@ -1419,19 +1436,26 @@ function confirmGroupSortModal(orderedAttrs) {
   const items = groupItems.slice();
   items.sort((a, b) => {
     for (const attr of orderedAttrs) {
-      const va = (skuToObject[a.SKU]?.[attr] || "").toString();
-      const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
-      const sortA = valueOrderMap.get(`${attr}|||${va}`);
-      const sortB = valueOrderMap.get(`${attr}|||${vb}`);
-      if (sortA !== undefined && sortB !== undefined) {
-        if (sortA !== sortB) return sortA - sortB;
-      } else if (sortA !== undefined) {
-        return -1;
-      } else if (sortB !== undefined) {
-        return 1;
+      if (attr === "product_ranking") {
+        // Usa el product_ranking leído del Excel
+        const rankA = window.productRankingMap?.[a.SKU] ?? 999999;
+        const rankB = window.productRankingMap?.[b.SKU] ?? 999999;
+        if (rankA !== rankB) return rankA - rankB;
       } else {
-        if (va < vb) return -1;
-        if (va > vb) return 1;
+        const va = (skuToObject[a.SKU]?.[attr] || "").toString();
+        const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
+        const sortA = valueOrderMap.get(`${attr}|||${va}`);
+        const sortB = valueOrderMap.get(`${attr}|||${vb}`);
+        if (sortA !== undefined && sortB !== undefined) {
+          if (sortA !== sortB) return sortA - sortB;
+        } else if (sortA !== undefined) {
+          return -1;
+        } else if (sortB !== undefined) {
+          return 1;
+        } else {
+          if (va < vb) return -1;
+          if (va > vb) return 1;
+        }
       }
     }
     return 0;
@@ -4362,10 +4386,10 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
 
   // AÑADIDO: Forzar que "orden_tabla" SIEMPRE esté disponible si no está seleccionado ni en la lista
   if (
-    !available.includes("orden_tabla") &&
-    !selected.includes("orden_tabla")
+    !available.includes("product_ranking") &&
+    !selected.includes("product_ranking")
   ) {
-    available.push("orden_tabla");
+    available.push("product_ranking");
   }
 
   // UI ajustada
