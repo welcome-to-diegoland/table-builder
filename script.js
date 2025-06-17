@@ -725,17 +725,18 @@ function refreshView() {
 }
 
 function renderWithStatClick() {
-  // Aplica el filtro stat-click a mano, SIN limpiar currentStatClickFilter
   const { attribute, type } = currentStatClickFilter;
   if (!attribute || !type) {
     render();
     return;
   }
-  // Replicar la lógica de handleStatClick pero NUNCA limpiar currentStatClickFilter aquí
-  currentFilter = { attribute, type };
-  highlightActiveFilter();
-
+  // En vez de usar filteredItems, reconstruye una lista base desde objectData
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  // O mejor aún, reconstruye un nuevo filteredItems basado en el CMS IG actual, si aplica
+  // (puedes adaptar esto según tu flujo de categorización)
+  // Por simplicidad, aquí asume que filteredItems es la base correcta, pero si no, usa objectData
+
+  // Aplica el filtro stat-click sobre los datos actuales
   const filteredGroupIds = new Set();
   const filteredItemsMap = {};
 
@@ -750,9 +751,7 @@ function renderWithStatClick() {
     }
   });
 
-  // Aquí puedes copiar el resto de la lógica de renderizado de grupos del stat-click
-  // ... (puedes extraerlo de handleStatClick)
-  // O simplemente: displayFilteredGroups(filteredGroupIds, attribute, type);
+  // Ahora sí, renderiza los grupos como siempre
   displayFilteredGroups(filteredGroupIds, attribute, type);
 }
 
