@@ -713,23 +713,7 @@ function createProductImageElement(rawImagePath) {
   return img;
 }
 
-function refreshView() {
-  // Si hay stat-click activo, reaplica el filtro especial
-  if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
-    // Simula un click virtual sobre el stat-click actual
-    handleStatClick({
-      target: {
-        getAttribute: (attr) => {
-          if (attr === 'data-attribute') return currentStatClickFilter.attribute;
-          if (attr === 'data-type') return currentStatClickFilter.type;
-          return undefined;
-        }
-      }
-    });
-  } else {
-    render(); // Fallback a render normal
-  }
-}
+
 
 function renderWithStatClick() {
   const { attribute, type } = currentStatClickFilter;
@@ -770,13 +754,84 @@ function handleStatClick(event) {
   // Guarda el filtro global
   currentStatClickFilter = { attribute: filterAttribute, type };
 
+  // Toggle: si ya estaba activo, limpiar filtro
   if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
     clearFilter();
     return;
   }
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
-  refreshView();
+  renderStatClick();
+}
+
+function renderStatClick() {
+  if (!currentStatClickFilter || !currentStatClickFilter.attribute || !currentStatClickFilter.type) {
+    render();
+    return;
+  }
+  const { attribute, type } = currentStatClickFilter;
+  currentFilter = { attribute, type };
+  highlightActiveFilter();
+
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  const filteredGroupIds = new Set();
+  const filteredItemsMap = {};
+
+  filteredItems.forEach(item => {
+    const details = skuToObject[item.SKU] || {};
+    const hasValue = details[attribute]?.toString().trim();
+    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
+      const groupIdStr = String(item["IG ID"]);
+      filteredGroupIds.add(groupIdStr);
+      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
+      filteredItemsMap[groupIdStr].push(item);
+    }
+  });
+
+  output.innerHTML = `
+    <div class="filter-results">
+      <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
+        <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
+          ${attribute}
+        </span>
+        <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
+      </h3>
+      <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
+    </div>
+  `;
+  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
+
+  // Renderizar cada grupo
+  Array.from(filteredGroupIds).forEach(groupIdStr => {
+    const groupItems = filteredItemsMap[groupIdStr];
+    if (!groupItems || groupItems.length === 0) return;
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (Array.isArray(orderedSkus)) {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    const groupInfo = skuToObject[groupIdStr] || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
+    const groupDiv = document.createElement("div");
+    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.dataset.groupId = groupIdStr;
+
+    createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
+    createItemsTable(groupDiv, groupItems, skuToObject, attribute);
+    output.appendChild(groupDiv);
+  });
+
+  highlightActiveFilter();
+}
+
+function refreshView() {
+  if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
+    renderStatClick();
+  } else {
+    render();
+  }
 }
 
 function applyWebFilters() {
@@ -3038,247 +3093,8 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
   });
 }
 
-function renderStatClick() {
-  // Si no hay filtro statclick, render normal
-  if (!currentStatClickFilter || !currentStatClickFilter.attribute || !currentStatClickFilter.type) {
-    render();
-    return;
-  }
-  const { attribute, type } = currentStatClickFilter;
-  currentFilter = { attribute, type };
-  highlightActiveFilter();
-
-  // Mapea SKUs a objetos actuales
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  const filteredGroupIds = new Set();
-  const filteredItemsMap = {};
-
-  // Filtra los items por el statclick activo
-  filteredItems.forEach(item => {
-    const details = skuToObject[item.SKU] || {};
-    const hasValue = details[attribute]?.toString().trim();
-    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
-      const groupIdStr = String(item["IG ID"]);
-      filteredGroupIds.add(groupIdStr);
-      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
-      filteredItemsMap[groupIdStr].push(item);
-    }
-  });
-
-  // Render visual
-  output.innerHTML = `
-    <div class="filter-results">
-      <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
-        <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
-          ${attribute}
-        </span>
-        <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
-      </h3>
-      <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
-    </div>
-  `;
-  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
-
-  // Render grupos en orden seguro
-  const orderedGroupIds = [];
-  const uniqueGroupIds = new Set();
-  filteredItems.forEach(item => {
-    const groupIdStr = String(item["IG ID"]);
-    if (filteredGroupIds.has(groupIdStr) && !uniqueGroupIds.has(groupIdStr)) {
-      orderedGroupIds.push(groupIdStr);
-      uniqueGroupIds.add(groupIdStr);
-    }
-  });
-
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = filteredItemsMap[groupIdStr];
-    if (!groupItems || groupItems.length === 0) return;
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
-    const groupInfo = skuToObject[groupIdStr] || {};
-    const isMergedGroup = mergedGroups.has(groupIdStr);
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupIdStr;
-
-    // Renderiza el header y la tabla como en handleStatClick
-    createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
-    createItemsTable(groupDiv, groupItems, skuToObject, attribute);
-    output.appendChild(groupDiv);
-  });
-
-  highlightActiveFilter();
-}
-
-function handleStatClick(event) {
-  const attribute = event.target.getAttribute('data-attribute');
-  const type = event.target.getAttribute('data-type');
-  const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-
-  // Guarda el filtro global
-  currentStatClickFilter = { attribute: filterAttribute, type };
-
-  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
-    clearFilter();
-    return;
-  }
-  currentFilter = { attribute: filterAttribute, type };
-  highlightActiveFilter();
-  renderStatClick();
 
 
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  const filteredGroupIds = new Set();
-  const filteredItemsMap = {};
-
-  filteredItems.forEach(item => {
-    const details = skuToObject[item.SKU] || {};
-    const hasValue = details[filterAttribute]?.toString().trim();
-    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
-      const groupIdStr = String(item["IG ID"]);
-      filteredGroupIds.add(groupIdStr);
-      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
-      filteredItemsMap[groupIdStr].push(item);
-    }
-  });
-
-  output.innerHTML = `
-    <div class="filter-results">
-      <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
-        <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
-          ${filterAttribute}
-        </span>
-        <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
-      </h3>
-      <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
-    </div>
-  `;
-  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
-
-  const orderedGroupIds = [];
-  const uniqueGroupIds = new Set();
-  filteredItems.forEach(item => {
-    const groupIdStr = String(item["IG ID"]);
-    if (filteredGroupIds.has(groupIdStr) && !uniqueGroupIds.has(groupIdStr)) {
-      orderedGroupIds.push(groupIdStr);
-      uniqueGroupIds.add(groupIdStr);
-    }
-  });
-
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = filteredItemsMap[groupIdStr];
-    if (!groupItems || groupItems.length === 0) return;
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
-    const groupInfo = skuToObject[groupIdStr] || {};
-    const isMergedGroup = mergedGroups.has(groupIdStr);
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupIdStr;
-
-    // Header
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-    const productImg = createProductImageElement(groupInfo.image);
-    leftContainer.appendChild(productImg);
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
-    const logo = createBrandLogoElement(groupInfo.brand_logo);
-    infoDiv.appendChild(logo);
-    if (groupInfo.sku) {
-      const skuP = document.createElement("p");
-      skuP.textContent = "SKU: " + groupInfo.sku;
-      infoDiv.appendChild(skuP);
-    }
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-    const rightContainer = createGroupHeaderRight({
-  groupIdStr,
-  groupItems,
-  skuToObject,
-  isMergedGroup,
-  groupDiv
-});
-headerDiv.appendChild(rightContainer);
-
-    // Detalles de grupo unido
-    if (isMergedGroup) {
-      const detailsContainer = document.createElement("div");
-      detailsContainer.className = "group-details-container";
-      const toggleDetailsBtn = document.createElement("button");
-      toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Detalles";
-      toggleDetailsBtn.setAttribute("aria-expanded", "false");
-      const detailsDiv = document.createElement("div");
-      detailsDiv.className = "group-extra-details";
-      detailsDiv.style.display = "none";
-      const mergedTextarea = document.createElement("textarea");
-      mergedTextarea.className = "form-control merged-group-textarea";
-      mergedTextarea.rows = 10;
-      let mergedContent = getMergedGroupDetails(groupIdStr);
-      if (!mergedContent) {
-        // Default solo si nunca se editó
-        const mergedGroupData = mergedGroups.get(groupIdStr);
-        mergedContent = "";
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
-          });
-          mergedContent += "--------------------\n\n";
-        });
-      }
-      mergedTextarea.value = mergedContent.trim();
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
-      saveBtn.textContent = "Guardar Cambios";
-      saveBtn.addEventListener('click', function() {
-        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
-      });
-      detailsDiv.appendChild(mergedTextarea);
-      detailsDiv.appendChild(saveBtn);
-      toggleDetailsBtn.addEventListener("click", function () {
-        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
-        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
-        detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
-      });
-      detailsContainer.appendChild(toggleDetailsBtn);
-      detailsContainer.appendChild(detailsDiv);
-      headerDiv.appendChild(detailsContainer);
-    }
-    groupDiv.appendChild(headerDiv);
-    createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
-    output.appendChild(groupDiv);
-  });
-}
 
 function highlightActiveFilter() {
   document.querySelectorAll('.clickable').forEach(td => {
