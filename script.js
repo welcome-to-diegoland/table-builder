@@ -713,23 +713,7 @@ function createProductImageElement(rawImagePath) {
   return img;
 }
 
-function refreshView() {
-  // Si hay stat-click activo, reaplica el filtro especial
-  if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
-    // Simula un click virtual sobre el stat-click actual
-    handleStatClick({
-      target: {
-        getAttribute: (attr) => {
-          if (attr === 'data-attribute') return currentStatClickFilter.attribute;
-          if (attr === 'data-type') return currentStatClickFilter.type;
-          return undefined;
-        }
-      }
-    });
-  } else {
-    render(); // Fallback a render normal
-  }
-}
+
 
 function renderWithStatClick() {
   const { attribute, type } = currentStatClickFilter;
@@ -762,21 +746,106 @@ function renderWithStatClick() {
   displayFilteredGroups(filteredGroupIds, attribute, type);
 }
 
+function renderStatClick() {
+  if (!currentStatClickFilter) {
+    render();
+    return;
+  }
+  
+  const { attribute, type } = currentStatClickFilter;
+  currentFilter = { attribute, type };
+  highlightActiveFilter();
+
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  const filteredGroupIds = new Set();
+  const filteredItemsMap = {};
+
+  // Usa filterAttribute (como en handleStatClick) para evitar typos
+  const filterAttribute = attribute;
+
+  filteredItems.forEach(item => {
+    const details = skuToObject[item.SKU] || {};
+    // OJO: aquí usamos filterAttribute, NO attribute
+    const hasValue = details[filterAttribute]?.toString().trim();
+    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
+      const groupIdStr = String(item["IG ID"]);
+      filteredGroupIds.add(groupIdStr);
+      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
+      filteredItemsMap[groupIdStr].push(item);
+    }
+  });
+
+  output.innerHTML = `
+    <div class="filter-results">
+      <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
+        <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
+          ${filterAttribute}
+        </span>
+        <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
+      </h3>
+      <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
+    </div>
+  `;
+  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
+
+  Array.from(filteredGroupIds).forEach(groupIdStr => {
+    const groupItems = filteredItemsMap[groupIdStr];
+    if (!groupItems || groupItems.length === 0) return;
+    if (!groupOrderMap.has(groupIdStr)) {
+      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
+    }
+    const orderedSkus = groupOrderMap.get(groupIdStr);
+    if (Array.isArray(orderedSkus)) {
+      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+    }
+    const groupInfo = skuToObject[groupIdStr] || {};
+    const isMergedGroup = mergedGroups.has(groupIdStr);
+    const groupDiv = document.createElement("div");
+    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
+    groupDiv.dataset.groupId = groupIdStr;
+
+    createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
+    createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
+    output.appendChild(groupDiv);
+  });
+
+  highlightActiveFilter();
+}
+
+/**
+ * Evento de click en stat ("con valor"/"sin valor").
+ */
 function handleStatClick(event) {
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
 
-  // Guarda el filtro global
-  currentStatClickFilter = { attribute: filterAttribute, type };
-
-  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
+  // Toggle: si ya está activo, limpia
+  if (
+    currentStatClickFilter &&
+    currentStatClickFilter.attribute === filterAttribute &&
+    currentStatClickFilter.type === type
+  ) {
+    currentStatClickFilter = null;
     clearFilter();
     return;
   }
+
+  currentStatClickFilter = { attribute: filterAttribute, type };
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
-  refreshView();
+  renderStatClick();
+}
+
+/**
+ * Siempre usa esta para refrescar la vista tras guardar, mover info, etc.
+ */
+function refreshView() {
+  if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
+    renderStatClick();
+  } else {
+    render();
+  }
 }
 
 function applyWebFilters() {
@@ -1047,8 +1116,8 @@ function handleCombinedExcel(event) {
       }
 
       // Guardar originales
-      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
-      filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
+filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
+filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
       // NUEVO: Leer value order si existe
@@ -1057,23 +1126,6 @@ function handleCombinedExcel(event) {
       } else {
         window.valueOrderList = [];
       }
-
-      // ----- AQUI AGREGA LECTURA DE product ranking -----
-      const productRankingSheet = workbook.Sheets["product ranking"];
-      let productRankingMap = {};
-      if (productRankingSheet) {
-        const rankingData = XLSX.utils.sheet_to_json(productRankingSheet);
-        rankingData.forEach(row => {
-          // Cambia "SKU" y "product_ranking" al nombre exacto de las columnas en tu Excel si es diferente
-          if (row.SKU && row.product_ranking !== undefined) {
-            productRankingMap[row.SKU] = Number(row.product_ranking);
-          }
-        });
-        window.productRankingMap = productRankingMap;
-      } else {
-        window.productRankingMap = {};
-      }
-      // ---------------------------------------------------
 
       // Renderiza el árbol (con el botón)
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
@@ -1436,26 +1488,19 @@ function confirmGroupSortModal(orderedAttrs) {
   const items = groupItems.slice();
   items.sort((a, b) => {
     for (const attr of orderedAttrs) {
-      if (attr === "product_ranking") {
-        // Usa el product_ranking leído del Excel
-        const rankA = window.productRankingMap?.[a.SKU] ?? 999999;
-        const rankB = window.productRankingMap?.[b.SKU] ?? 999999;
-        if (rankA !== rankB) return rankA - rankB;
+      const va = (skuToObject[a.SKU]?.[attr] || "").toString();
+      const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
+      const sortA = valueOrderMap.get(`${attr}|||${va}`);
+      const sortB = valueOrderMap.get(`${attr}|||${vb}`);
+      if (sortA !== undefined && sortB !== undefined) {
+        if (sortA !== sortB) return sortA - sortB;
+      } else if (sortA !== undefined) {
+        return -1;
+      } else if (sortB !== undefined) {
+        return 1;
       } else {
-        const va = (skuToObject[a.SKU]?.[attr] || "").toString();
-        const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
-        const sortA = valueOrderMap.get(`${attr}|||${va}`);
-        const sortB = valueOrderMap.get(`${attr}|||${vb}`);
-        if (sortA !== undefined && sortB !== undefined) {
-          if (sortA !== sortB) return sortA - sortB;
-        } else if (sortA !== undefined) {
-          return -1;
-        } else if (sortB !== undefined) {
-          return 1;
-        } else {
-          if (va < vb) return -1;
-          if (va > vb) return 1;
-        }
+        if (va < vb) return -1;
+        if (va > vb) return 1;
       }
     }
     return 0;
@@ -3062,168 +3107,8 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
   });
 }
 
-function handleStatClick(event) {
-  const attribute = event.target.getAttribute('data-attribute');
-  const type = event.target.getAttribute('data-type');
-  const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
 
-  // GUARDAR el stat-click global
-  currentStatClickFilter = { attribute: filterAttribute, type };
 
-  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
-    clearFilter();
-    return;
-  }
-  currentFilter = { attribute: filterAttribute, type };
-  highlightActiveFilter();
-
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-  const filteredGroupIds = new Set();
-  const filteredItemsMap = {};
-
-  filteredItems.forEach(item => {
-    const details = skuToObject[item.SKU] || {};
-    const hasValue = details[filterAttribute]?.toString().trim();
-    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
-      const groupIdStr = String(item["IG ID"]);
-      filteredGroupIds.add(groupIdStr);
-      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
-      filteredItemsMap[groupIdStr].push(item);
-    }
-  });
-
-  output.innerHTML = `
-    <div class="filter-results">
-      <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
-        <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
-          ${filterAttribute}
-        </span>
-        <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
-      </h3>
-      <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
-    </div>
-  `;
-  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
-
-  const orderedGroupIds = [];
-  const uniqueGroupIds = new Set();
-  filteredItems.forEach(item => {
-    const groupIdStr = String(item["IG ID"]);
-    if (filteredGroupIds.has(groupIdStr) && !uniqueGroupIds.has(groupIdStr)) {
-      orderedGroupIds.push(groupIdStr);
-      uniqueGroupIds.add(groupIdStr);
-    }
-  });
-
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = filteredItemsMap[groupIdStr];
-    if (!groupItems || groupItems.length === 0) return;
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
-    const groupInfo = skuToObject[groupIdStr] || {};
-    const isMergedGroup = mergedGroups.has(groupIdStr);
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupIdStr;
-
-    // Header
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-    const productImg = createProductImageElement(groupInfo.image);
-    leftContainer.appendChild(productImg);
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
-    const logo = createBrandLogoElement(groupInfo.brand_logo);
-    infoDiv.appendChild(logo);
-    if (groupInfo.sku) {
-      const skuP = document.createElement("p");
-      skuP.textContent = "SKU: " + groupInfo.sku;
-      infoDiv.appendChild(skuP);
-    }
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-    const rightContainer = createGroupHeaderRight({
-  groupIdStr,
-  groupItems,
-  skuToObject,
-  isMergedGroup,
-  groupDiv
-});
-headerDiv.appendChild(rightContainer);
-
-    // Detalles de grupo unido
-    if (isMergedGroup) {
-      const detailsContainer = document.createElement("div");
-      detailsContainer.className = "group-details-container";
-      const toggleDetailsBtn = document.createElement("button");
-      toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Detalles";
-      toggleDetailsBtn.setAttribute("aria-expanded", "false");
-      const detailsDiv = document.createElement("div");
-      detailsDiv.className = "group-extra-details";
-      detailsDiv.style.display = "none";
-      const mergedTextarea = document.createElement("textarea");
-      mergedTextarea.className = "form-control merged-group-textarea";
-      mergedTextarea.rows = 10;
-      let mergedContent = getMergedGroupDetails(groupIdStr);
-      if (!mergedContent) {
-        // Default solo si nunca se editó
-        const mergedGroupData = mergedGroups.get(groupIdStr);
-        mergedContent = "";
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
-          });
-          mergedContent += "--------------------\n\n";
-        });
-      }
-      mergedTextarea.value = mergedContent.trim();
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
-      saveBtn.textContent = "Guardar Cambios";
-      saveBtn.addEventListener('click', function() {
-        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
-      });
-      detailsDiv.appendChild(mergedTextarea);
-      detailsDiv.appendChild(saveBtn);
-      toggleDetailsBtn.addEventListener("click", function () {
-        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
-        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
-        detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
-      });
-      detailsContainer.appendChild(toggleDetailsBtn);
-      detailsContainer.appendChild(detailsDiv);
-      headerDiv.appendChild(detailsContainer);
-    }
-    groupDiv.appendChild(headerDiv);
-    createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
-    output.appendChild(groupDiv);
-  });
-}
 
 function highlightActiveFilter() {
   document.querySelectorAll('.clickable').forEach(td => {
@@ -4386,10 +4271,10 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
 
   // AÑADIDO: Forzar que "orden_tabla" SIEMPRE esté disponible si no está seleccionado ni en la lista
   if (
-    !available.includes("product_ranking") &&
-    !selected.includes("product_ranking")
+    !available.includes("orden_tabla") &&
+    !selected.includes("orden_tabla")
   ) {
-    available.push("product_ranking");
+    available.push("orden_tabla");
   }
 
   // UI ajustada
