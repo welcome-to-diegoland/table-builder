@@ -716,7 +716,7 @@ function createProductImageElement(rawImagePath) {
 function refreshView() {
   // Si hay stat-click activo, reaplica ese filtro especial
   if (currentStatClickFilter && currentStatClickFilter.attribute && currentStatClickFilter.type) {
-    handleStatClickFromState();
+    renderWithStatClick();
   } else if (Object.keys(activeFilters).length > 0) {
     applyMultipleFilters();
   } else {
@@ -724,25 +724,51 @@ function refreshView() {
   }
 }
 
-function handleStatClickFromState() {
-  if (!currentStatClickFilter || !currentStatClickFilter.attribute || !currentStatClickFilter.type) {
+function renderWithStatClick() {
+  // Aplica el filtro stat-click a mano, SIN limpiar currentStatClickFilter
+  const { attribute, type } = currentStatClickFilter;
+  if (!attribute || !type) {
     render();
     return;
   }
-  // Mantener currentFilter sincronizado para el highlight
-  currentFilter = { 
-    attribute: currentStatClickFilter.attribute, 
-    type: currentStatClickFilter.type 
-  };
-  handleStatClick({
-    target: {
-      getAttribute: (attr) => {
-        if (attr === 'data-attribute') return currentStatClickFilter.attribute;
-        if (attr === 'data-type') return currentStatClickFilter.type;
-        return undefined;
-      }
+  // Replicar la lógica de handleStatClick pero NUNCA limpiar currentStatClickFilter aquí
+  currentFilter = { attribute, type };
+  highlightActiveFilter();
+
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  const filteredGroupIds = new Set();
+  const filteredItemsMap = {};
+
+  filteredItems.forEach(item => {
+    const details = skuToObject[item.SKU] || {};
+    const hasValue = details[attribute]?.toString().trim();
+    if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
+      const groupIdStr = String(item["IG ID"]);
+      filteredGroupIds.add(groupIdStr);
+      if (!filteredItemsMap[groupIdStr]) filteredItemsMap[groupIdStr] = [];
+      filteredItemsMap[groupIdStr].push(item);
     }
   });
+
+  // Aquí puedes copiar el resto de la lógica de renderizado de grupos del stat-click
+  // ... (puedes extraerlo de handleStatClick)
+  // O simplemente: displayFilteredGroups(filteredGroupIds, attribute, type);
+  displayFilteredGroups(filteredGroupIds, attribute, type);
+}
+
+function handleStatClick(event) {
+  const attribute = event.target.getAttribute('data-attribute');
+  const type = event.target.getAttribute('data-type');
+  const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
+
+  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
+    // Limpiar SOLO si el usuario da click de nuevo en el mismo filtro
+    clearFilter();
+    return;
+  }
+  // Activar stat-click
+  currentStatClickFilter = { attribute: filterAttribute, type };
+  refreshView();
 }
 
 function applyWebFilters() {
@@ -2869,7 +2895,7 @@ function applyCatOrder() {
 }
 
 function clearFilter() {
-  currentStatClickFilter = null;
+  currentStatClickFilter = null; // Limpia el stat-click
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
   refreshView();
