@@ -751,18 +751,22 @@ function renderStatClick() {
     render();
     return;
   }
+  
   const { attribute, type } = currentStatClickFilter;
   currentFilter = { attribute, type };
   highlightActiveFilter();
 
-  // Filtra grupos
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   const filteredGroupIds = new Set();
   const filteredItemsMap = {};
 
+  // Usa filterAttribute (como en handleStatClick) para evitar typos
+  const filterAttribute = attribute;
+
   filteredItems.forEach(item => {
     const details = skuToObject[item.SKU] || {};
-    const hasValue = details[attribute]?.toString().trim();
+    // OJO: aquí usamos filterAttribute, NO attribute
+    const hasValue = details[filterAttribute]?.toString().trim();
     if ((type === 'withValue' && hasValue) || (type === 'withoutValue' && !hasValue)) {
       const groupIdStr = String(item["IG ID"]);
       filteredGroupIds.add(groupIdStr);
@@ -771,12 +775,11 @@ function renderStatClick() {
     }
   });
 
-  // Limpiar output y mostrar contador
   output.innerHTML = `
     <div class="filter-results">
       <h3>Item groups ${type === 'withValue' ? 'con' : 'sin'} 
         <span class="active-filter-label" style="color: ${type === 'withValue' ? '#2ecc71' : '#e74c3c'}">
-          ${attribute}
+          ${filterAttribute}
         </span>
         <button class="btn btn-sm btn-outline-secondary ml-2 clear-filter-btn">Limpiar filtro</button>
       </h3>
@@ -785,7 +788,6 @@ function renderStatClick() {
   `;
   output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
 
-  // Renderiza cada grupo real
   Array.from(filteredGroupIds).forEach(groupIdStr => {
     const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
@@ -802,9 +804,8 @@ function renderStatClick() {
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
-    // Usa tu función de header y tabla
     createGroupHeader(groupDiv, groupInfo, isMergedGroup, groupItems, skuToObject);
-    createItemsTable(groupDiv, groupItems, skuToObject, attribute);
+    createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
     output.appendChild(groupDiv);
   });
 
