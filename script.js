@@ -1106,34 +1106,75 @@ function handleCombinedExcel(event) {
     try {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
+
       const dataSheet = workbook.Sheets["data"];
       const catSheet = workbook.Sheets["category-data"];
-      const valueOrderSheet = workbook.Sheets["value order"]; // NUEVO
+      const valueOrderSheet = workbook.Sheets["value order"];
+      const rankingSheet = workbook.Sheets["product_ranking"];
 
       if (!dataSheet || !catSheet) {
         alert("El archivo no contiene las hojas necesarias.");
         return;
       }
 
-      // Guardar originales
-filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
-filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
+      // 1. Cargar datos principales
+      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
+      filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
       categoryData = XLSX.utils.sheet_to_json(catSheet);
 
-      // NUEVO: Leer value order si existe
+      // 2. Value order (opcional)
       if (valueOrderSheet) {
         window.valueOrderList = XLSX.utils.sheet_to_json(valueOrderSheet);
       } else {
         window.valueOrderList = [];
       }
 
-      // Renderiza el árbol (con el botón)
+      // 3. Merge product_ranking
+      if (rankingSheet) {
+        const rankingRows = XLSX.utils.sheet_to_json(rankingSheet);
+
+        const rankingMap = {};
+        rankingRows.forEach(row => {
+          let sku =
+            (row.sku !== undefined ? row.sku :
+            row.SKU !== undefined ? row.SKU :
+            row.Sku !== undefined ? row.Sku :
+            row.Codigo !== undefined ? row.Codigo :
+            row.ID !== undefined ? row.ID : ""
+            );
+          sku = sku ? sku.toString().trim() : "";
+
+          let ranking =
+            (row.product_ranking !== undefined ? row.product_ranking :
+            row.ranking !== undefined ? row.ranking :
+            row.Product_Ranking !== undefined ? row.Product_Ranking :
+            row.Ranking !== undefined ? row.Ranking : ""
+            );
+          ranking = (ranking !== null && ranking !== undefined) ? ranking : "";
+
+          rankingMap[sku] = ranking;
+        });
+
+        filteredItems.forEach(item => {
+          const sku = item.SKU ? item.SKU.toString().trim() : "";
+          item.product_ranking = rankingMap[sku] || "";
+        });
+        filteredItemsOriginal.forEach(item => {
+          const sku = item.SKU ? item.SKU.toString().trim() : "";
+          item.product_ranking = rankingMap[sku] || "";
+        });
+      } else {
+        filteredItems.forEach(item => { item.product_ranking = ""; });
+        filteredItemsOriginal.forEach(item => { item.product_ranking = ""; });
+      }
+
+      // Renderiza el árbol de categorías y sigue el flujo normal
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
       processCategoryDataFromSheet();
-      // NO render() aquí, hasta elegir categoría
 
     } catch (error) {
       console.error("Error procesando archivo combinado:", error);
+      alert("Ocurrió un error procesando el archivo combinado: " + error.message);
     }
   };
   reader.readAsArrayBuffer(file);
@@ -1488,19 +1529,26 @@ function confirmGroupSortModal(orderedAttrs) {
   const items = groupItems.slice();
   items.sort((a, b) => {
     for (const attr of orderedAttrs) {
-      const va = (skuToObject[a.SKU]?.[attr] || "").toString();
-      const vb = (skuToObject[b.SKU]?.[attr] || "").toString();
-      const sortA = valueOrderMap.get(`${attr}|||${va}`);
-      const sortB = valueOrderMap.get(`${attr}|||${vb}`);
-      if (sortA !== undefined && sortB !== undefined) {
-        if (sortA !== sortB) return sortA - sortB;
-      } else if (sortA !== undefined) {
-        return -1;
-      } else if (sortB !== undefined) {
-        return 1;
+      const va = (skuToObject[a.SKU]?.[attr] || "");
+      const vb = (skuToObject[b.SKU]?.[attr] || "");
+      // --- NUEVO: product_ranking se ordena numérico ASC ---
+      if (attr === "product_ranking") {
+        const na = Number(va) || Infinity;
+        const nb = Number(vb) || Infinity;
+        if (na !== nb) return na - nb;
       } else {
-        if (va < vb) return -1;
-        if (va > vb) return 1;
+        const sortA = valueOrderMap.get(`${attr}|||${va}`);
+        const sortB = valueOrderMap.get(`${attr}|||${vb}`);
+        if (sortA !== undefined && sortB !== undefined) {
+          if (sortA !== sortB) return sortA - sortB;
+        } else if (sortA !== undefined) {
+          return -1;
+        } else if (sortB !== undefined) {
+          return 1;
+        } else {
+          if (va < vb) return -1;
+          if (va > vb) return 1;
+        }
       }
     }
     return 0;
@@ -4262,6 +4310,7 @@ injectGroupSortModal();
 // Estado temporal del modal (por grupo)
 let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
 
+// MODAL DE ORDEN: SIEMPRE incluye product_ranking
 function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   groupSortModalState.groupId = groupId;
   groupSortModalState.groupItems = groupItems;
@@ -4269,21 +4318,23 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   let available = attributeList.filter(attr => attr === "marca" || !excludedAttributes.has(attr));
   let selected = [];
 
-  // AÑADIDO: Forzar que "orden_tabla" SIEMPRE esté disponible si no está seleccionado ni en la lista
-  if (
-    !available.includes("orden_tabla") &&
-    !selected.includes("orden_tabla")
-  ) {
+  if (!available.includes("product_ranking")) {
+    available.unshift("product_ranking");
+  }
+
+  if (!available.includes("orden_tabla") && !selected.includes("orden_tabla")) {
     available.push("orden_tabla");
   }
 
-  // UI ajustada
+  // UI dual-list
   const listDiv = document.getElementById('groupSortAttrList');
   listDiv.innerHTML = `
     <div class="dual-list-modal compact">
       <div class="dual-list-col">
         <div class="dual-list-label">Atributos disponibles</div>
-        <ul id="attr-available" class="dual-list-box" tabindex="0"></ul>
+        <ul id="attr-available" class="dual-list-box" tabindex="0">
+          ${available.map(attr => `<li tabindex="0">${attr}</li>`).join('')}
+        </ul>
       </div>
       <div class="dual-list-controls">
         <button id="attr-add" title="Agregar seleccionados" class="dual-list-btn compact-btn">&rarr;</button>
@@ -4296,83 +4347,6 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
     </div>
   `;
 
-  // Añade CSS compacto una sola vez
-  if (!document.getElementById('dual-list-css')) {
-    const style = document.createElement('style');
-    style.id = 'dual-list-css';
-    style.textContent = `
-      .dual-list-modal.compact {
-        display: flex;
-        gap: 16px;
-        justify-content: center;
-        align-items: center;
-        padding: 8px 0 0 0;
-        font-size: 13px;
-      }
-      .dual-list-col {
-        flex:1; min-width:120px; max-width:170px;
-      }
-      .dual-list-label {
-        text-align: center;
-        font-weight: 500;
-        margin-bottom: 4px;
-        font-size: 12px;
-        color: #456;
-      }
-      .dual-list-box {
-        border: 1px solid #bbb;
-        background: #fafbfc;
-        border-radius: 4px;
-        min-height: 120px;
-        max-height: 160px;
-        overflow-y: auto;
-        list-style: none;
-        margin: 0; padding: 0;
-        font-size: 13px;
-      }
-      .dual-list-box li {
-        padding: 4px 7px;
-        cursor: pointer;
-        user-select: none;
-        transition: background 0.13s;
-        border-bottom: 1px solid #eee;
-        font-size: 13px;
-      }
-      .dual-list-box li:last-child { border-bottom: none;}
-      .dual-list-box li.selected, .dual-list-box li:focus {
-        background: #e6f1ff;
-        outline: none;
-      }
-      .dual-list-controls {
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
-        justify-content: center;
-        align-items: center;
-      }
-      .dual-list-btn {
-        font-size: 1.08em;
-        width: 30px; height: 30px;
-        border-radius: 50%; border: none;
-        background: #f1f4f7;
-        color: #456;
-        cursor: pointer;
-        transition: background 0.15s, color 0.15s;
-        padding: 0;
-      }
-      .dual-list-btn:active, .dual-list-btn:focus { background: #d6e8fd; color: #124;}
-      .dual-list-selected li {
-        cursor: grab;
-      }
-      @media (max-width:600px) {
-        .dual-list-modal.compact { flex-direction:column; gap:7px;}
-        .dual-list-controls { flex-direction:row; gap: 7px;}
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Render helpers
   function renderLists() {
     const availUl = listDiv.querySelector('#attr-available');
     availUl.innerHTML = available.map(attr =>
@@ -4385,7 +4359,6 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   }
   renderLists();
 
-  // Selection logic
   function getSelectedIndices(ul) {
     return Array.from(ul.querySelectorAll('li.selected')).map(li =>
       Array.from(ul.children).indexOf(li)
@@ -4398,7 +4371,6 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
     li.focus();
   }
   function clearSelection(ul) { ul.querySelectorAll('li.selected').forEach(l => l.classList.remove('selected')); }
-
   function setupListClicks(ul, multiAllowed) {
     ul.addEventListener('click', (e) => {
       if (e.target.tagName === 'LI') {
@@ -4431,7 +4403,6 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   setupListClicks(listDiv.querySelector('#attr-available'));
   setupListClicks(listDiv.querySelector('#attr-selected'));
 
-  // Add to selected
   function addAttrs() {
     const ul = listDiv.querySelector('#attr-available');
     const idxs = getSelectedIndices(ul);
@@ -4440,7 +4411,6 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
     available = available.filter(attr => !toAdd.includes(attr));
     renderLists(); setupListClicks(listDiv.querySelector('#attr-available')); setupListClicks(listDiv.querySelector('#attr-selected'));
   }
-  // Remove from selected
   function removeAttrs() {
     const ul = listDiv.querySelector('#attr-selected');
     const idxs = getSelectedIndices(ul);
@@ -4486,6 +4456,61 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   };
 
   document.getElementById('groupSortModal').style.display = 'block';
+}
+
+
+// ORDENAMIENTO: product_ranking como número
+function confirmGroupSortModal(orderedAttrs) {
+  const { groupId } = groupSortModalState;
+  const groupItems = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+
+  const valueOrderMap = new Map();
+  (window.valueOrderList || []).forEach(row => {
+    if (!row["Nombre atributo"] || !row["Valor de Atributo"]) return;
+    const key = `${row["Nombre atributo"]}|||${row["Valor de Atributo"]}`;
+    valueOrderMap.set(key, Number(row.sort_order));
+  });
+
+  const items = groupItems.slice();
+  items.sort((a, b) => {
+    for (const attr of orderedAttrs) {
+      const va = (skuToObject[a.SKU]?.[attr] ?? a[attr] ?? "");
+      const vb = (skuToObject[b.SKU]?.[attr] ?? b[attr] ?? "");
+      if (attr === "product_ranking") {
+        const na = Number(va) || Infinity;
+        const nb = Number(vb) || Infinity;
+        if (na !== nb) return na - nb;
+      } else {
+        const sortA = valueOrderMap.get(`${attr}|||${va}`);
+        const sortB = valueOrderMap.get(`${attr}|||${vb}`);
+        if (sortA !== undefined && sortB !== undefined) {
+          if (sortA !== sortB) return sortA - sortB;
+        } else if (sortA !== undefined) {
+          return -1;
+        } else if (sortB !== undefined) {
+          return 1;
+        } else {
+          if (va < vb) return -1;
+          if (va > vb) return 1;
+        }
+      }
+    }
+    return 0;
+  });
+
+  groupOrderMap.set(groupId, items.map(it => it.SKU));
+  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
+  if (groupContainer) {
+    const existingTable = groupContainer.querySelector('.table-responsive');
+    if (existingTable) existingTable.remove();
+    const orderedSkus = groupOrderMap.get(groupId);
+    const orderedItems = orderedSkus
+      .map(sku => items.find(it => it.SKU === sku))
+      .filter(Boolean);
+    createItemsTable(groupContainer, orderedItems, skuToObject);
+  }
+  showTemporaryMessage('Grupo ordenado por atributos seleccionados');
 }
 
 function closeGroupSortModal() {
