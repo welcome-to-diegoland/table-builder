@@ -2854,10 +2854,9 @@ function applyCatOrder() {
 }
 
 function clearFilter() {
-  currentStatClickFilter = null; // LIMPIAR
+  currentStatClickFilter = null;
   currentFilter = { attribute: null, type: null };
   highlightActiveFilter();
-  refreshView();
 }
 
 
@@ -2922,7 +2921,7 @@ function unmergeGroup(groupId) {
   
   // 6. Forzar render completo
   if (filteredItems.length && objectData.length) {
-    render();
+    refreshView();
   }
   
   // 7. Mensaje visual
@@ -5088,7 +5087,7 @@ moveInfoUndoBackup[groupId] = {
     groupDestHighlightAttr[groupId] = dstAttr;
 
     showTemporaryMessage('Información movida correctamente');
-    render();
+    refreshView();
 
     // Espera a que el DOM esté renderizado y luego: scroll + resalta head + muestra botón deshacer
     let attempts = 0;
