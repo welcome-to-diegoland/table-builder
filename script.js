@@ -4575,6 +4575,7 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
 }
 
 
+
 // ORDENAMIENTO: product_ranking como número
 function confirmGroupSortModal(orderedAttrs) {
   const { groupId } = groupSortModalState;
