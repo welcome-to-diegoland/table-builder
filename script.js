@@ -557,7 +557,7 @@ function createGroupHeaderRight({
       saveGroupItemEdits(groupDiv, groupIdStr);
       editAllBtn.textContent = "Editar";
       editAllBtn.dataset.editing = "false";
-      render();
+      refreshView();
       // Scroll y highlight (igual que antes)
       let attempts = 0;
       const maxAttempts = 20;
@@ -625,7 +625,7 @@ function createGroupHeaderRight({
       delete moveInfoUndoBackup[groupIdStr];
       if (groupDestHighlightAttr[groupIdStr]) delete groupDestHighlightAttr[groupIdStr];
 
-      render();
+      refreshView();
       let attempts = 0;
       const maxAttempts = 20;
       const pollId = setInterval(() => {
@@ -706,7 +706,22 @@ function createProductImageElement(rawImagePath) {
   return img;
 }
 
+function refreshView() {
+  if (Object.keys(activeFilters).length > 0) {
+    applyMultipleFilters();
+  } else {
+    render();
+  }
+}
 
+function handleStatClickFromState() {
+  if (!currentStatClickFilter) return render();
+  handleStatClick({
+    target: {
+      getAttribute: (attr) => currentStatClickFilter[attr]
+    }
+  });
+}
 
 function applyWebFilters() {
   // Implementación de applyWebFilters si es necesaria
@@ -3056,34 +3071,14 @@ function handleStatClick(event) {
     }
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
-    const rightContainer = document.createElement("div");
-    rightContainer.className = "group-header-right";
-    const hasNewItem = groupItems.some(item => {
-      const details = skuToObject[item.SKU];
-      return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-    });
-    if (hasNewItem) {
-      const newBadge = document.createElement("span");
-      newBadge.className = "new-badge";
-      newBadge.textContent = "New";
-      rightContainer.appendChild(newBadge);
-    }
-    if (isMergedGroup) {
-      const mergedBadge = document.createElement("span");
-      mergedBadge.className = "merged-badge";
-      mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-      rightContainer.appendChild(mergedBadge);
-      const unmergeBtn = document.createElement("button");
-      unmergeBtn.className = "btn btn-sm btn-outline-danger";
-      unmergeBtn.textContent = "Desagrupar";
-      unmergeBtn.title = "Revertir esta unión de grupos";
-      unmergeBtn.dataset.groupIdStr = groupIdStr;
-      unmergeBtn.addEventListener('click', function() {
-        unmergeGroup(this.dataset.groupIdStr);
-      });
-      rightContainer.appendChild(unmergeBtn);
-    }
-    headerDiv.appendChild(rightContainer);
+    const rightContainer = createGroupHeaderRight({
+  groupIdStr,
+  groupItems,
+  skuToObject,
+  isMergedGroup,
+  groupDiv
+});
+headerDiv.appendChild(rightContainer);
 
     // Detalles de grupo unido
     if (isMergedGroup) {
