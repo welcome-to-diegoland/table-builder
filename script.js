@@ -1293,6 +1293,7 @@ cargarBtn.textContent = 'Cargar categoría';
 cargarBtn.disabled = true; // Deshabilitado al inicio
 header.appendChild(cargarBtn);
 
+
   // Contenedor para el árbol (hace scroll, no el header)
   let treeList = document.createElement('div');
   treeList.className = 'category-tree-list';
