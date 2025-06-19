@@ -550,14 +550,55 @@ function createGroupHeaderRight({
   editAllBtn.className = "btn btn-sm btn-outline-primary";
   editAllBtn.dataset.editing = "false";
   editAllBtn.onclick = function() {
+    const titleContainer = groupDiv.querySelector('.group-title-container');
+    const groupTitle = titleContainer && titleContainer.querySelector('.group-title');
+    const existingInput = titleContainer && titleContainer.querySelector('.group-title-input');
+
     if (editAllBtn.dataset.editing === "false") {
       editAllBtn.textContent = "Guardar cambios";
       editAllBtn.dataset.editing = "true";
       makeGroupItemsEditable(groupDiv, groupIdStr);
+
+      // --- Título a input ---
+      if (groupTitle && !existingInput) {
+        const currentText = groupTitle.textContent;
+        const input = document.createElement('input');
+        input.type = "text";
+        input.className = "group-title-input";
+        input.value = currentText;
+        input.style.fontSize = "1.1rem";
+        input.style.width = "90%";
+        groupTitle.replaceWith(input);
+        input.focus();
+      }
     } else {
       saveGroupItemEdits(groupDiv, groupIdStr);
       editAllBtn.textContent = "Editar";
       editAllBtn.dataset.editing = "false";
+      // --- Guardar título y volverlo texto ---
+      const titleContainer = groupDiv.querySelector('.group-title-container');
+      if (titleContainer) {
+        const input = titleContainer.querySelector('.group-title-input');
+        if (input) {
+          const newTitle = input.value.trim() || groupIdStr; // fallback por si queda vacío
+          // Actualiza en objectData
+          const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+          if (groupObj) groupObj.name = newTitle;
+          // Actualiza en mergedGroups si aplica
+          if (mergedGroups.has(groupIdStr)) {
+            mergedGroups.get(groupIdStr).name = newTitle;
+          }
+          // Reemplaza el input por el h2
+          const h2 = document.createElement('h2');
+          h2.className = "group-title";
+          const link = document.createElement('a');
+          link.href = `https://www.travers.com.mx/${groupIdStr}`;
+          link.target = "_blank";
+          link.textContent = newTitle;
+          h2.appendChild(link);
+          input.replaceWith(h2);
+        }
+      }
       refreshView();
       // Asegura el highlight después de refrescar la vista
       setTimeout(() => highlightActiveFilter(), 0);
@@ -2927,11 +2968,6 @@ function applyCatOrder() {
   }
 }
 
-function clearFilter() {
-  currentStatClickFilter = null;
-  currentFilter = { attribute: null, type: null };
-  highlightActiveFilter();
-}
 
 
 // Función para seleccionar todos los grupos
@@ -3060,12 +3096,11 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
 }
 
 function handleStatClick(event) {
-  // Obtener el atributo y tipo del click
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
 
-  // Si ya está el filtro activo, quítalo (toggle)
+  // Toggle: Si ya está ese filtro, quítalo y muestra todo
   if (
     currentFilter.attribute === filterAttribute &&
     currentFilter.type === type
@@ -3074,7 +3109,7 @@ function handleStatClick(event) {
     return;
   }
 
-  // Guardar filtro activo
+  // Aplica nuevo filtro
   currentStatClickFilter = { attribute: filterAttribute, type };
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
@@ -3105,9 +3140,11 @@ function handleStatClick(event) {
       <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
     </div>
   `;
-  // Botón "Limpiar filtro" siempre funciona
+  // Asegúrate de que el botón "Limpiar filtro" SIEMPRE limpie y rerenderice
   output.querySelector('.clear-filter-btn').addEventListener('click', function() {
     clearFilter();
+    // El refreshView asegura que se vea la vista original de grupos
+    refreshView();
   });
 
   const orderedGroupIds = [];
@@ -3225,12 +3262,18 @@ function handleStatClick(event) {
       headerDiv.appendChild(detailsContainer);
     }
     groupDiv.appendChild(headerDiv);
-
-    // Tabla, usando columnas de stats normales
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
-
     output.appendChild(groupDiv);
   });
+}
+
+// REEMPLAZA tu clearFilter por esto:
+function clearFilter() {
+  currentStatClickFilter = null;
+  currentFilter = { attribute: null, type: null };
+  highlightActiveFilter();
+  // SIEMPRE regresa a la vista de grupos principal
+  render();
 }
 
 function highlightActiveFilter() {
