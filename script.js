@@ -3060,15 +3060,22 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
 }
 
 function handleStatClick(event) {
+  // Obtener el atributo y tipo del click
   const attribute = event.target.getAttribute('data-attribute');
   const type = event.target.getAttribute('data-type');
   const filterAttribute = attribute === 'item_code' ? 'item_code' : attribute;
-  // GUARDAR
-  currentStatClickFilter = { attribute: filterAttribute, type };
-  if (currentFilter.attribute === filterAttribute && currentFilter.type === type) {
+
+  // Si ya está el filtro activo, quítalo (toggle)
+  if (
+    currentFilter.attribute === filterAttribute &&
+    currentFilter.type === type
+  ) {
     clearFilter();
     return;
   }
+
+  // Guardar filtro activo
+  currentStatClickFilter = { attribute: filterAttribute, type };
   currentFilter = { attribute: filterAttribute, type };
   highlightActiveFilter();
 
@@ -3098,7 +3105,10 @@ function handleStatClick(event) {
       <p>Mostrando ${filteredGroupIds.size} Item Groups</p>
     </div>
   `;
-  output.querySelector('.clear-filter-btn').addEventListener('click', clearFilter);
+  // Botón "Limpiar filtro" siempre funciona
+  output.querySelector('.clear-filter-btn').addEventListener('click', function() {
+    clearFilter();
+  });
 
   const orderedGroupIds = [];
   const uniqueGroupIds = new Set();
@@ -3153,13 +3163,13 @@ function handleStatClick(event) {
     leftContainer.appendChild(infoDiv);
     headerDiv.appendChild(leftContainer);
     const rightContainer = createGroupHeaderRight({
-  groupIdStr,
-  groupItems,
-  skuToObject,
-  isMergedGroup,
-  groupDiv
-});
-headerDiv.appendChild(rightContainer);
+      groupIdStr,
+      groupItems,
+      skuToObject,
+      isMergedGroup,
+      groupDiv
+    });
+    headerDiv.appendChild(rightContainer);
 
     // Detalles de grupo unido
     if (isMergedGroup) {
@@ -3215,7 +3225,10 @@ headerDiv.appendChild(rightContainer);
       headerDiv.appendChild(detailsContainer);
     }
     groupDiv.appendChild(headerDiv);
+
+    // Tabla, usando columnas de stats normales
     createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
+
     output.appendChild(groupDiv);
   });
 }
@@ -4977,9 +4990,17 @@ function applyCategoryTables() {
 
     groupDiv.appendChild(headerDiv);
 
-    // Renderiza la tabla usando customAttrs
-    // (No olvides el manejo de catálogo, omitted here for brevity)
-    createItemsTable(groupDiv, groupItems, skuToObject);
+    // --- SOLO CAMBIA ESTA PARTE ---
+    // Lee columnas de table_attributes_cat del primer item
+    const groupObj = groupItems[0];
+    let customAttrs = null;
+    if (groupObj && groupObj.table_attributes_cat) {
+      customAttrs = groupObj.table_attributes_cat
+        .split(",")
+        .map(attr => attr.trim())
+        .filter(attr => attr && attr !== "marca" && attr !== "sku" && attr !== "price");
+    }
+    createItemsTable(groupDiv, groupItems, skuToObject, null, customAttrs);
 
     output.appendChild(groupDiv);
 
