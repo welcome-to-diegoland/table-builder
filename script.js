@@ -691,6 +691,41 @@ function createGroupHeaderRight({
     rightContainer.appendChild(undoBtn);
   }
 
+  // --- Badge de atributos llenos basado en las columnas reales de la tabla, con ajuste solicitado ---
+  setTimeout(() => {
+    const table = groupDiv.querySelector('.attribute-table');
+    if (!table) return;
+    const ths = Array.from(table.querySelectorAll('thead th'))
+      .map(th => th.textContent.trim())
+      .filter(header =>
+        header && !["×", "Drag", "Origen", ""].includes(header.toLowerCase())
+      );
+
+    let withValue = 0;
+    ths.forEach(attr => {
+      const hasAny = groupItems.some(item => {
+        const details = skuToObject[item.SKU] || {};
+        return details[attr] && details[attr].toString().trim() !== "";
+      });
+      if (hasAny) withValue++;
+    });
+
+    // Restar 2 y 4 según lo pedido
+    const badgeLl = Math.max(withValue - 2, 0);
+    const badgeTot = Math.max(ths.length - 4, 0);
+
+    if (ths.length > 0) {
+      const badge = document.createElement("span");
+      badge.className = "badge badge-pill badge-info group-cols-badge";
+      badge.style.marginLeft = "8px";
+      badge.style.background = "#17a2b8";
+      badge.style.color = "white";
+      badge.style.fontSize = "0.95em";
+      badge.textContent = `Llenos: ${badgeLl} / ${badgeTot}`;
+      rightContainer.appendChild(badge);
+    }
+  }, 0);
+
   return rightContainer;
 }
 
