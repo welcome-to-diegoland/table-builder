@@ -47,6 +47,9 @@ let moveInfoBackups = {}; // { [groupId]: [array de copias de objetos] }
 let attributeFiltersState = {};
 let attributeFilterInputs = {};
 let currentFilteredItems = [];
+let originalExcelSheets = {}; // { sheetName: { header: [], data: [] } }
+let originalCsvHeader = [];
+let originalCsvData = [];
 let activeFilters = {};
 let defaultFilterAttributes = new Set();
 const forcedFilterAttributes = new Set(['marca', 'shop_by']);
@@ -1030,6 +1033,61 @@ function openAddStatsAttributeModal() {
   document.getElementById('addStatsAttrConfirmBtn').onclick = confirmAddStatsAttributesModal;
 }
 
+function exportAllData() {
+  // 1. Exportar el Excel con los datos modificados
+  const wb = XLSX.utils.book_new();
+  Object.keys(originalExcelSheets).forEach(sheetName => {
+    let sheetData = [];
+    let sheetHeader = originalExcelSheets[sheetName].header;
+
+    // ¿Qué hoja es? Usa los datos modificados si aplica
+    if (sheetName === "data") {
+      // Usa filteredItems (ya modificados)
+      sheetData = filteredItems.map(item => {
+        const row = {};
+        sheetHeader.forEach(col => row[col] = item[col] ?? "");
+        return row;
+      });
+    } else if (sheetName === "category-data") {
+      sheetData = categoryData.map(item => {
+        const row = {};
+        sheetHeader.forEach(col => row[col] = item[col] ?? "");
+        return row;
+      });
+    } else {
+      // Para hojas que no editas, puedes exportar los datos originales
+      sheetData = originalExcelSheets[sheetName].data;
+    }
+
+    // Siempre asegúrate de que el header esté primero
+    const ws = XLSX.utils.json_to_sheet(sheetData, { header: sheetHeader });
+    XLSX.utils.sheet_add_aoa(ws, [sheetHeader], { origin: "A1" });
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  // 2. Guardar el Excel
+  XLSX.writeFile(wb, "datos_modificados.xlsx");
+
+  // 3. Exportar el CSV de objectData (modificado)
+  if (objectData.length && originalCsvHeader.length) {
+    // Asegura que cada fila tenga exactamente los headers originales
+    const csvRows = objectData.map(obj => {
+      const row = {};
+      originalCsvHeader.forEach(col => row[col] = obj[col] ?? "");
+      return row;
+    });
+    const csv = Papa.unparse(csvRows, { columns: originalCsvHeader });
+    // Descargar el CSV
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "object_data_modificado.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
+
 function closeAddStatsAttributeModal() {
   document.getElementById('addStatsAttributeModal').style.display = 'none';
   // Limpiar el estado para que siempre empiece fresh
@@ -1070,6 +1128,20 @@ function handleCombinedExcel(event) {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
 
+      // GUARDAR TODAS LAS HOJAS ORIGINALES (headers y datos)
+      originalExcelSheets = {};
+      workbook.SheetNames.forEach(sheetName => {
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }); // array de arrays
+        if (rows.length) {
+          originalExcelSheets[sheetName] = {
+            header: rows[0],
+            data: XLSX.utils.sheet_to_json(sheet, { defval: "" }) // array de objetos
+          };
+        }
+      });
+
+      // CARGAR TUS DATOS NORMALES (usa los objetos, como ya tienes)
       const dataSheet = workbook.Sheets["data"];
       const catSheet = workbook.Sheets["category-data"];
       const valueOrderSheet = workbook.Sheets["value order"];
@@ -1081,21 +1153,20 @@ function handleCombinedExcel(event) {
       }
 
       // 1. Cargar datos principales
-      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet).map(o => ({ ...o }));
+      filteredItemsOriginal = XLSX.utils.sheet_to_json(dataSheet, { defval: "" }).map(o => ({ ...o }));
       filteredItems = filteredItemsOriginal.map(o => ({ ...o }));
-      categoryData = XLSX.utils.sheet_to_json(catSheet);
+      categoryData = XLSX.utils.sheet_to_json(catSheet, { defval: "" });
 
       // 2. Value order (opcional)
       if (valueOrderSheet) {
-        window.valueOrderList = XLSX.utils.sheet_to_json(valueOrderSheet);
+        window.valueOrderList = XLSX.utils.sheet_to_json(valueOrderSheet, { defval: "" });
       } else {
         window.valueOrderList = [];
       }
 
       // 3. Merge product_ranking
       if (rankingSheet) {
-        const rankingRows = XLSX.utils.sheet_to_json(rankingSheet);
-
+        const rankingRows = XLSX.utils.sheet_to_json(rankingSheet, { defval: "" });
         const rankingMap = {};
         rankingRows.forEach(row => {
           let sku =
@@ -1143,6 +1214,7 @@ function handleCombinedExcel(event) {
   reader.readAsArrayBuffer(file);
 }
 
+// ---- FUNCION COMPLETA: Cuando cargas el CSV ----
 function handleCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1153,6 +1225,10 @@ function handleCSV(event) {
     complete: (results) => {
       objectDataOriginal = results.data.map(o => ({ ...o })); // copia profunda
       objectData = objectDataOriginal.map(o => ({ ...o }));   // copia profunda
+
+      // GUARDAR HEADER Y DATOS ORIGINALES DEL CSV
+      originalCsvHeader = results.meta.fields ? [...results.meta.fields] : Object.keys(results.data[0] || {});
+      originalCsvData = results.data.map(o => ({ ...o }));
 
       // --- HABILITA EL BOTÓN ---
       const btn = document.getElementById('btn-cargar-categoria');
