@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   }
+  
   const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
   const wsMerged = XLSX.utils.json_to_sheet(
     mergedExportData.length ? mergedExportData : [{}],
@@ -304,7 +305,8 @@ document.addEventListener('DOMContentLoaded', function() {
   XLSX.writeFile(wb, finalFileName);
 });
 
-
+document.getElementById('avanceExcelFile').addEventListener('change', handleAvanceExcel);
+document.getElementById('avanceCsvFile').addEventListener('change', handleAvanceCSV);
   
   document.querySelectorAll('input[type="file"]').forEach(input => {
     input.style.color = 'transparent';
@@ -1017,6 +1019,11 @@ function openAddStatsAttributeModal() {
 }
 
 function exportAllData() {
+  // Usa el CMS actual para los nombres de archivo
+  const cmsIg = getCmsIg();
+  const excelFilename = `${cmsIg}_FilteredItems.xlsx`;
+  const csvFilename = `${cmsIg}_ObjectData.csv`;
+
   // 1. Exportar el Excel con los datos modificados
   const wb = XLSX.utils.book_new();
   Object.keys(originalExcelSheets).forEach(sheetName => {
@@ -1024,7 +1031,6 @@ function exportAllData() {
     let sheetHeader = originalExcelSheets[sheetName].header;
 
     if (sheetName === "data") {
-      // ===> Aquí es donde cambiamos para respetar el ORDEN VISUAL <===
       // Agrupa por grupo
       const grouped = {};
       filteredItems.forEach(item => {
@@ -1033,7 +1039,7 @@ function exportAllData() {
         grouped[groupId].push(item);
       });
 
-      // Junta todos los items en el orden de groupOrderMap
+      // Orden visual según groupOrderMap
       let ordered = [];
       Object.keys(grouped).forEach(groupId => {
         const groupItems = grouped[groupId];
@@ -1044,10 +1050,28 @@ function exportAllData() {
         ordered = ordered.concat(groupOrdered);
       });
 
+      // Calcula el orden de atributos Cat
+      const catOrderInputs = Array.from(document.querySelectorAll('.order-cat-input'));
+      const catOrderArr = catOrderInputs
+        .map(input => ({
+          attribute: input.getAttribute('data-attribute'),
+          value: parseInt(input.value)
+        }))
+        .filter(input => input.value > 0 && input.attribute)
+        .sort((a, b) => a.value - b.value);
+      const catOrderAttributes = catOrderArr.map(x => x.attribute);
+      const catOrderString = catOrderAttributes.join(',');
+
+      // Asegura que el header tenga la columna
+      if (!sheetHeader.includes('table_attributes_cat')) {
+        sheetHeader.push('table_attributes_cat');
+      }
+
       // Ahora usa el header original y el orden correcto
       sheetData = ordered.map(item => {
         const row = {};
         sheetHeader.forEach(col => row[col] = item[col] ?? "");
+        row['table_attributes_cat'] = catOrderString;
         return row;
       });
     }
@@ -1068,12 +1092,72 @@ function exportAllData() {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  // 2. Guardar el Excel
-  XLSX.writeFile(wb, "datos_modificados.xlsx");
+  // 2. Guardar el Excel con el nombre personalizado
+  XLSX.writeFile(wb, excelFilename);
 
   // 3. Exportar el CSV de objectData (modificado)
   if (objectData.length && originalCsvHeader.length) {
-    const csvRows = objectData.map(obj => {
+    // Incluye también los grupos NUEVOS (merged) en el CSV
+    let mergedGroupsArr = [];
+    if (typeof mergedGroups !== "undefined" && mergedGroups.size > 0) {
+      for (const [mergedId, mergedGroupData] of mergedGroups.entries()) {
+        let groupObj = objectData.find(o => String(o.SKU) === mergedId);
+        // Intenta obtener los detalles guardados o generados dinámicamente
+        let detallesGrupo = "";
+        if (typeof getMergedGroupDetails === "function") {
+          detallesGrupo = getMergedGroupDetails(mergedId);
+        }
+        // Si no hay detalles guardados, genera el texto por default al unir grupos
+        if (!detallesGrupo) {
+          if (mergedGroupData && mergedGroupData.originalGroups && mergedGroupData.items) {
+            detallesGrupo = "";
+            mergedGroupData.originalGroups.forEach(originalGroupId => {
+              const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
+              detallesGrupo += `${originalGroupId}, ${originalGroupInfo.name || ""}, ${originalGroupInfo.brand_logo || ""}\n`;
+              const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
+              fields.forEach(field => {
+                if (originalGroupInfo[field]) {
+                  let fieldValue = originalGroupInfo[field]
+                    .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
+                    .replace(/<br\s*\/?>|<\/br>/gi, '\n');
+                  detallesGrupo += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
+                }
+              });
+              detallesGrupo += "--------------------\n\n";
+            });
+            detallesGrupo = detallesGrupo.trim();
+          }
+        }
+        if (!groupObj) {
+          const firstItem = mergedGroupData.items && mergedGroupData.items[0] ? mergedGroupData.items[0] : {};
+          groupObj = {
+            SKU: mergedId,
+            name: mergedGroupData.name || firstItem.name || "",
+            marca: firstItem.marca || "",
+            imagen: firstItem.imagen || firstItem.image || "",
+            "IG ID": mergedId,
+            ventajas: detallesGrupo,
+            aplicaciones: "",
+            especificaciones: "",
+            incluye: ""
+          };
+          originalCsvHeader.forEach(col => {
+            if (!(col in groupObj) && col in firstItem) groupObj[col] = firstItem[col];
+          });
+        } else {
+          groupObj.ventajas = detallesGrupo;
+          groupObj.aplicaciones = "";
+          groupObj.especificaciones = "";
+          groupObj.incluye = "";
+        }
+        mergedGroupsArr.push(groupObj);
+      }
+    }
+
+    // Combina los objetos normales y los merged
+    const allObjectsToExport = [...objectData, ...mergedGroupsArr];
+
+    const csvRows = allObjectsToExport.map(obj => {
       const row = {};
       originalCsvHeader.forEach(col => row[col] = obj[col] ?? "");
       return row;
@@ -1082,7 +1166,7 @@ function exportAllData() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "object_data_modificado.csv";
+    link.download = csvFilename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1242,6 +1326,88 @@ function handleCSV(event) {
     },
     error: (error) => {
       console.error("Error procesando Data File:", error);
+    }
+  });
+}
+
+// Aplica el avance de datos_modificados.xlsx sobre el originalExcelSheets y filteredItems
+function handleAvanceExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      // Aplica SOLO la hoja "data" (ajusta si tienes más)
+      const dataSheet = workbook.Sheets["data"];
+      if (dataSheet) {
+        const avanceItems = XLSX.utils.sheet_to_json(dataSheet, { defval: "" });
+        // Aplica los cambios del avance sobre filteredItems y filteredItemsOriginal
+        // (actualiza por SKU, reemplaza campos diferentes)
+        let avanceMap = {};
+        avanceItems.forEach(item => {
+          if (item.SKU) avanceMap[String(item.SKU)] = item;
+        });
+        filteredItems = filteredItems.map(orig => {
+          let sku = String(orig.SKU);
+          return avanceMap[sku] ? { ...orig, ...avanceMap[sku] } : orig;
+        });
+        filteredItemsOriginal = filteredItems.map(o => ({ ...o })); // sincroniza el backup visual
+        // Si necesitas actualizar groupOrderMap con el orden de avance, hazlo aquí
+      }
+      showTemporaryMessage('Avance Excel aplicado');
+      render(); // refresca la vista
+    } catch (e) {
+      alert("Error cargando avance Excel: " + e.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Aplica el avance de object_data_modificado.csv sobre objectData y objectDataOriginal
+function handleAvanceCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      const avanceRows = results.data.map(o => ({ ...o }));
+
+      // --- Normaliza campos para merged groups
+      avanceRows.forEach(row => {
+        // Si es grupo merged, asegúrate que 'name' esté correcto
+        if (row.SKU && row.SKU.startsWith("merged-")) {
+          // Si tu UI usa .name como título, sincroniza:
+          if (!row.name && row.titulo) row.name = row.titulo;
+          if (!row.name && row["titulo"]) row.name = row["titulo"];
+        }
+      });
+
+      // Ahora reemplaza los datos visuales
+      let avanceMap = {};
+      avanceRows.forEach(row => {
+        if (row.SKU) avanceMap[String(row.SKU)] = row;
+      });
+      objectData = objectData.map(orig => {
+        let sku = String(orig.SKU);
+        return avanceMap[sku] ? { ...orig, ...avanceMap[sku] } : orig;
+      });
+
+      // Y agrega los merged groups que están en avance pero no en objectData
+      avanceRows.forEach(row => {
+        if (row.SKU && row.SKU.startsWith("merged-") && !objectData.find(o => o.SKU === row.SKU)) {
+          objectData.push(row);
+        }
+      });
+
+      objectDataOriginal = objectData.map(o => ({ ...o }));
+      showTemporaryMessage('Avance CSV aplicado');
+      render();
+    },
+    error: (error) => {
+      alert("Error cargando avance CSV: " + error.message);
     }
   });
 }
@@ -4001,20 +4167,24 @@ function mergeSelectedGroups() {
     previousDetails = localStorage.getItem(`merged_details_${newGroupId}`);
   }
 
-  // Crear array para los items unidos
-  const mergedItems = [];
+  // Crear array para los items unidos, ÚNICOS por item_code o SKU
+  const mergedItemsMap = new Map();
   groupsToMerge.forEach(groupId => {
     const itemsInGroup = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
     itemsInGroup.forEach(item => {
-      const mergedItem = {
-        ...item,
-        __originalIGID: groupId,
-        "IG ID": newGroupId,
-        "Original IG ID": groupId
-      };
-      mergedItems.push(mergedItem);
+      const code = item.item_code || item.SKU; // Usa aquí el campo correcto
+      if (!mergedItemsMap.has(code)) {
+        const mergedItem = {
+          ...item,
+          __originalIGID: groupId,
+          "IG ID": newGroupId,
+          "Original IG ID": groupId
+        };
+        mergedItemsMap.set(code, mergedItem);
+      }
     });
   });
+  const mergedItems = Array.from(mergedItemsMap.values());
 
   // Eliminar items de los grupos originales
   filteredItems = filteredItems.filter(item => !groupsToMerge.includes(String(item["IG ID"])));
@@ -4027,7 +4197,7 @@ function mergeSelectedGroups() {
     originalGroups: [...groupsToMerge],
     items: [...mergedItems],
     creationTime: Date.now(),
-    details: previousDetails // CONSERVA SI YA EXISTÍA
+    details: previousDetails
   });
 
   // Agregar el nuevo grupo a objectData
@@ -4047,7 +4217,7 @@ function mergeSelectedGroups() {
     __isMergedGroup: true,
     __originalGroups: [...groupsToMerge],
     groupCreatedAt: Date.now(),
-    details: previousDetails // CONSERVA SI YA EXISTÍA
+    details: previousDetails
   });
 
   // Limpiar la selección visual

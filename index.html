@@ -15,17 +15,26 @@
   <header class="main-header">
     <div class="header-content">
       <div class="header-column left-column bg-primary-dark">
-        <div class="file-inputs">
-          <div class="input-group">
-            <label for="xlsxFile">Items File (xlsx):</label>
-            <input type="file" id="combinedFile" accept=".xlsx,.xls" />
-          </div>
-          <div class="input-group">
-            <label for="csvFile">Data File (csv):</label>
-            <input type="file" id="csvFile" accept=".csv" />
-          </div>
-        </div>
+<div class="file-inputs">
+  <div class="input-group">
+    <label for="combinedFile">Items File (xlsx):</label>
+    <input type="file" id="combinedFile" accept=".xlsx,.xls" />
+  </div>
+  <div class="input-group">
+    <label for="csvFile">Data File (csv):</label>
+    <input type="file" id="csvFile" accept=".csv" />
+  </div>
+  <div class="input-group">
+    <label for="avanceExcelFile">Avance Excel:</label>
+    <input type="file" id="avanceExcelFile" accept=".xlsx,.xls" />
+  </div>
+  <div class="input-group">
+    <label for="avanceCsvFile">Avance CSV:</label>
+    <input type="file" id="avanceCsvFile" accept=".csv" />
+  </div>
+</div>
       </div>
+      
       <div class="header-column right-column bg-primary-light">
         <div class="header-buttons">
 
@@ -35,8 +44,11 @@
   </button>
 
           <!-- exportar --> 
-           <button onclick="exportAllData()">Exportar todo</button>
-           
+<button id="exportAllDataBtn" class="header-avance-btn" onclick="exportAllData()" title="Exportar todo">
+  <i class="fa fa-file-excel"></i>
+  Exportar<br>Avances
+</button>
+
           <button id="exportStatsExcelBtn" class="header-excel-btn">
             Exportar todos<br>los Archivos
           </button>

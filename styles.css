@@ -835,6 +835,22 @@ h2 a:hover {
   line-height: 1.4;
 }
 
+.header-avance-btn{
+  padding: 5px 10px;
+  background-color: #ef3a1e !important;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem !important;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  line-height: 1.4;
+}
+
 .header-group-btn{
   padding: 5px 10px;
   background-color: #2576da !important;
