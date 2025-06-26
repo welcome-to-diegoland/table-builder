@@ -109,217 +109,200 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
   // Exportar Excel
+
   document.getElementById('exportStatsExcelBtn').addEventListener('click', function () {
-    // Creamos el workbook una sola vez
-    const wb = XLSX.utils.book_new();
-  
-    // ====== 1. ATRIBUTOS ======
-    const cmsSet = new Set();
-    filteredItems.forEach(item => {
-      if (item["CMS IG"]) cmsSet.add(item["CMS IG"]);
-    });
-  
-    const attributes = [];
-    document.querySelectorAll('.filter-order-input').forEach(input => {
-      const attr = input.getAttribute('data-attribute');
-      if (attr) attributes.push(attr);
-    });
-  
-      const mergeBtn = document.getElementById('mergeSelectedGroupsBtn');
-  if (mergeBtn) {
-    mergeBtn.addEventListener('click', mergeSelectedGroups);
-  }
+  // Crea el libro Excel
+  const wb = XLSX.utils.book_new();
 
+  // ==================== 1. Hoja "data" en ORDEN VISUAL ====================
+  // Usa los headers originales si tienes originalExcelSheets, si no usa los de filteredItems[0]
+  const dataSheetHeader = (window.originalExcelSheets && window.originalExcelSheets["data"] && window.originalExcelSheets["data"].header)
+    ? window.originalExcelSheets["data"].header
+    : Object.keys(filteredItems[0]);
 
-
-    const data = [];
-    cmsSet.forEach(cmsIg => {
-      attributes.forEach(attr => {
-        const filtroInput = document.querySelector(`.filter-order-input[data-attribute="${attr}"]`);
-        const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
-        const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
-        data.push({
-          "CMS IG": cmsIg,          
-          "Atributo": attr,
-          "Filtros": filtroInput ? (filtroInput.value || "") : "",
-          "Web": webInput ? (webInput.value || "") : "",
-          "Cat": catInput ? (catInput.value || "") : ""
-        });
-      });
-    });
-  
-    let cmsPart = 'CMSIG';
-    if (cmsSet.size >= 1) {
-      cmsPart = [...cmsSet][0];
-    }
-    const atributosCols = ["CMS IG", "Atributo", "Filtros", "Web", "Cat"];
-    // Siempre crear la pestaña, aunque data esté vacío
-    const wsAtributos = XLSX.utils.json_to_sheet(
-      data.length ? data : [{}],
-      { header: atributosCols }
-    );
-    XLSX.utils.sheet_add_aoa(wsAtributos, [atributosCols], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, wsAtributos, "Atributos");
-  
-    // ====== 2. ORDEN DE GRUPOS SOLO REORDENADOS ======
-    const originalOrderByGroup = {};
-    filteredItems.forEach(item => {
-      const igidStr = String(item["IG ID"]);
-      if (!originalOrderByGroup[igidStr]) originalOrderByGroup[igidStr] = [];
-      originalOrderByGroup[igidStr].push(item.SKU);
-    });
-  
-    const ordenExportData = [];
-    const gruposReordenados = [];
-  
-    if (typeof groupOrderMap.entries === "function") {
-      for (const [igid, currentOrder] of groupOrderMap.entries()) {
-        const igidStr = String(igid);
-        if (igidStr.startsWith('merged-')) continue;
-        if (!Array.isArray(currentOrder)) continue;
-        const originalOrder = originalOrderByGroup[igidStr] || [];
-        const changed = originalOrder.length === currentOrder.length &&
-          originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
-        if (!changed) continue;
-        const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-        const titulo = groupObj && groupObj.name ? groupObj.name : "";
-        gruposReordenados.push(igidStr);
-        currentOrder.forEach(sku => {
-          ordenExportData.push({
-            "IG ID": igidStr,
-            "titulo": titulo,
-            "Sku": sku
-          });
-        });
-      }
-    } else {
-      Object.keys(groupOrderMap).forEach(igid => {
-        const igidStr = String(igid);
-        if (igidStr.startsWith('merged-')) return;
-        const currentOrder = groupOrderMap[igidStr];
-        if (!Array.isArray(currentOrder)) return;
-        const originalOrder = originalOrderByGroup[igidStr] || [];
-        const changed = originalOrder.length === currentOrder.length &&
-          originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
-        if (!changed) return;
-        const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-        const titulo = groupObj && groupObj.name ? groupObj.name : "";
-        gruposReordenados.push(igidStr);
-        currentOrder.forEach(sku => {
-          ordenExportData.push({
-            "IG ID": igidStr,
-            "titulo": titulo,
-            "Sku": sku
-          });
-        });
-      });
-    }
-    const ordenCols = ["IG ID", "titulo", "Sku"];
-    // Siempre crear la pestaña, aunque ordenExportData esté vacío
-    const wsOrden = XLSX.utils.json_to_sheet(
-      ordenExportData.length ? ordenExportData : [{}],
-      { header: ordenCols }
-    );
-    XLSX.utils.sheet_add_aoa(wsOrden, [ordenCols], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, wsOrden, "Orden Grupos");
-  
-    // ====== 3. GRUPOS AGRUPADOS (MERGED) ======
-    const mergedExportData = [];
-    let mergedCmsWeb = null; // para el nombre del archivo
-  
-    if (typeof groupOrderMap.entries === "function") {
-      for (const [igid, currentOrder] of groupOrderMap.entries()) {
-        const igidStr = String(igid);
-  
-        // Solo exportar si el grupo sigue existiendo y tiene items
-        const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-        const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
-        if (!igidStr.startsWith('merged-') || !groupObj || !hasItems) continue;
-        if (!Array.isArray(currentOrder)) continue;
-  
-        const cmsWeb = groupObj["cms_web"] || groupObj["CMS IG"] || groupObj["CMSIG"] || "CMSIG";
-        if (!mergedCmsWeb) mergedCmsWeb = cmsWeb;
-        let titulo = "";
-        const titleInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .group-title-input`);
-        if (titleInput && titleInput.value) {
-          titulo = titleInput.value;
-        } else {
-          titulo = groupObj.name || "";
-        }
-        let detalles = "";
-        const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
-        if (detailsInput && detailsInput.value) {
-          detalles = detailsInput.value;
-        } else {
-          detalles = groupObj.detalles || groupObj.ventajas || groupObj.descripcion || "";
-        }
-  
-        currentOrder.forEach(sku => {
-          const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
-          const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
-          mergedExportData.push({
-            "ID": igidStr.replace('merged-', ''),
-            "IG ID Original": originalIGID,
-            "titulo": titulo,
-            "Detalles": detalles,
-            "Sku": sku
-          });
-        });
-      }
-    }
-    const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
-    // Siempre crear la pestaña, aunque mergedExportData esté vacío
-    const wsMerged = XLSX.utils.json_to_sheet(
-      mergedExportData.length ? mergedExportData : [{}],
-      { header: mergedCols }
-    );
-    XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
-  
-    // ====== 4. SKUs con valores rellenados (inputs vacíos) ======
-    const filledByUser = {}; // { sku: { attr1: val1, attr2: val2, ... } }
-    const allAttrsFilled = new Set();
-  
-    for (const cellKey in editedCells) {
-      const { value, wasOriginallyEmpty } = editedCells[cellKey];
-      if (wasOriginallyEmpty && value && value.trim() !== "") {
-        const idx = cellKey.lastIndexOf("-");
-        if (idx > 0) {
-          const sku = cellKey.substring(0, idx);
-          const attr = cellKey.substring(idx + 1);
-          if (!filledByUser[sku]) filledByUser[sku] = {};
-          filledByUser[sku][attr] = value.trim();
-          allAttrsFilled.add(attr);
-        }
-      }
-    }
-  
-    
-    // Si hay valores, usa los atributos editados; si no, pon solo el encabezado SKU
-    const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
-    const valoresExport = [];
-    if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
-      for (const sku in filledByUser) {
-        const row = { "SKU": sku };
-        for (const attr of allAttrsFilled) {
-          row[attr] = filledByUser[sku][attr] || "";
-        }
-        valoresExport.push(row);
-      }
-    }
-    // Siempre crear la pestaña, aunque valoresExport esté vacío
-    const wsValores = XLSX.utils.json_to_sheet(
-      valoresExport.length ? valoresExport : [{}],
-      { header: valoresCols.length > 1 ? valoresCols : ["SKU"] }
-    );
-    XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
-  
-    // ==== Guardar todo en un solo archivo ====
-    const finalFileName = `${cmsPart}_todo.xlsx`;
-    XLSX.writeFile(wb, finalFileName);
+  // Agrupa y ordena por groupOrderMap
+  const grouped = {};
+  filteredItems.forEach(item => {
+    const groupId = String(item["IG ID"]);
+    if (!grouped[groupId]) grouped[groupId] = [];
+    grouped[groupId].push(item);
   });
-  
+  let ordered = [];
+  Object.keys(grouped).forEach(groupId => {
+    const groupItems = grouped[groupId];
+    const skusOrder = groupOrderMap.get(groupId) || groupItems.map(i => i.SKU);
+    const groupOrdered = skusOrder
+      .map(sku => groupItems.find(i => String(i.SKU) === String(sku)))
+      .filter(Boolean);
+    ordered = ordered.concat(groupOrdered);
+  });
+
+  const wsData = XLSX.utils.json_to_sheet(
+    ordered.map(item => {
+      const row = {};
+      dataSheetHeader.forEach(col => row[col] = item[col] ?? "");
+      return row;
+    }),
+    { header: dataSheetHeader }
+  );
+  XLSX.utils.sheet_add_aoa(wsData, [dataSheetHeader], { origin: "A1" });
+  XLSX.utils.book_append_sheet(wb, wsData, "data");
+
+  // ==================== 2. Hoja "Atributos" ====================
+  const cmsSet = new Set();
+  filteredItems.forEach(item => {
+    if (item["CMS IG"]) cmsSet.add(item["CMS IG"]);
+  });
+  const attributes = [];
+  document.querySelectorAll('.filter-order-input').forEach(input => {
+    const attr = input.getAttribute('data-attribute');
+    if (attr) attributes.push(attr);
+  });
+  const data = [];
+  cmsSet.forEach(cmsIg => {
+    attributes.forEach(attr => {
+      const filtroInput = document.querySelector(`.filter-order-input[data-attribute="${attr}"]`);
+      const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+      const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
+      data.push({
+        "CMS IG": cmsIg,
+        "Atributo": attr,
+        "Filtros": filtroInput ? (filtroInput.value || "") : "",
+        "Web": webInput ? (webInput.value || "") : "",
+        "Cat": catInput ? (catInput.value || "") : ""
+      });
+    });
+  });
+  const atributosCols = ["CMS IG", "Atributo", "Filtros", "Web", "Cat"];
+  const wsAtributos = XLSX.utils.json_to_sheet(
+    data.length ? data : [{}],
+    { header: atributosCols }
+  );
+  XLSX.utils.sheet_add_aoa(wsAtributos, [atributosCols], { origin: "A1" });
+  XLSX.utils.book_append_sheet(wb, wsAtributos, "Atributos");
+
+  // ==================== 3. Hoja "Orden Grupos" ====================
+  const originalOrderByGroup = {};
+  filteredItems.forEach(item => {
+    const igidStr = String(item["IG ID"]);
+    if (!originalOrderByGroup[igidStr]) originalOrderByGroup[igidStr] = [];
+    originalOrderByGroup[igidStr].push(item.SKU);
+  });
+  const ordenExportData = [];
+  if (typeof groupOrderMap.entries === "function") {
+    for (const [igid, currentOrder] of groupOrderMap.entries()) {
+      const igidStr = String(igid);
+      if (igidStr.startsWith('merged-')) continue;
+      if (!Array.isArray(currentOrder)) continue;
+      const originalOrder = originalOrderByGroup[igidStr] || [];
+      const changed = originalOrder.length === currentOrder.length &&
+        originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
+      if (!changed) continue;
+      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+      const titulo = groupObj && groupObj.name ? groupObj.name : "";
+      currentOrder.forEach(sku => {
+        ordenExportData.push({
+          "IG ID": igidStr,
+          "titulo": titulo,
+          "Sku": sku
+        });
+      });
+    }
+  }
+  const ordenCols = ["IG ID", "titulo", "Sku"];
+  const wsOrden = XLSX.utils.json_to_sheet(
+    ordenExportData.length ? ordenExportData : [{}],
+    { header: ordenCols }
+  );
+  XLSX.utils.sheet_add_aoa(wsOrden, [ordenCols], { origin: "A1" });
+  XLSX.utils.book_append_sheet(wb, wsOrden, "Orden Grupos");
+
+  // ==================== 4. Hoja "Merged" ====================
+  const mergedExportData = [];
+  if (typeof groupOrderMap.entries === "function") {
+    for (const [igid, currentOrder] of groupOrderMap.entries()) {
+      const igidStr = String(igid);
+      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+      const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
+      if (!igidStr.startsWith('merged-') || !groupObj || !hasItems) continue;
+      if (!Array.isArray(currentOrder)) continue;
+      let titulo = "";
+      const titleInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .group-title-input`);
+      if (titleInput && titleInput.value) {
+        titulo = titleInput.value;
+      } else {
+        titulo = groupObj.name || "";
+      }
+      let detalles = "";
+      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+      if (detailsInput && detailsInput.value) {
+        detalles = detailsInput.value;
+      } else {
+        detalles = groupObj.detalles || groupObj.ventajas || groupObj.descripcion || "";
+      }
+      currentOrder.forEach(sku => {
+        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+        mergedExportData.push({
+          "ID": igidStr.replace('merged-', ''),
+          "IG ID Original": originalIGID,
+          "titulo": titulo,
+          "Detalles": detalles,
+          "Sku": sku
+        });
+      });
+    }
+  }
+  const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
+  const wsMerged = XLSX.utils.json_to_sheet(
+    mergedExportData.length ? mergedExportData : [{}],
+    { header: mergedCols }
+  );
+  XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
+  XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
+
+  // ==================== 5. Hoja "Valores Nuevos" ====================
+  const filledByUser = {};
+  const allAttrsFilled = new Set();
+  for (const cellKey in editedCells) {
+    const { value, wasOriginallyEmpty } = editedCells[cellKey];
+    if (wasOriginallyEmpty && value && value.trim() !== "") {
+      const idx = cellKey.lastIndexOf("-");
+      if (idx > 0) {
+        const sku = cellKey.substring(0, idx);
+        const attr = cellKey.substring(idx + 1);
+        if (!filledByUser[sku]) filledByUser[sku] = {};
+        filledByUser[sku][attr] = value.trim();
+        allAttrsFilled.add(attr);
+      }
+    }
+  }
+  const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
+  const valoresExport = [];
+  if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
+    for (const sku in filledByUser) {
+      const row = { "SKU": sku };
+      for (const attr of allAttrsFilled) {
+        row[attr] = filledByUser[sku][attr] || "";
+      }
+      valoresExport.push(row);
+    }
+  }
+  const wsValores = XLSX.utils.json_to_sheet(
+    valoresExport.length ? valoresExport : [{}],
+    { header: valoresCols.length > 1 ? valoresCols : ["SKU"] }
+  );
+  XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
+  XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
+
+  // ==================== 6. Guardar archivo ====================
+  let cmsPart = 'CMSIG';
+  if (cmsSet.size >= 1) {
+    cmsPart = [...cmsSet][0];
+  }
+  const finalFileName = `${cmsPart}_todo.xlsx`;
+  XLSX.writeFile(wb, finalFileName);
+});
 
 
   
@@ -1040,26 +1023,46 @@ function exportAllData() {
     let sheetData = [];
     let sheetHeader = originalExcelSheets[sheetName].header;
 
-    // ¿Qué hoja es? Usa los datos modificados si aplica
     if (sheetName === "data") {
-      // Usa filteredItems (ya modificados)
-      sheetData = filteredItems.map(item => {
+      // ===> Aquí es donde cambiamos para respetar el ORDEN VISUAL <===
+      // Agrupa por grupo
+      const grouped = {};
+      filteredItems.forEach(item => {
+        const groupId = String(item["IG ID"]);
+        if (!grouped[groupId]) grouped[groupId] = [];
+        grouped[groupId].push(item);
+      });
+
+      // Junta todos los items en el orden de groupOrderMap
+      let ordered = [];
+      Object.keys(grouped).forEach(groupId => {
+        const groupItems = grouped[groupId];
+        const skusOrder = groupOrderMap.get(groupId) || groupItems.map(i => i.SKU);
+        const groupOrdered = skusOrder
+          .map(sku => groupItems.find(i => String(i.SKU) === String(sku)))
+          .filter(Boolean);
+        ordered = ordered.concat(groupOrdered);
+      });
+
+      // Ahora usa el header original y el orden correcto
+      sheetData = ordered.map(item => {
         const row = {};
         sheetHeader.forEach(col => row[col] = item[col] ?? "");
         return row;
       });
-    } else if (sheetName === "category-data") {
+    }
+    else if (sheetName === "category-data") {
       sheetData = categoryData.map(item => {
         const row = {};
-        sheetHeader.forEach(col => row[col] = item[col] ?? "");
+        sheetHeader.forEach(col => row[col] ??= item[col] ?? "");
         return row;
       });
-    } else {
-      // Para hojas que no editas, puedes exportar los datos originales
+    }
+    else {
       sheetData = originalExcelSheets[sheetName].data;
     }
 
-    // Siempre asegúrate de que el header esté primero
+    // Header primero SIEMPRE
     const ws = XLSX.utils.json_to_sheet(sheetData, { header: sheetHeader });
     XLSX.utils.sheet_add_aoa(ws, [sheetHeader], { origin: "A1" });
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
@@ -1070,14 +1073,12 @@ function exportAllData() {
 
   // 3. Exportar el CSV de objectData (modificado)
   if (objectData.length && originalCsvHeader.length) {
-    // Asegura que cada fila tenga exactamente los headers originales
     const csvRows = objectData.map(obj => {
       const row = {};
       originalCsvHeader.forEach(col => row[col] = obj[col] ?? "");
       return row;
     });
     const csv = Papa.unparse(csvRows, { columns: originalCsvHeader });
-    // Descargar el CSV
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
