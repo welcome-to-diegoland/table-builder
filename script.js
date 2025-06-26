@@ -233,22 +233,28 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         titulo = groupObj.name || "";
       }
-      let detalles = "";
-      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
-      if (detailsInput && detailsInput.value) {
-        detalles = detailsInput.value;
-      } else {
-        detalles = groupObj.detalles || groupObj.ventajas || groupObj.descripcion || "";
-      }
-      currentOrder.forEach(sku => {
-        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
-        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
-        mergedExportData.push({
-          "ID": igidStr.replace('merged-', ''),
-          "IG ID Original": originalIGID,
-          "titulo": titulo,
-          "Detalles": detalles,
-          "Sku": sku
+     let detalles = "";
+const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+if (detailsInput && detailsInput.value) {
+  detalles = detailsInput.value.trim();
+} else {
+  // Puedes agregar aquí el campo details si lo usas en mergedGroups u objectData
+  detalles =
+    groupObj.details || // preferiblemente el campo 'details' principal
+    groupObj.detalles ||
+    groupObj.ventajas ||
+    groupObj.descripcion ||
+    "";
+}
+currentOrder.forEach(sku => {
+  const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+  const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+  mergedExportData.push({
+    "ID": igidStr.replace('merged-', ''),
+    "IG ID Original": originalIGID,
+    "titulo": titulo,
+    "Detalles": detalles,
+    "Sku": sku
         });
       });
     }
@@ -262,39 +268,67 @@ document.addEventListener('DOMContentLoaded', function() {
   XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
   XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
 
-  // ==================== 5. Hoja "Valores Nuevos" ====================
-  const filledByUser = {};
-  const allAttrsFilled = new Set();
-  for (const cellKey in editedCells) {
-    const { value, wasOriginallyEmpty } = editedCells[cellKey];
-    if (wasOriginallyEmpty && value && value.trim() !== "") {
-      const idx = cellKey.lastIndexOf("-");
-      if (idx > 0) {
-        const sku = cellKey.substring(0, idx);
-        const attr = cellKey.substring(idx + 1);
-        if (!filledByUser[sku]) filledByUser[sku] = {};
-        filledByUser[sku][attr] = value.trim();
-        allAttrsFilled.add(attr);
-      }
+
+// ==================== 5. Hoja "Valores Nuevos" ====================
+const filledByUser = {};
+const allAttrsFilled = new Set();
+const skuToGroupId = {}; // NUEVO: Mapeo SKU -> IG ID para buscar título
+const skuToTitle = {};   // NUEVO: Mapeo SKU -> titulo editado
+
+// Construye el mapeo SKU a IG ID y título editado (input) o de objectData
+filteredItems.forEach(item => {
+  const sku = String(item.SKU);
+  const groupId = String(item["IG ID"]);
+  skuToGroupId[sku] = groupId;
+  let titulo = "";
+  const titleInput = document.querySelector(`.group-container[data-group-id="${groupId}"] .group-title-input`);
+  if (titleInput && titleInput.value) {
+    titulo = titleInput.value;
+  } else {
+    const groupObj = objectData.find(o => String(o.SKU) === groupId);
+    if (groupObj && groupObj.name) {
+      titulo = groupObj.name;
     }
   }
-  const valoresCols = ["SKU", ...Array.from(allAttrsFilled)];
-  const valoresExport = [];
-  if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
-    for (const sku in filledByUser) {
-      const row = { "SKU": sku };
-      for (const attr of allAttrsFilled) {
-        row[attr] = filledByUser[sku][attr] || "";
-      }
-      valoresExport.push(row);
+  skuToTitle[sku] = titulo;
+});
+
+for (const cellKey in editedCells) {
+  const { value, wasOriginallyEmpty } = editedCells[cellKey];
+  if (wasOriginallyEmpty && value && value.trim() !== "") {
+    const idx = cellKey.lastIndexOf("-");
+    if (idx > 0) {
+      const sku = cellKey.substring(0, idx);
+      const attr = cellKey.substring(idx + 1);
+      if (!filledByUser[sku]) filledByUser[sku] = {};
+      filledByUser[sku][attr] = value.trim();
+      allAttrsFilled.add(attr);
     }
   }
-  const wsValores = XLSX.utils.json_to_sheet(
-    valoresExport.length ? valoresExport : [{}],
-    { header: valoresCols.length > 1 ? valoresCols : ["SKU"] }
-  );
-  XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
-  XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
+}
+
+// Agrega las columnas IG ID y titulo editado
+const valoresCols = ["SKU", "IG ID", "titulo", ...Array.from(allAttrsFilled)];
+const valoresExport = [];
+if (Object.keys(filledByUser).length > 0 && allAttrsFilled.size > 0) {
+  for (const sku in filledByUser) {
+    const row = { 
+      "SKU": sku, 
+      "IG ID": skuToGroupId[sku] || "", 
+      "titulo": skuToTitle[sku] || "" 
+    };
+    for (const attr of allAttrsFilled) {
+      row[attr] = filledByUser[sku][attr] || "";
+    }
+    valoresExport.push(row);
+  }
+}
+const wsValores = XLSX.utils.json_to_sheet(
+  valoresExport.length ? valoresExport : [{}],
+  { header: valoresCols.length > 1 ? valoresCols : ["SKU"] }
+);
+XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
+XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
 
   // ==================== 6. Guardar archivo ====================
   let cmsPart = 'CMSIG';
@@ -434,21 +468,27 @@ document.getElementById('exportMergedBtn').addEventListener('click', function() 
         titulo = groupObj.name || "";
       }
       let detalles = "";
-      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
-      if (detailsInput && detailsInput.value) {
-        detalles = detailsInput.value;
-      } else {
-        detalles = groupObj.detalles || groupObj.ventajas || groupObj.descripcion || "";
-      }
-      currentOrder.forEach(sku => {
-        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
-        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
-        mergedExportData.push({
-          "ID": igidStr.replace('merged-', ''),
-          "IG ID Original": originalIGID,
-          "titulo": titulo,
-          "Detalles": detalles,
-          "Sku": sku
+const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+if (detailsInput && detailsInput.value) {
+  detalles = detailsInput.value.trim();
+} else {
+  // Puedes agregar aquí el campo details si lo usas en mergedGroups u objectData
+  detalles =
+    groupObj.details || // preferiblemente el campo 'details' principal
+    groupObj.detalles ||
+    groupObj.ventajas ||
+    groupObj.descripcion ||
+    "";
+}
+currentOrder.forEach(sku => {
+  const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+  const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+  mergedExportData.push({
+    "ID": igidStr.replace('merged-', ''),
+    "IG ID Original": originalIGID,
+    "titulo": titulo,
+    "Detalles": detalles,
+    "Sku": sku
         });
       });
     }
@@ -559,6 +599,13 @@ function createGroupHeaderRight({
         groupTitle.replaceWith(input);
         input.focus();
       }
+      // --- Hacer textarea de detalles editable ---
+      const detailsTextarea = groupDiv.querySelector('.merged-group-textarea');
+      if (detailsTextarea) {
+        detailsTextarea.removeAttribute('readonly');
+        detailsTextarea.classList.add('editing-details');
+        detailsTextarea.focus();
+      }
     } else {
       saveGroupItemEdits(groupDiv, groupIdStr);
       editAllBtn.textContent = "Editar";
@@ -586,6 +633,20 @@ function createGroupHeaderRight({
           h2.appendChild(link);
           input.replaceWith(h2);
         }
+      }
+      // --- Guardar detalles y volver textarea readonly ---
+      const detailsTextarea = groupDiv.querySelector('.merged-group-textarea');
+      if (detailsTextarea) {
+        detailsTextarea.setAttribute('readonly', 'readonly');
+        detailsTextarea.classList.remove('editing-details');
+        const newDetails = detailsTextarea.value.trim();
+        // Actualiza en objeto de datos
+        if (mergedGroups.has(groupIdStr)) {
+          mergedGroups.get(groupIdStr).details = newDetails;
+        }
+        const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+        if (groupObj) groupObj.details = newDetails;
+        localStorage.setItem(`merged_details_${groupIdStr}`, newDetails);
       }
       refreshView();
       // Asegura el highlight después de refrescar la vista
