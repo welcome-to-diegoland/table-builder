@@ -330,6 +330,39 @@ const wsValores = XLSX.utils.json_to_sheet(
 XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
 XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
 
+// ==================== 6. Hoja "Valores Nuevos Grupos" ====================
+const valoresNuevosGrupos = [];
+const grupoCols = ["IG ID", "titulo", "detalles"];
+
+groupOrderMap.forEach((currentOrder, igid) => {
+  const igidStr = String(igid);
+  const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+  const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
+
+  // Valores actuales
+  const titulo = (groupObj && groupObj.name ? groupObj.name : "").trim();
+  const detalles = (groupObj && groupObj.details ? groupObj.details : "").trim();
+
+  // Valores originales
+  const originalTitulo = (originalObj && originalObj.name ? originalObj.name : "").trim();
+  const originalDetalles = (originalObj && originalObj.details ? originalObj.details : "").trim();
+
+  // Solo exporta si cambió alguno
+  if (titulo !== originalTitulo || detalles !== originalDetalles) {
+    valoresNuevosGrupos.push({
+      "IG ID": igidStr,
+      "titulo": titulo,
+      "detalles": detalles
+    });
+  }
+});
+
+const wsValoresNuevosGrupos = XLSX.utils.json_to_sheet(
+  valoresNuevosGrupos.length ? valoresNuevosGrupos : [{}],
+  { header: grupoCols }
+);
+XLSX.utils.sheet_add_aoa(wsValoresNuevosGrupos, [grupoCols], { origin: "A1" });
+XLSX.utils.book_append_sheet(wb, wsValoresNuevosGrupos, "Valores Nuevos Grupos");
   // ==================== 6. Guardar archivo ====================
   let cmsPart = 'CMSIG';
   if (cmsSet.size >= 1) {
@@ -1348,6 +1381,15 @@ function handleCombinedExcel(event) {
         filteredItemsOriginal.forEach(item => { item.product_ranking = ""; });
       }
 
+      // === SNAPSHOT PARA DETECCIÓN DE CAMBIOS DE GRUPO ===
+      // Recuerda: objectData puede que no exista aún aquí, lo igualamos con filteredItems
+      window.objectData = filteredItems.map(o => ({ ...o }));
+      window.originalGroupData = window.objectData.map(obj => ({
+        SKU: obj.SKU,
+        name: obj.name || "",
+        details: obj.details || ""
+      }));
+
       // Renderiza el árbol de categorías y sigue el flujo normal
       renderCategoryTree(categoryData, document.getElementById('fileInfo'));
       processCategoryDataFromSheet();
@@ -1375,6 +1417,14 @@ function handleCSV(event) {
       // GUARDAR HEADER Y DATOS ORIGINALES DEL CSV
       originalCsvHeader = results.meta.fields ? [...results.meta.fields] : Object.keys(results.data[0] || {});
       originalCsvData = results.data.map(o => ({ ...o }));
+
+      // === SNAPSHOT PARA DETECCIÓN DE CAMBIOS DE GRUPO ===
+      // Solo las propiedades relevantes para los cambios de grupo
+      window.originalGroupData = objectData.map(obj => ({
+        SKU: obj.SKU,
+        name: obj.name || "",
+        details: obj.details || ""
+      }));
 
       // --- HABILITA EL BOTÓN ---
       const btn = document.getElementById('btn-cargar-categoria');
