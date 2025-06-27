@@ -402,21 +402,20 @@ function getCmsIg() {
   return String(cmsIg).replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_").trim();
 }
 
+// 1. EXPORTAR SOLO "Atributos"
 document.getElementById('exportAtributosBtn').addEventListener('click', function() {
-  // Generar y exportar la pestaña "Atributos"
   const cmsIg = getCmsIg();
 
+  // ============== Hoja "Atributos" ==============
   const cmsSet = new Set();
   filteredItems.forEach(item => {
     if (item["CMS IG"]) cmsSet.add(item["CMS IG"]);
   });
-
   const attributes = [];
   document.querySelectorAll('.filter-order-input').forEach(input => {
     const attr = input.getAttribute('data-attribute');
     if (attr) attributes.push(attr);
   });
-
   const data = [];
   cmsSet.forEach(cmsIgVal => {
     attributes.forEach(attr => {
@@ -441,17 +440,17 @@ document.getElementById('exportAtributosBtn').addEventListener('click', function
   XLSX.writeFile(wb, `${cmsIg}_Atributos.xlsx`);
 });
 
+// 2. EXPORTAR SOLO "Orden Grupos"
 document.getElementById('exportOrdenGruposBtn').addEventListener('click', function() {
-  // Generar y exportar la pestaña "Orden Grupos"
   const cmsIg = getCmsIg();
 
+  // ============== Hoja "Orden Grupos" ==============
   const originalOrderByGroup = {};
   filteredItems.forEach(item => {
     const igidStr = String(item["IG ID"]);
     if (!originalOrderByGroup[igidStr]) originalOrderByGroup[igidStr] = [];
     originalOrderByGroup[igidStr].push(item.SKU);
   });
-
   const ordenExportData = [];
   if (typeof groupOrderMap.entries === "function") {
     for (const [igid, currentOrder] of groupOrderMap.entries()) {
@@ -481,10 +480,11 @@ document.getElementById('exportOrdenGruposBtn').addEventListener('click', functi
   XLSX.writeFile(wb, `${cmsIg}_OrdenGrupos.xlsx`);
 });
 
+// 3. EXPORTAR SOLO "Merged"
 document.getElementById('exportMergedBtn').addEventListener('click', function() {
-  // Generar y exportar la pestaña "Merged"
   const cmsIg = getCmsIg();
 
+  // ============== Hoja "Merged" ==============
   const mergedExportData = [];
   if (typeof groupOrderMap.entries === "function") {
     for (const [igid, currentOrder] of groupOrderMap.entries()) {
@@ -501,27 +501,26 @@ document.getElementById('exportMergedBtn').addEventListener('click', function() 
         titulo = groupObj.name || "";
       }
       let detalles = "";
-const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
-if (detailsInput && detailsInput.value) {
-  detalles = detailsInput.value.trim();
-} else {
-  // Puedes agregar aquí el campo details si lo usas en mergedGroups u objectData
-  detalles =
-    groupObj.details || // preferiblemente el campo 'details' principal
-    groupObj.detalles ||
-    groupObj.ventajas ||
-    groupObj.descripcion ||
-    "";
-}
-currentOrder.forEach(sku => {
-  const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
-  const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
-  mergedExportData.push({
-    "ID": igidStr.replace('merged-', ''),
-    "IG ID Original": originalIGID,
-    "titulo": titulo,
-    "Detalles": detalles,
-    "Sku": sku
+      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+      if (detailsInput && detailsInput.value) {
+        detalles = detailsInput.value.trim();
+      } else {
+        detalles =
+          groupObj.details ||
+          groupObj.detalles ||
+          groupObj.ventajas ||
+          groupObj.descripcion ||
+          "";
+      }
+      currentOrder.forEach(sku => {
+        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+        mergedExportData.push({
+          "ID": igidStr.replace('merged-', ''),
+          "IG ID Original": originalIGID,
+          "titulo": titulo,
+          "Detalles": detalles,
+          "Sku": sku
         });
       });
     }
@@ -534,11 +533,11 @@ currentOrder.forEach(sku => {
   XLSX.writeFile(wb, `${cmsIg}_Merged.xlsx`);
 });
 
+// 4. EXPORTAR SOLO "Valores Nuevos"
 document.getElementById('exportValoresNuevosBtn').addEventListener('click', function() {
-  // Generar y exportar la pestaña "Valores Nuevos"
   const cmsIg = getCmsIg();
 
-  // Mapa SKU → objeto original
+  // ============== Hoja "Valores Nuevos" ==============
   const originalMap = Object.fromEntries(objectDataOriginal.map(o => [o.SKU, o]));
   const allAttrsChanged = new Set();
   const changedByUser = {};
@@ -554,7 +553,6 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
       const newVal = (obj[attr] || "").toString().trim();
 
       if (oldVal !== newVal) {
-        // Si antes tenía valor y ahora está vacío, pon '<NULL>'
         changes[attr] = (oldVal && !newVal) ? '<NULL>' : newVal;
         allAttrsChanged.add(attr);
       }
@@ -565,15 +563,12 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
     }
   });
 
-  // --- FILTRO DE SEGURIDAD ---
-  // Solo atributos que existen en objectDataOriginal (por si hay basura)
   const validKeys = new Set(
     Object.keys(objectDataOriginal[0] || {}).filter(k => k !== "SKU" && !excludedAttributes.has(k))
   );
   const safeAttrsChanged = Array.from(allAttrsChanged).filter(attr => validKeys.has(attr));
   const valoresCols = ["SKU", ...safeAttrsChanged];
 
-  // --- Armado de las filas ---
   const valoresExport = [];
   Object.entries(changedByUser).forEach(([sku, attrs]) => {
     const row = { "SKU": sku };
@@ -583,10 +578,49 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
     valoresExport.push(row);
   });
 
-  const wsValores = XLSX.utils.json_to_sheet(valoresExport.length ? valoresExport : [{}], { header: valoresCols.length > 1 ? valoresCols : ["SKU"] });
+  const wsValores = XLSX.utils.json_to_sheet(
+    valoresExport.length ? valoresExport : [{}],
+    { header: valoresCols.length > 1 ? valoresCols : ["SKU"] }
+  );
   XLSX.utils.sheet_add_aoa(wsValores, [valoresCols.length > 1 ? valoresCols : ["SKU"]], { origin: "A1" });
+
+  // ============== Hoja "Valores Nuevos Grupos" ==============
+  const valoresNuevosGrupos = [];
+  const grupoCols = ["IG ID", "titulo", "detalles"];
+
+  groupOrderMap.forEach((currentOrder, igid) => {
+    const igidStr = String(igid);
+    const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+    const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
+
+    // Valores actuales
+    const titulo = (groupObj && groupObj.name ? groupObj.name : "").trim();
+    const detalles = (groupObj && groupObj.details ? groupObj.details : "").trim();
+
+    // Valores originales
+    const originalTitulo = (originalObj && originalObj.name ? originalObj.name : "").trim();
+    const originalDetalles = (originalObj && originalObj.details ? originalObj.details : "").trim();
+
+    // Solo exporta si cambió alguno
+    if (titulo !== originalTitulo || detalles !== originalDetalles) {
+      valoresNuevosGrupos.push({
+        "IG ID": igidStr,
+        "titulo": titulo,
+        "detalles": detalles
+      });
+    }
+  });
+
+  const wsValoresNuevosGrupos = XLSX.utils.json_to_sheet(
+    valoresNuevosGrupos.length ? valoresNuevosGrupos : [{}],
+    { header: grupoCols }
+  );
+  XLSX.utils.sheet_add_aoa(wsValoresNuevosGrupos, [grupoCols], { origin: "A1" });
+
+  // ========== Construcción y descarga del archivo ==========
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, wsValores, "Valores Nuevos");
+  XLSX.utils.book_append_sheet(wb, wsValoresNuevosGrupos, "Valores Nuevos Grupos");
   XLSX.writeFile(wb, `${cmsIg}_ValoresNuevos.xlsx`);
 });
 
@@ -614,6 +648,10 @@ function createGroupHeaderRight({
     const titleContainer = groupDiv.querySelector('.group-title-container');
     const groupTitle = titleContainer && titleContainer.querySelector('.group-title');
     const existingInput = titleContainer && titleContainer.querySelector('.group-title-input');
+    // --- Detalles para grupos no agrupados
+    const detailsDiv = groupDiv.querySelector('.group-extra-details');
+    const detailsTextDiv = detailsDiv && detailsDiv.querySelector('.group-details-text');
+    const detailsTextarea = detailsDiv && detailsDiv.querySelector('.group-details-textarea');
 
     if (editAllBtn.dataset.editing === "false") {
       editAllBtn.textContent = "Guardar cambios";
@@ -632,11 +670,11 @@ function createGroupHeaderRight({
         groupTitle.replaceWith(input);
         input.focus();
       }
-      // --- Hacer textarea de detalles editable ---
-      const detailsTextarea = groupDiv.querySelector('.merged-group-textarea');
-      if (detailsTextarea) {
+      // --- Detalles a textarea (solo si NO es grupo unido) ---
+      if (!isMergedGroup && detailsTextDiv && detailsTextarea) {
+        detailsTextDiv.style.display = "none";
+        detailsTextarea.style.display = "";
         detailsTextarea.removeAttribute('readonly');
-        detailsTextarea.classList.add('editing-details');
         detailsTextarea.focus();
       }
     } else {
@@ -644,11 +682,10 @@ function createGroupHeaderRight({
       editAllBtn.textContent = "Editar";
       editAllBtn.dataset.editing = "false";
       // --- Guardar título y volverlo texto ---
-      const titleContainer = groupDiv.querySelector('.group-title-container');
       if (titleContainer) {
         const input = titleContainer.querySelector('.group-title-input');
         if (input) {
-          const newTitle = input.value.trim() || groupIdStr; // fallback por si queda vacío
+          const newTitle = input.value.trim() || groupIdStr;
           // Actualiza en objectData
           const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
           if (groupObj) groupObj.name = newTitle;
@@ -667,22 +704,21 @@ function createGroupHeaderRight({
           input.replaceWith(h2);
         }
       }
-      // --- Guardar detalles y volver textarea readonly ---
-      const detailsTextarea = groupDiv.querySelector('.merged-group-textarea');
-      if (detailsTextarea) {
-        detailsTextarea.setAttribute('readonly', 'readonly');
-        detailsTextarea.classList.remove('editing-details');
-        const newDetails = detailsTextarea.value.trim();
-        // Actualiza en objeto de datos
-        if (mergedGroups.has(groupIdStr)) {
-          mergedGroups.get(groupIdStr).details = newDetails;
-        }
+      // --- Detalles a texto (solo si NO es grupo unido) ---
+      if (!isMergedGroup && detailsTextDiv && detailsTextarea) {
+        const newValue = detailsTextarea.value.trim();
+        // Actualiza en objectData
         const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
-        if (groupObj) groupObj.details = newDetails;
-        localStorage.setItem(`merged_details_${groupIdStr}`, newDetails);
+        if (groupObj) groupObj.details = newValue;
+        // Actualiza el div de texto y alterna visibilidad
+        detailsTextDiv.innerHTML = newValue
+          ? newValue.replace(/\n/g, "<br>")
+          : "<em>Sin detalles</em>";
+        detailsTextDiv.style.display = "";
+        detailsTextarea.style.display = "none";
+        detailsTextarea.setAttribute('readonly', 'readonly');
       }
       refreshView();
-      // Asegura el highlight después de refrescar la vista
       setTimeout(() => highlightActiveFilter(), 0);
 
       // Scroll y highlight (igual que antes)
@@ -690,9 +726,9 @@ function createGroupHeaderRight({
       const maxAttempts = 20;
       const pollId = setInterval(() => {
         const output = document.getElementById('output');
-        const groupDiv = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
-        if (output && groupDiv) {
-          groupDiv.scrollIntoView({ behavior: "auto", block: "start" });
+        const groupDivNew = document.querySelector(`.group-container[data-group-id="${groupIdStr}"]`);
+        if (output && groupDivNew) {
+          groupDivNew.scrollIntoView({ behavior: "auto", block: "start" });
           output.scrollTop -= 40;
           clearInterval(pollId);
         } else if (++attempts > maxAttempts) {
@@ -1251,11 +1287,39 @@ function exportAllData() {
     // Combina los objetos normales y los merged
     const allObjectsToExport = [...objectData, ...mergedGroupsArr];
 
+    // ---- BLOQUE CORREGIDO PARA TÍTULO Y VENTAJAS ----
     const csvRows = allObjectsToExport.map(obj => {
       const row = {};
-      originalCsvHeader.forEach(col => row[col] = obj[col] ?? "");
+      originalCsvHeader.forEach(col => {
+        // Sobrescribe "name" o "titulo" si existe, con el valor editado
+        if (col === "name" || col === "titulo") {
+          row[col] = obj.name || "";
+        }
+        // Sobrescribe "ventajas" con details si existe, y limpia otros si hubo edición
+        else if (col === "ventajas") {
+          if (typeof obj.details === "string" && obj.details.trim() !== "") {
+            row[col] = obj.details;
+          } else {
+            row[col] = obj.ventajas || "";
+          }
+        }
+        // Si hubo edición de detalles, limpia aplicaciones, especificaciones, incluye
+        else if ((col === "aplicaciones" || col === "especificaciones" || col === "incluye")) {
+          if (typeof obj.details === "string" && obj.details.trim() !== "") {
+            row[col] = "";
+          } else {
+            row[col] = obj[col] || "";
+          }
+        }
+        // El resto igual
+        else {
+          row[col] = obj[col] ?? "";
+        }
+      });
       return row;
     });
+    // ---- FIN BLOQUE CORREGIDO ----
+
     const csv = Papa.unparse(csvRows, { columns: originalCsvHeader });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -3749,6 +3813,7 @@ function processItemGroups(skuToObject) {
   output.innerHTML = '';
   createStatusMessage();
 
+  // Controles: merge, seleccionar todos, deseleccionar todos
   const controlsDiv = document.createElement("div");
   controlsDiv.className = "groups-controls";
   const mergeBtn = document.createElement("button");
@@ -3806,7 +3871,7 @@ function processItemGroups(skuToObject) {
     const headerDiv = document.createElement("div");
     headerDiv.className = "group-header";
 
-    // Contenedor principal (imagen + info + badges)
+    // Contenido del header (left + right)
     const headerContentDiv = document.createElement("div");
     headerContentDiv.className = "group-header-content";
 
@@ -3862,28 +3927,31 @@ function processItemGroups(skuToObject) {
     leftContainer.appendChild(infoDiv);
     headerContentDiv.appendChild(leftContainer);
 
+    // Header derecho
+    const rightContainer = createGroupHeaderRight({
+      groupIdStr,
+      groupItems,
+      skuToObject,
+      isMergedGroup,
+      groupDiv
+    });
+    headerContentDiv.appendChild(rightContainer);
 
-   // ...dentro del forEach groupIdStr...
-const rightContainer = createGroupHeaderRight({
-  groupIdStr,
-  groupItems,
-  skuToObject,
-  isMergedGroup,
-  groupDiv
-});
-headerContentDiv.appendChild(rightContainer);
-
-   
     headerDiv.appendChild(headerContentDiv);
 
     // Contenedor de detalles (pleca)
     const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
     let detailsHtml = "";
+    // --- CORRECCIÓN AQUÍ: mostrar primero el campo details editable, si existe ---
     if (groupObj) {
-      if (groupObj.ventajas) detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
-      if (groupObj.aplicaciones) detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
-      if (groupObj.especificaciones) detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
-      if (groupObj.incluye) detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
+      if (groupObj.details && groupObj.details.trim() !== "") {
+        detailsHtml = groupObj.details.replace(/\n/g, "<br>");
+      } else {
+        if (groupObj.ventajas) detailsHtml += `<div class="details-row"><strong>Ventajas:<br></strong> ${groupObj.ventajas}</div>`;
+        if (groupObj.aplicaciones) detailsHtml += `<div class="details-row"><strong>Aplicaciones:<br></strong> ${groupObj.aplicaciones}</div>`;
+        if (groupObj.especificaciones) detailsHtml += `<div class="details-row"><strong>Especificaciones:<br></strong> ${groupObj.especificaciones}</div>`;
+        if (groupObj.incluye) detailsHtml += `<div class="details-row"><strong>Incluye:<br></strong> ${groupObj.incluye}</div>`;
+      }
     }
 
     if (detailsHtml || isMergedGroup) {
@@ -3899,12 +3967,12 @@ headerContentDiv.appendChild(rightContainer);
       detailsDiv.style.display = "none";
 
       if (isMergedGroup) {
+        // Grupos unidos: textarea editable
         const mergedTextarea = document.createElement("textarea");
         mergedTextarea.className = "form-control merged-group-textarea";
         mergedTextarea.rows = 10;
         let mergedContent = getMergedGroupDetails(groupIdStr);
         if (!mergedContent) {
-          // Genera el default solo si nunca se ha editado
           const mergedGroupData = mergedGroups.get(groupIdStr);
           mergedContent = "";
           mergedGroupData.originalGroups.forEach(originalGroupId => {
@@ -3934,9 +4002,34 @@ headerContentDiv.appendChild(rightContainer);
         detailsDiv.appendChild(mergedTextarea);
         detailsDiv.appendChild(saveBtn);
       } else {
-        detailsDiv.innerHTML = detailsHtml;
+        // Grupos normales: div de texto + textarea editable (oculto)
+        const detailsTextDiv = document.createElement("div");
+        detailsTextDiv.className = "group-details-text";
+        detailsTextDiv.innerHTML = detailsHtml;
+
+        const detailsTextarea = document.createElement("textarea");
+        detailsTextarea.className = "form-control group-details-textarea";
+        detailsTextarea.rows = 8;
+        detailsTextarea.style.display = "none";
+
+        let detallesRawText = "";
+        if (groupObj && groupObj.details !== undefined && groupObj.details !== "") {
+          detallesRawText = groupObj.details;
+        } else {
+          if (groupObj) {
+            if (groupObj.ventajas) detallesRawText += `Ventajas: ${groupObj.ventajas}\n`;
+            if (groupObj.aplicaciones) detallesRawText += `Aplicaciones: ${groupObj.aplicaciones}\n`;
+            if (groupObj.especificaciones) detallesRawText += `Especificaciones: ${groupObj.especificaciones}\n`;
+            if (groupObj.incluye) detallesRawText += `Incluye: ${groupObj.incluye}\n`;
+          }
+        }
+        detailsTextarea.value = detallesRawText.trim();
+
+        detailsDiv.appendChild(detailsTextDiv);
+        detailsDiv.appendChild(detailsTextarea);
       }
 
+      // Toggle
       toggleDetailsBtn.addEventListener("click", function () {
         const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
         toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
@@ -3951,6 +4044,7 @@ headerContentDiv.appendChild(rightContainer);
 
     groupDiv.appendChild(headerDiv);
 
+    // Tabla de items del grupo
     createItemsTable(groupDiv, groupItems, skuToObject);
 
     output.appendChild(groupDiv);
