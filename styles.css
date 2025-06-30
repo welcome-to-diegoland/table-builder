@@ -1933,3 +1933,8 @@ html, body {
 .cell-edited-modified {
   background-color: #fff3cd !important; /* amarillo claro */
 }
+
+.item-code-duplicate {
+  background-color: orange !important;
+  color: #222 !important;
+}

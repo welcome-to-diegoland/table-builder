@@ -2761,7 +2761,7 @@ function createStatsColumn(stats) {
     <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">x</button>
   </div>
   <div class="web-header-divider"></div>
-  Web
+  Web >
 </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
   <div class="cat-header-icons grid-2x2">
@@ -2771,7 +2771,7 @@ function createStatsColumn(stats) {
     <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
   </div>
   <div class="cat-header-divider"></div>
-  Cat
+  < Cat
 </th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
@@ -2839,13 +2839,13 @@ function createStatsColumn(stats) {
   `;
 
   // --- Listener para el botón "+" ---
-const statsAddAttributeBtn = table.querySelector('#stats-addAttributeBtn');
-if (statsAddAttributeBtn) {
-  statsAddAttributeBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    openAddStatsAttributeModal();
-  });
-}
+  const statsAddAttributeBtn = table.querySelector('#stats-addAttributeBtn');
+  if (statsAddAttributeBtn) {
+    statsAddAttributeBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      openAddStatsAttributeModal();
+    });
+  }
 
   // --------- LISTENERS ---------
   // Limpiar filtros generales
@@ -2970,6 +2970,61 @@ if (statsAddAttributeBtn) {
       e.preventDefault();
       if (typeof clearCatOrder === 'function') clearCatOrder();
     });
+  }
+
+  // --------- COPIAR ORDEN ENTRE WEB Y CAT Y CURSOR MANO ---------
+  setTimeout(() => {
+    // Header Web
+    const webThDivider = table.querySelector('th:nth-child(3) .web-header-divider');
+    if (webThDivider) {
+      webThDivider.parentElement.style.cursor = "pointer";
+      webThDivider.parentElement.addEventListener('click', function (e) {
+        // Evita activar con los botones internos
+        if (e.target.closest('.web-header-icon-btn')) return;
+        // Copia de Web a Cat
+        document.querySelectorAll('.order-input:not(.order-cat-input)').forEach(webInput => {
+          const attr = webInput.getAttribute('data-attribute');
+          const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+          if (catInput) {
+            catInput.value = webInput.value;
+            localStorage.setItem(`cat_order_${attr}`, webInput.value);
+          }
+        });
+        showTemporaryMessage('Valores de Web copiados a Catálogo');
+      });
+    }
+    // Header Cat
+    const catThDivider = table.querySelector('th:nth-child(4) .cat-header-divider');
+    if (catThDivider) {
+      catThDivider.parentElement.style.cursor = "pointer";
+      catThDivider.parentElement.addEventListener('click', function (e) {
+        if (e.target.closest('.cat-header-icon-btn')) return;
+        // Copia de Cat a Web
+        document.querySelectorAll('.order-cat-input').forEach(catInput => {
+          const attr = catInput.getAttribute('data-attribute');
+          const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]:not(.order-cat-input)`);
+          if (webInput) {
+            webInput.value = catInput.value;
+            localStorage.setItem(`order_${attr}`, catInput.value);
+          }
+        });
+        showTemporaryMessage('Valores de Catálogo copiados a Web');
+      });
+    }
+  }, 0);
+
+  // --------- OPCIONAL: CSS global para feedback visual de hover ---------
+  if (!document.getElementById('stats-header-pointer-css')) {
+    const style = document.createElement('style');
+    style.id = 'stats-header-pointer-css';
+    style.innerHTML = `
+      .attribute-stats-table th:nth-child(3):hover,
+      .attribute-stats-table th:nth-child(4):hover {
+        cursor: pointer !important;
+        background: #e8f4ff;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   column.appendChild(table);
@@ -4561,6 +4616,19 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     existingTable.remove();
   }
 
+  // Calcula los item_codes duplicados en todos los items filtrados (CMS activo)
+  const globalItemCodeCounts = {};
+  filteredItems.forEach(item => {
+    const code = item.item_code;
+    if (!code) return;
+    globalItemCodeCounts[code] = (globalItemCodeCounts[code] || 0) + 1;
+  });
+  const duplicatedGlobalItemCodes = new Set(
+    Object.entries(globalItemCodeCounts)
+      .filter(([code, count]) => count > 1)
+      .map(([code]) => code)
+  );
+
   // Verificar si es un grupo unido
   const groupId = groupItems[0]?.["IG ID"];
   const isMergedGroup = mergedGroups.has(groupId);
@@ -4569,43 +4637,42 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   }
 
   // === AGREGAR BOTÓN "ORDENAR..." EN EL HEADER DERECHO DEL GRUPO ===
-(function() {
-  // Busca el header del grupo
-  let headerDiv = container.querySelector('.group-header');
-  if (!headerDiv) return;
-  let headerRight = headerDiv.querySelector('.group-header-right');
-  if (!headerRight) {
-    headerRight = document.createElement('div');
-    headerRight.className = "group-header-right";
-    headerDiv.appendChild(headerRight);
-  }
-  // Botón "Ordenar..."
-  if (!headerRight.querySelector('.group-sort-btn')) {
-    const sortBtn = document.createElement("button");
-    sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
-    sortBtn.textContent = "Ordenar";
-    sortBtn.addEventListener('click', () =>
-      openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
-    );
-    headerRight.insertBefore(sortBtn, headerRight.firstChild);
-  }
-  // Botón "Mover info"
-  if (!headerRight.querySelector('.move-info-btn')) {
-    const moveBtn = document.createElement("button");
-    moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
-    moveBtn.textContent = "Mover info";
-    moveBtn.addEventListener('click', () => {
-      let attributeList = filteredAttributes.map(a => a.attribute);
-      openMoveInfoModal(groupId, groupItems, attributeList);
-    });
-    headerRight.insertBefore(moveBtn, headerRight.firstChild);
-  }
-})();
+  (function() {
+    let headerDiv = container.querySelector('.group-header');
+    if (!headerDiv) return;
+    let headerRight = headerDiv.querySelector('.group-header-right');
+    if (!headerRight) {
+      headerRight = document.createElement('div');
+      headerRight.className = "group-header-right";
+      headerDiv.appendChild(headerRight);
+    }
+    // Botón "Ordenar..."
+    if (!headerRight.querySelector('.group-sort-btn')) {
+      const sortBtn = document.createElement("button");
+      sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
+      sortBtn.textContent = "Ordenar";
+      sortBtn.addEventListener('click', () =>
+        openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
+      );
+      headerRight.insertBefore(sortBtn, headerRight.firstChild);
+    }
+    // Botón "Mover info"
+    if (!headerRight.querySelector('.move-info-btn')) {
+      const moveBtn = document.createElement("button");
+      moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
+      moveBtn.textContent = "Mover info";
+      moveBtn.addEventListener('click', () => {
+        let attributeList = filteredAttributes.map(a => a.attribute);
+        openMoveInfoModal(groupId, groupItems, attributeList);
+      });
+      headerRight.insertBefore(moveBtn, headerRight.firstChild);
+    }
+  })();
 
   const table = document.createElement("table");
   table.className = "table table-striped table-bordered attribute-table";
   table.style.width = "100%";
-  table.style.tableLayout = "fixed"; // Importante para que los anchos se respeten
+  table.style.tableLayout = "fixed";
 
   // Obtener atributos ordenados
   let orderedAttributes;
@@ -4618,14 +4685,12 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   } else {
     orderedAttributes = getOrderedAttributes(groupItems, skuToObject);
   }
-  
+
   // Filtrar atributos según showEmptyAttributes
   const filteredAttributes = orderedAttributes.filter(attr => {
-    if (showEmptyAttributes) return true; // ON: mostrar todos, vacíos incluidos
-    // OFF: solo los que tengan algún valor
+    if (showEmptyAttributes) return true;
     return groupItems.some(item => {
       const details = skuToObject[item.SKU] || {};
-      // --- CAMBIO: si es product_ranking revisa en el item directo ---
       if (attr.attribute === "product_ranking") {
         return (item.product_ranking || "").toString().trim();
       }
@@ -4635,8 +4700,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
   // Crear THEAD
   let theadHtml = "<thead><tr>";
-  
-  // Columna de drag handle con botón de reset
   theadHtml += `
     <th style='width: 10px;' class='drag-handle-column'>
       <span class='drag-reset-btn' title='Reordenar a estado original'>×</span>
@@ -4647,7 +4710,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     let isAllEmpty = true;
     for (const item of groupItems) {
       const details = skuToObject[item.SKU] || {};
-      // --- CAMBIO: si es product_ranking revisa en el item directo ---
       if (attr.attribute === "product_ranking") {
         if ((item.product_ranking || "").toString().trim()) {
           isAllEmpty = false;
@@ -4658,15 +4720,11 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         break;
       }
     }
-  const isHighlighted = attr.attribute === highlightAttribute;
+    const isHighlighted = attr.attribute === highlightAttribute;
+    const highlightClass = groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
+    theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
+  });
 
-  // Aquí la línea IMPORTANTE:
-  const highlightClass = groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
-
-  theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
-});
-
-  // Columnas forzadas con ancho
   forcedColumns.forEach(forced => {
     let width = "";
     if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
@@ -4674,17 +4732,15 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     theadHtml += `<th style="${width}">${forced}</th>`;
   });
 
-  // Columna de origen (ancho fijo)
   theadHtml += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th></tr></thead>`;
 
   // Crear TBODY
   const tbody = document.createElement("tbody");
-  tbody.id = `tbody-${groupId}`; // ID único para cada tabla
+  tbody.id = `tbody-${groupId}`;
 
-  // === Alternancia de color SOLO en la celda Origen ===
   let currentColorClass = 'origen-cell-color1';
   let lastOrigenValue = null;
-  
+
   groupItems.forEach((item, itemIndex) => {
     const details = skuToObject[item.SKU] || {};
     const currentItem = filteredItems.find(fi => fi.SKU === item.SKU);
@@ -4695,7 +4751,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const isMergedItem = item.__originalIGID;
 
     const row = document.createElement("tr");
-    row.dataset.sku = item.SKU; // Agregar SKU como data attribute
+    row.dataset.sku = item.SKU;
 
     // Celda de drag handle
     const dragCell = document.createElement("td");
@@ -4706,7 +4762,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
     // Columnas de atributos normales
     filteredAttributes.forEach((attr, attrIdx) => {
-      // --- CAMBIO: si es product_ranking, toma el valor del item de groupItems (filteredItems), no de details ---
       let originalValue;
       if (attr.attribute === "product_ranking") {
         originalValue = (item.product_ranking || "").toString().trim();
@@ -4715,16 +4770,13 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       }
       const cellKey = `${item.SKU}-${attr.attribute}`;
       const cellData = editedCells[cellKey];
-      
       const shouldShowInput = !originalValue || (cellData && cellData.wasOriginallyEmpty);
       const isHighlighted = attr.attribute === highlightAttribute;
-      
       const cell = document.createElement("td");
       cell.style.minWidth = "100px";
       if (isHighlighted) {
         cell.classList.add('highlight-cell');
       }
-      
       if (shouldShowInput) {
         const input = document.createElement("input");
         input.type = "text";
@@ -4733,34 +4785,29 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         input.dataset.sku = item.SKU;
         input.dataset.attribute = attr.attribute;
         input.dataset.originallyEmpty = (!originalValue).toString();
-        
         input.addEventListener('input', function() {
           editedCells[cellKey] = {
             value: this.value,
             wasOriginallyEmpty: this.dataset.originallyEmpty === 'true'
           };
           updateCellStyle(cell, this.value.trim());
-          
           const itemToUpdate = objectData.find(o => o.SKU === this.dataset.sku);
           if (itemToUpdate) {
             itemToUpdate[this.dataset.attribute] = this.value.trim();
           }
         });
-        
         updateCellStyle(cell, input.value.trim());
         cell.appendChild(input);
       } else {
         cell.textContent = originalValue;
-        
         if (originalValue.length > 40) {
           cell.style.whiteSpace = "normal";
           cell.style.wordBreak = "break-word";
         }
       }
-      
       row.appendChild(cell);
     });
-    
+
     // Columnas forzadas con anchos fijos
     forcedColumns.forEach(forced => {
       const cell = document.createElement("td");
@@ -4775,7 +4822,13 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       const highlightStyle = forced === 'item_code' && shouldHighlight ? 
                          'background-color: #e6e6fa;' : '';
       if (highlightStyle) cell.style = highlightStyle + `width:${width};min-width:${width};max-width:${width};`;
-      
+
+      // --- Aquí pintamos naranja si el item_code está duplicado en el CMS ---
+      if (forced === 'item_code' && value && duplicatedGlobalItemCodes.has(value)) {
+        cell.classList.add('item-code-duplicate');
+      }
+      // ---
+
       if (forced === 'item_code' && value) {
         const link = document.createElement("a");
         link.href = `https://www.travers.com.mx/${value}`;
@@ -4786,10 +4839,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       } else {
         cell.textContent = value;
       }
-      
       row.appendChild(cell);
     });
-    
+
     // Columna de origen con ancho fijo
     const originCell = document.createElement("td");
     originCell.style.width = "100px";
@@ -4798,7 +4850,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     let origenValue;
     if (isMergedItem) {
       origenValue = item.__originalIGID;
-      // Alternar color cuando cambie el valor de origen
       if (lastOrigenValue !== origenValue) {
         currentColorClass = currentColorClass === 'origen-cell-color1'
           ? 'origen-cell-color2'
@@ -4843,7 +4894,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     resetGroupOrder(groupId);
   });
 
-  // Estilos CSS para la celda Origen y el botón de reset
+  // Estilos CSS para la celda Origen y el botón de reset y el item_code duplicado
   const style = document.createElement('style');
   style.textContent = `
     .origen-cell-color1 { background-color: #e8f5e9 !important; }
@@ -4852,7 +4903,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     .drag-handle-column {
       position: relative;
     }
-    
     .drag-reset-btn {
       position: absolute;
       top: 0;
@@ -4863,7 +4913,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       color: #999;
       z-index: 10;
     }
-    
     .drag-reset-btn:hover {
       color: #333;
       background-color: #eee;
@@ -4875,8 +4924,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   const tableContainer = document.createElement("div");
   tableContainer.className = "table-responsive";
   tableContainer.appendChild(table);
-  
-  // Insertar tabla después de la pleca si existe, si no después del header, si no al final
+
   if (plecaDiv) {
     plecaDiv.insertAdjacentElement('afterend', tableContainer);
   } else if (existingHeader) {
