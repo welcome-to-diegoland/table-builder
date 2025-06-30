@@ -1935,6 +1935,6 @@ html, body {
 }
 
 .item-code-duplicate {
-  background-color: orange !important;
+  background-color: rgb(255, 192, 76) !important;
   color: #222 !important;
 }

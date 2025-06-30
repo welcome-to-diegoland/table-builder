@@ -4603,43 +4603,19 @@ function addMergeStyles() {
     document.head.appendChild(style);
 }
 
-window.lastDuplicatedItemCodes = [...duplicatedGlobalItemCodes];
 
 function createItemsTable(container, groupItems, skuToObject, highlightAttribute = null, customAttributes = null) {
   // Preservar el header del grupo si existe
   const existingHeader = container.querySelector('.group-header');
-  // Buscar la pleca de detalles, si existe
   const plecaDiv = container.querySelector('.group-details-pleca');
-
-  // Limpiar solo la tabla anterior
   const existingTable = container.querySelector('.table-responsive');
-  if (existingTable) {
-    existingTable.remove();
-  }
+  if (existingTable) existingTable.remove();
 
-  // === Cálculo global de item_codes duplicados en todo el CMS actual ===
-  // Normalizamos y contamos los item_code
-  const globalItemCodeCounts = {};
-  filteredItems.forEach(item => {
-    const code = (item.item_code || "").toString().trim();
-    if (!code) return;
-    globalItemCodeCounts[code] = (globalItemCodeCounts[code] || 0) + 1;
-  });
-  // Set de duplicados
-  const duplicatedGlobalItemCodes = new Set(
-    Object.entries(globalItemCodeCounts)
-      .filter(([code, count]) => count > 1)
-      .map(([code]) => code)
-  );
-
-  // Verificar si es un grupo unido
   const groupId = groupItems[0]?.["IG ID"];
   const isMergedGroup = mergedGroups.has(groupId);
-  if (isMergedGroup) {
-    container.classList.add('merged-group'); 
-  }
+  if (isMergedGroup) container.classList.add('merged-group');
 
-  // Botones de ordenar/mover info
+  // Botones de header derecho del grupo
   (function() {
     let headerDiv = container.querySelector('.group-header');
     if (!headerDiv) return;
@@ -4649,7 +4625,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       headerRight.className = "group-header-right";
       headerDiv.appendChild(headerRight);
     }
-    // Botón "Ordenar..."
     if (!headerRight.querySelector('.group-sort-btn')) {
       const sortBtn = document.createElement("button");
       sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
@@ -4659,7 +4634,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       );
       headerRight.insertBefore(sortBtn, headerRight.firstChild);
     }
-    // Botón "Mover info"
     if (!headerRight.querySelector('.move-info-btn')) {
       const moveBtn = document.createElement("button");
       moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
@@ -4701,6 +4675,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     });
   });
 
+  // Detección de SKUs repetidos
+  const allSkus = filteredItems.map(item => item.sku || item.SKU || "").filter(x => x);
+  const skuCounts = {};
+  allSkus.forEach(sku => {
+    skuCounts[sku] = (skuCounts[sku] || 0) + 1;
+  });
+  const duplicatedSkus = Object.keys(skuCounts).filter(sku => skuCounts[sku] > 1);
+
   // Crear THEAD
   let theadHtml = "<thead><tr>";
   theadHtml += `
@@ -4708,26 +4690,27 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       <span class='drag-reset-btn' title='Reordenar a estado original'>×</span>
     </th>
   `;
-
   filteredAttributes.forEach(attr => {
     let isAllEmpty = true;
     for (const item of groupItems) {
       const details = skuToObject[item.SKU] || {};
       if (attr.attribute === "product_ranking") {
         if ((item.product_ranking || "").toString().trim()) {
-          isAllEmpty = false; break;
+          isAllEmpty = false;
+          break;
         }
       } else if (details[attr.attribute]?.toString().trim()) {
-        isAllEmpty = false; break;
+        isAllEmpty = false;
+        break;
       }
     }
     const isHighlighted = attr.attribute === highlightAttribute;
     const highlightClass = groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
     theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
   });
-
   forcedColumns.forEach(forced => {
     let width = "";
+    if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
     if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
     if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
     theadHtml += `<th style="${width}">${forced}</th>`;
@@ -4743,12 +4726,11 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
   groupItems.forEach((item, itemIndex) => {
     const details = skuToObject[item.SKU] || {};
-    const currentItem = filteredItems.find(fi => fi.SKU === item.SKU);
-    const shouldHighlight = currentItem && currentItem['CMS IG'] && currentItem['CMS IC'] && currentItem['CMS IG'] !== currentItem['CMS IC'];
+    const currentItem = filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku));
     const isMergedItem = item.__originalIGID;
 
     const row = document.createElement("tr");
-    row.dataset.sku = item.SKU;
+    row.dataset.sku = item.SKU || item.sku;
 
     // Celda de drag handle
     const dragCell = document.createElement("td");
@@ -4771,7 +4753,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       const isHighlighted = attr.attribute === highlightAttribute;
       const cell = document.createElement("td");
       cell.style.minWidth = "100px";
-      if (isHighlighted) cell.classList.add('highlight-cell');
+      if (isHighlighted) {
+        cell.classList.add('highlight-cell');
+      }
       if (shouldShowInput) {
         const input = document.createElement("input");
         input.type = "text";
@@ -4807,36 +4791,25 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     forcedColumns.forEach(forced => {
       const cell = document.createElement("td");
       let width = "";
+      if (forced === "sku") width = "100px";
       if (forced === "item_code") width = "100px";
       if (forced === "precio") width = "100px";
       cell.style.width = width;
       cell.style.minWidth = width;
       cell.style.maxWidth = width;
 
-      // Valor original (sin normalizar para mostrar)
-      const valueRaw = details[forced] || "";
-      // Valor normalizado para checar duplicados
-      const valueNorm = valueRaw.toString().trim();
+      const value = details[forced] || details[forced.toUpperCase?.()] || "";
 
-      const highlightStyle = forced === 'item_code' && shouldHighlight ? 
-                         'background-color: #e6e6fa;' : '';
-      if (highlightStyle) cell.style = highlightStyle + `width:${width};min-width:${width};max-width:${width};`;
-
-      // --- NARANJA si es item_code duplicado en el CMS ---
-      if (forced === 'item_code' && valueNorm && duplicatedGlobalItemCodes.has(valueNorm)) {
-        cell.classList.add('item-code-duplicate');
+      // Pintar de naranja la celda de item_code si está duplicado en los visibles
+      if (forced === 'item_code') {
+        const code = value.toString().trim();
+        if (duplicatedSkus.includes(code)) {
+          cell.classList.add("item-code-duplicate");
+          cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
+        }
       }
 
-      if (forced === 'item_code' && valueRaw) {
-        const link = document.createElement("a");
-        link.href = `https://www.travers.com.mx/${valueRaw}`;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = valueRaw;
-        cell.appendChild(link);
-      } else {
-        cell.textContent = valueRaw;
-      }
+      cell.textContent = value;
       row.appendChild(cell);
     });
 
@@ -4871,7 +4844,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   table.innerHTML = theadHtml;
   table.appendChild(tbody);
 
-  // Hacer la tabla ordenable
   if (typeof Sortable !== 'undefined') {
     new Sortable(tbody, {
       animation: 150,
@@ -4884,26 +4856,36 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     });
   }
 
-  // Configurar selección múltiple
   setupRowSelection(table);
 
-  // Agregar evento al botón de reset
   table.querySelector('.drag-reset-btn').addEventListener('click', function() {
     resetGroupOrder(groupId);
   });
 
-  // Añadir el CSS para cell naranja si no existe
-  if (!document.getElementById('item-code-duplicate-style')) {
-    const style = document.createElement('style');
-    style.id = 'item-code-duplicate-style';
-    style.textContent = `
-      .item-code-duplicate {
-        background-color: orange !important;
-        color: #222 !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  const style = document.createElement('style');
+  style.textContent = `
+    .origen-cell-color1 { background-color: #e8f5e9 !important; }
+    .origen-cell-color2 { background-color: #e3f2fd !important; }
+    .drag-handle-column {
+      position: relative;
+    }
+    .drag-reset-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 3px;
+      color: #999;
+      z-index: 10;
+    }
+    .drag-reset-btn:hover {
+      color: #333;
+      background-color: #eee;
+      border-radius: 3px;
+    }
+  `;
+  table.appendChild(style);
 
   const tableContainer = document.createElement("div");
   tableContainer.className = "table-responsive";
