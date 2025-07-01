@@ -168,11 +168,13 @@ html, body {
 }
 
 .box-content {
+  overflow-y: auto;
+  position: relative;
   flex: 1;
-  overflow: auto;
   padding: 15px;
   width: 100%;
   min-height: 0;
+  background: yellow;
 }
 
 .vertical-divider {
