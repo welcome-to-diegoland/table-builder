@@ -168,13 +168,12 @@ html, body {
 }
 
 .box-content {
-  overflow-y: auto;
-  position: relative;
   flex: 1;
+  overflow-y: auto;    /* SOLO vertical */
+  position: relative;  /* CLAVE para sticky */
   padding: 15px;
   width: 100%;
   min-height: 0;
-  background: yellow;
 }
 
 .vertical-divider {
