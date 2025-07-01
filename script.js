@@ -862,7 +862,7 @@ function createGroupHeaderRight({
 
   rightContainer.appendChild(topDiv);
 
-  // === Segunda línea: IG ID, PG, Llenos, Unión de grupos (azul, al final) ===
+  // === Segunda línea: IG ID, PG, Llenos, #Items (nuevo), Unión de grupos (azul, al final) ===
   const bottomDiv = document.createElement("div");
   bottomDiv.className = "group-header-right-bottom";
 
@@ -872,15 +872,17 @@ function createGroupHeaderRight({
   igIdTag.textContent = groupIdStr;
   bottomDiv.appendChild(igIdTag);
 
-  // 2. PG (si aplica)
+  // 2. PG (siempre se muestra)
   const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+  const pgTag = document.createElement("span");
+  pgTag.className = "badge bg-secondary text-white small";
   if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
-    const pgTag = document.createElement("span");
-    pgTag.className = "badge bg-secondary text-white small";
     pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
-    bottomDiv.appendChild(pgTag);
+  } else {
+    pgTag.textContent = "No en Catálogo";
   }
-  
+  bottomDiv.appendChild(pgTag);
+
   // 3. Llenos badge
   setTimeout(() => {
     // Elimina el anterior si existe
@@ -918,7 +920,13 @@ function createGroupHeaderRight({
     }
   }, 0);
 
-  // 4. Unión de grupos (si aplica, SIEMPRE al final y azul)
+  // 4. NUEVO: Número de items (penúltimo)
+  const itemsTag = document.createElement("span");
+  itemsTag.className = "badge bg-secondary text-white small";
+  itemsTag.textContent = `Items: ${groupItems.length}`;
+  bottomDiv.appendChild(itemsTag);
+
+  // 5. Unión de grupos (si aplica, SIEMPRE al final y azul)
   if (isMergedGroup && mergedGroups.has(groupIdStr)) {
     const mergedBadge = document.createElement("span");
     mergedBadge.className = "badge bg-info text-white small";
