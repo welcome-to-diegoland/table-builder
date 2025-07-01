@@ -643,7 +643,26 @@ function createGroupHeaderRight({
   const topDiv = document.createElement("div");
   topDiv.className = "group-header-right-top";
 
-  // Botón Editar
+  // 1. Botón Mover info
+  const moveBtn = document.createElement("button");
+  moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
+  moveBtn.textContent = "Mover info";
+  moveBtn.onclick = function () {
+    let attributeList = [];
+    const table = groupDiv.querySelector('.attribute-table');
+    if (table) {
+      attributeList = Array.from(table.querySelectorAll('thead th'))
+        .map(th => th.textContent.trim())
+        .filter(header => header && !["×", "Drag", "Origen", ""].includes(header));
+    } else if (window.filteredItems && window.filteredItems.length > 0) {
+      const item = groupItems[0];
+      attributeList = Object.keys(item || {});
+    }
+    openMoveInfoModal(groupIdStr, groupItems, attributeList);
+  };
+  topDiv.appendChild(moveBtn);
+
+  // 2. Botón Editar
   const editAllBtn = document.createElement("button");
   editAllBtn.textContent = "Editar";
   editAllBtn.className = "btn btn-sm btn-outline-primary";
@@ -660,7 +679,6 @@ function createGroupHeaderRight({
       editAllBtn.textContent = "Guardar cambios";
       editAllBtn.dataset.editing = "true";
       makeGroupItemsEditable(groupDiv, groupIdStr);
- 
       if (groupTitle && !existingInput) {
         const currentText = groupTitle.textContent;
         const input = document.createElement('input');
@@ -732,7 +750,26 @@ function createGroupHeaderRight({
   };
   topDiv.appendChild(editAllBtn);
 
-  // Botón Borrar
+  // 3. Botón Ordenar
+  const sortBtn = document.createElement("button");
+  sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
+  sortBtn.textContent = "Ordenar";
+  sortBtn.onclick = function () {
+    let attributeList = [];
+    const table = groupDiv.querySelector('.attribute-table');
+    if (table) {
+      attributeList = Array.from(table.querySelectorAll('thead th'))
+        .map(th => th.textContent.trim())
+        .filter(header => header && !["×", "Drag", "Origen", ""].includes(header));
+    } else if (window.filteredItems && window.filteredItems.length > 0) {
+      const item = groupItems[0];
+      attributeList = Object.keys(item || {});
+    }
+    openGroupSortModal(groupIdStr, groupItems, skuToObject, attributeList);
+  };
+  topDiv.appendChild(sortBtn);
+
+  // 4. Botón Borrar
   const borrarBtn = document.createElement("button");
   borrarBtn.textContent = "Borrar";
   borrarBtn.className = "btn btn-sm btn-danger";
@@ -770,19 +807,7 @@ function createGroupHeaderRight({
   };
   topDiv.appendChild(borrarBtn);
 
-  // Badge "New"
-  const hasNewItem = groupItems.some(item => {
-    const details = skuToObject[item.SKU];
-    return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
-  });
-  if (hasNewItem) {
-    const newBadge = document.createElement("span");
-    newBadge.className = "new-badge";
-    newBadge.textContent = "New";
-    topDiv.appendChild(newBadge);
-  }
-
-  // Botón de desagrupar si es grupo unido
+  // 5. Botón de desagrupar (solo si es grupo unido)
   if (isMergedGroup) {
     const unmergeBtn = document.createElement("button");
     unmergeBtn.className = "btn btn-sm btn-outline-danger";
@@ -795,7 +820,7 @@ function createGroupHeaderRight({
     topDiv.appendChild(unmergeBtn);
   }
 
-  // Botón de "Deshacer mover info" si aplica
+  // 6. Botón de "Deshacer mover info" (solo si aplica)
   if (moveInfoUndoBackup[groupIdStr]) {
     const undoBtn = document.createElement("button");
     undoBtn.textContent = "Deshacer mover info";
@@ -837,12 +862,28 @@ function createGroupHeaderRight({
 
   rightContainer.appendChild(topDiv);
 
-  // === Segunda línea: badges ===
+  // === Segunda línea: IG ID, PG, Llenos, Unión de grupos (azul, al final) ===
   const bottomDiv = document.createElement("div");
   bottomDiv.className = "group-header-right-bottom";
 
-  // Badge llenos
+  // 1. IG ID
+  const igIdTag = document.createElement("span");
+  igIdTag.className = "badge bg-secondary text-white small";
+  igIdTag.textContent = groupIdStr;
+  bottomDiv.appendChild(igIdTag);
+
+  // 2. PG (si aplica)
+  const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+  if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
+    const pgTag = document.createElement("span");
+    pgTag.className = "badge bg-secondary text-white small";
+    pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
+    bottomDiv.appendChild(pgTag);
+  }
+  
+  // 3. Llenos badge
   setTimeout(() => {
+    // Elimina el anterior si existe
     const oldBadge = bottomDiv.querySelector('.group-cols-badge');
     if (oldBadge) oldBadge.remove();
 
@@ -865,28 +906,22 @@ function createGroupHeaderRight({
     const badgeTot = Math.max(ths.length - 4, 0);
     if (ths.length > 0) {
       const badge = document.createElement("span");
-      badge.className = "badge badge-pill badge-info group-cols-badge";
-      badge.style.background = "#17a2b8";
-      badge.style.color = "white";
-      badge.style.fontSize = "0.95em";
+      badge.className = "badge bg-secondary text-white small group-cols-badge";
       badge.textContent = `Llenos: ${badgeLl} / ${badgeTot}`;
-      bottomDiv.appendChild(badge);
+      // Insertar después de los dos primeros badges (IG ID y PG)
+      let insertAfter = bottomDiv.querySelectorAll("span")[1] || bottomDiv.lastChild;
+      if (insertAfter && insertAfter.nextSibling) {
+        bottomDiv.insertBefore(badge, insertAfter.nextSibling);
+      } else {
+        bottomDiv.appendChild(badge);
+      }
     }
   }, 0);
 
-  // Badge PG
-  const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
-  if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
-    const pgTag = document.createElement("span");
-    pgTag.className = "badge badge-pill badge-secondary pg-tag";
-    pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
-    bottomDiv.appendChild(pgTag);
-  }
-
-  // Badge Unión de XX grupos
+  // 4. Unión de grupos (si aplica, SIEMPRE al final y azul)
   if (isMergedGroup && mergedGroups.has(groupIdStr)) {
     const mergedBadge = document.createElement("span");
-    mergedBadge.className = "merged-badge";
+    mergedBadge.className = "badge bg-info text-white small";
     mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
     bottomDiv.appendChild(mergedBadge);
   }
