@@ -1364,15 +1364,7 @@ tr[data-original-igid]:nth-child(even) {
   width: 100%;
 }
 
-.group-header-right {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 10px;
-  position: absolute;
-  right: 10px;
-  top: 10px;
-}
+
 
 /* Para resaltar filas al pasar el mouse */
 tr[data-original-igid]:hover {
@@ -1935,6 +1927,47 @@ html, body {
 }
 
 .item-code-duplicate {
-  background-color: rgb(255, 192, 76) !important;
+  background-color: rgb(255, 231, 76) !important;
   color: #222 !important;
+}
+
+
+.group-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: calc(100% - 20px); /* Usa todo el ancho disponible del padre menos el right */
+  max-width: 100%;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.group-header-right-top,
+.group-header-right-bottom {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.pg-tag {
+  background: #6c757d !important;
+  color: #fff !important;
+  font-size: 0.95em;
+}
+.merged-badge {
+  background: #ffc107;
+  color: #212529;
+  font-size: 0.95em;
+  padding: 0.3em 0.8em;
+  border-radius: 1em;
 }

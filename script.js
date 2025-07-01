@@ -639,7 +639,11 @@ function createGroupHeaderRight({
   const rightContainer = document.createElement("div");
   rightContainer.className = "group-header-right";
 
-  // Botón Editar Todo
+  // === Primera línea: botones y acciones ===
+  const topDiv = document.createElement("div");
+  topDiv.className = "group-header-right-top";
+
+  // Botón Editar
   const editAllBtn = document.createElement("button");
   editAllBtn.textContent = "Editar";
   editAllBtn.className = "btn btn-sm btn-outline-primary";
@@ -648,7 +652,6 @@ function createGroupHeaderRight({
     const titleContainer = groupDiv.querySelector('.group-title-container');
     const groupTitle = titleContainer && titleContainer.querySelector('.group-title');
     const existingInput = titleContainer && titleContainer.querySelector('.group-title-input');
-    // --- Detalles para grupos no agrupados
     const detailsDiv = groupDiv.querySelector('.group-extra-details');
     const detailsTextDiv = detailsDiv && detailsDiv.querySelector('.group-details-text');
     const detailsTextarea = detailsDiv && detailsDiv.querySelector('.group-details-textarea');
@@ -658,7 +661,6 @@ function createGroupHeaderRight({
       editAllBtn.dataset.editing = "true";
       makeGroupItemsEditable(groupDiv, groupIdStr);
 
-      // --- Título a input ---
       if (groupTitle && !existingInput) {
         const currentText = groupTitle.textContent;
         const input = document.createElement('input');
@@ -670,7 +672,6 @@ function createGroupHeaderRight({
         groupTitle.replaceWith(input);
         input.focus();
       }
-      // --- Detalles a textarea (solo si NO es grupo unido) ---
       if (!isMergedGroup && detailsTextDiv && detailsTextarea) {
         detailsTextDiv.style.display = "none";
         detailsTextarea.style.display = "";
@@ -681,19 +682,15 @@ function createGroupHeaderRight({
       saveGroupItemEdits(groupDiv, groupIdStr);
       editAllBtn.textContent = "Editar";
       editAllBtn.dataset.editing = "false";
-      // --- Guardar título y volverlo texto ---
       if (titleContainer) {
         const input = titleContainer.querySelector('.group-title-input');
         if (input) {
           const newTitle = input.value.trim() || groupIdStr;
-          // Actualiza en objectData
           const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
           if (groupObj) groupObj.name = newTitle;
-          // Actualiza en mergedGroups si aplica
           if (mergedGroups.has(groupIdStr)) {
             mergedGroups.get(groupIdStr).name = newTitle;
           }
-          // Reemplaza el input por el h2
           const h2 = document.createElement('h2');
           h2.className = "group-title";
           const link = document.createElement('a');
@@ -704,13 +701,10 @@ function createGroupHeaderRight({
           input.replaceWith(h2);
         }
       }
-      // --- Detalles a texto (solo si NO es grupo unido) ---
       if (!isMergedGroup && detailsTextDiv && detailsTextarea) {
         const newValue = detailsTextarea.value.trim();
-        // Actualiza en objectData
         const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
         if (groupObj) groupObj.details = newValue;
-        // Actualiza el div de texto y alterna visibilidad
         detailsTextDiv.innerHTML = newValue
           ? newValue.replace(/\n/g, "<br>")
           : "<em>Sin detalles</em>";
@@ -721,7 +715,6 @@ function createGroupHeaderRight({
       refreshView();
       setTimeout(() => highlightActiveFilter(), 0);
 
-      // Scroll y highlight (igual que antes)
       let attempts = 0;
       const maxAttempts = 20;
       const pollId = setInterval(() => {
@@ -737,9 +730,47 @@ function createGroupHeaderRight({
       }, 40);
     }
   };
-  rightContainer.appendChild(editAllBtn);
+  topDiv.appendChild(editAllBtn);
 
-  // Badge "New" si algún item es nuevo
+  // Botón Borrar
+  const borrarBtn = document.createElement("button");
+  borrarBtn.textContent = "Borrar";
+  borrarBtn.className = "btn btn-sm btn-danger";
+  borrarBtn.onclick = function() {
+    const titleInput = groupDiv.querySelector('.group-title-input');
+    const groupTitle = groupDiv.querySelector('.group-title');
+    let currTitle = "";
+
+    if (titleInput) {
+      currTitle = titleInput.value.trim();
+      if (!currTitle.startsWith("[BORRAR]")) {
+        titleInput.value = `[BORRAR] ${currTitle}`;
+      }
+    } else if (groupTitle) {
+      currTitle = groupTitle.textContent.trim();
+      if (!currTitle.startsWith("[BORRAR]")) {
+        const link = groupTitle.querySelector('a');
+        if (link) link.textContent = `[BORRAR] ${currTitle}`;
+        else groupTitle.textContent = `[BORRAR] ${currTitle}`;
+      }
+    }
+
+    const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+    if (groupObj) {
+      if (!groupObj.name || !groupObj.name.startsWith("[BORRAR]")) {
+        groupObj.name = `[BORRAR] ${groupObj.name || currTitle}`;
+      }
+    }
+    if (mergedGroups.has(groupIdStr)) {
+      let mg = mergedGroups.get(groupIdStr);
+      if (mg && mg.name && !mg.name.startsWith("[BORRAR]")) {
+        mg.name = `[BORRAR] ${mg.name}`;
+      }
+    }
+  };
+  topDiv.appendChild(borrarBtn);
+
+  // Badge "New"
   const hasNewItem = groupItems.some(item => {
     const details = skuToObject[item.SKU];
     return details && details.shop_by && details.shop_by.trim().toLowerCase() === 'new';
@@ -748,16 +779,11 @@ function createGroupHeaderRight({
     const newBadge = document.createElement("span");
     newBadge.className = "new-badge";
     newBadge.textContent = "New";
-    rightContainer.appendChild(newBadge);
+    topDiv.appendChild(newBadge);
   }
 
-  // Badge y botón de desagrupar si es grupo unido
+  // Botón de desagrupar si es grupo unido
   if (isMergedGroup) {
-    const mergedBadge = document.createElement("span");
-    mergedBadge.className = "merged-badge";
-    mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
-    rightContainer.appendChild(mergedBadge);
-
     const unmergeBtn = document.createElement("button");
     unmergeBtn.className = "btn btn-sm btn-outline-danger";
     unmergeBtn.textContent = "Desagrupar";
@@ -766,7 +792,7 @@ function createGroupHeaderRight({
     unmergeBtn.addEventListener('click', function() {
       unmergeGroup(this.dataset.groupIdStr);
     });
-    rightContainer.appendChild(unmergeBtn);
+    topDiv.appendChild(unmergeBtn);
   }
 
   // Botón de "Deshacer mover info" si aplica
@@ -806,11 +832,20 @@ function createGroupHeaderRight({
         if (++attempts > maxAttempts) clearInterval(pollId);
       }, 50);
     };
-    rightContainer.appendChild(undoBtn);
+    topDiv.appendChild(undoBtn);
   }
 
-  // --- Badge de atributos llenos basado en las columnas reales de la tabla, con ajuste solicitado ---
+  rightContainer.appendChild(topDiv);
+
+  // === Segunda línea: badges ===
+  const bottomDiv = document.createElement("div");
+  bottomDiv.className = "group-header-right-bottom";
+
+  // Badge llenos
   setTimeout(() => {
+    const oldBadge = bottomDiv.querySelector('.group-cols-badge');
+    if (oldBadge) oldBadge.remove();
+
     const table = groupDiv.querySelector('.attribute-table');
     if (!table) return;
     const ths = Array.from(table.querySelectorAll('thead th'))
@@ -818,7 +853,6 @@ function createGroupHeaderRight({
       .filter(header =>
         header && !["×", "Drag", "Origen", ""].includes(header.toLowerCase())
       );
-
     let withValue = 0;
     ths.forEach(attr => {
       const hasAny = groupItems.some(item => {
@@ -827,22 +861,37 @@ function createGroupHeaderRight({
       });
       if (hasAny) withValue++;
     });
-
-    // Restar 2 y 4 según lo pedido
     const badgeLl = Math.max(withValue - 2, 0);
     const badgeTot = Math.max(ths.length - 4, 0);
-
     if (ths.length > 0) {
       const badge = document.createElement("span");
       badge.className = "badge badge-pill badge-info group-cols-badge";
-      badge.style.marginLeft = "8px";
       badge.style.background = "#17a2b8";
       badge.style.color = "white";
       badge.style.fontSize = "0.95em";
       badge.textContent = `Llenos: ${badgeLl} / ${badgeTot}`;
-      rightContainer.appendChild(badge);
+      bottomDiv.appendChild(badge);
     }
   }, 0);
+
+  // Badge PG
+  const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+  if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
+    const pgTag = document.createElement("span");
+    pgTag.className = "badge badge-pill badge-secondary pg-tag";
+    pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
+    bottomDiv.appendChild(pgTag);
+  }
+
+  // Badge Unión de XX grupos
+  if (isMergedGroup && mergedGroups.has(groupIdStr)) {
+    const mergedBadge = document.createElement("span");
+    mergedBadge.className = "merged-badge";
+    mergedBadge.textContent = `Unión de ${mergedGroups.get(groupIdStr).originalGroups.length} grupos`;
+    bottomDiv.appendChild(mergedBadge);
+  }
+
+  rightContainer.appendChild(bottomDiv);
 
   return rightContainer;
 }
