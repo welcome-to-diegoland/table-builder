@@ -286,13 +286,14 @@ html, body {
 .group-header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start; /* Alinea arriba */
+  align-items: flex-start;
   gap: 20px;
-  width: 100%;
+  margin-bottom: -10px;
 }
 
 .group-header-left {
-  flex: 1 1 0;
+  display: flex;
+  flex: 1;
   min-width: 0;
 }
 
@@ -1933,37 +1934,19 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  /* Elimina position: absolute aquí */
+  gap: 4px;
+  min-width: 220px;
 }
 
 .group-header-right-top,
 .group-header-right-bottom {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap; /* Nunca saltan de línea */
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  overflow-x: auto;
-}
-
-.group-header-right button,
-.group-header-right .btn {
-  /* Normaliza el tamaño de todos los botones */
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  border-radius: 4px;
-  min-width: 80px;
-  white-space: nowrap;
-  line-height: 1.2;
+  width: auto;
 }
 
 .pg-tag {
@@ -1977,13 +1960,4 @@ html, body {
   font-size: 0.95em;
   padding: 0.3em 0.8em;
   border-radius: 1em;
-}
-.new-badge {
-  display: inline-block;
-  background-color: #ff6b6b;
-  color: white;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 0.95em;
-  font-weight: bold;
 }
