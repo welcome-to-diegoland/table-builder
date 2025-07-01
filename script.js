@@ -660,7 +660,7 @@ function createGroupHeaderRight({
       editAllBtn.textContent = "Guardar cambios";
       editAllBtn.dataset.editing = "true";
       makeGroupItemsEditable(groupDiv, groupIdStr);
-
+ 
       if (groupTitle && !existingInput) {
         const currentText = groupTitle.textContent;
         const input = document.createElement('input');
