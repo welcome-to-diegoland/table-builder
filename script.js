@@ -2845,7 +2845,7 @@ function createStatsColumn(stats) {
     <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">x</button>
   </div>
   <div class="web-header-divider"></div>
-  Web >
+  Web ⏵
 </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
   <div class="cat-header-icons grid-2x2">
@@ -2855,7 +2855,7 @@ function createStatsColumn(stats) {
     <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
   </div>
   <div class="cat-header-divider"></div>
-  < Cat
+  ⏴ Cat
 </th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
@@ -4787,16 +4787,24 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
 
       const value = details[forced] || details[forced.toUpperCase?.()] || "";
 
-      // Pintar de naranja la celda de item_code si está duplicado en los visibles
-      if (forced === 'item_code') {
+      if (forced === 'item_code' && value) {
+        // LINK SIEMPRE
+        const link = document.createElement("a");
+        link.href = `https://www.travers.com.mx/${encodeURIComponent(value)}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = value;
+        // COLOR SI ES DUPLICADO
         const code = value.toString().trim();
         if (duplicatedSkus.includes(code)) {
           cell.classList.add("item-code-duplicate");
           cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
         }
+        cell.appendChild(link);
+      } else {
+        cell.textContent = value;
       }
 
-      cell.textContent = value;
       row.appendChild(cell);
     });
 
