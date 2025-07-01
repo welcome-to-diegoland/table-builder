@@ -1934,21 +1934,20 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
-  min-width: 220px;
+  gap: 2px;
 }
 
 .group-header-right-top,
 .group-header-right-bottom {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  width: auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
 }
-
 .pg-tag {
   background: #6c757d !important;
   color: #fff !important;
