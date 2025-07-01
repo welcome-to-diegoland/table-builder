@@ -1931,30 +1931,57 @@ html, body {
 }
 
 /* Asegura que el contenedor derecho esté en columna y alineado a la derecha */
+/* CONTENEDOR: columna, derecha */
 .group-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end; /* <--- pega a la derecha */
-  justify-content: center;
-  gap: 0.5em;
-  min-width: 0;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: auto !important;
 }
 
-/* Los botones van en fila, alineados a la derecha */
-.group-header-right-top button,
-.group-header-right-bottom span,
-.group-header-right-bottom .badge {
-  margin-left: 6px;
-  margin-right: 0;
-  min-width: 70px;   /* Ajusta si es necesario */
-  padding: 5px 12px; /* Más espacio interno */
-  font-size: 0.98em;
-  white-space: nowrap;
+/* SOLO DOS RENGLONES: cada uno es horizontal, nunca wrap */
+.group-header-right-top,
+.group-header-right-bottom {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 
-.group-header-right-top button:first-child,
-.group-header-right-bottom span:first-child {
-  margin-left: 0;
+/* Botones: NO afectan badges/tags */
+.group-header-right-top button {
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  font-size: 1em !important;
+  padding: 5px 12px !important;
+}
+
+/* BADGES y TAGS: NO afectan botones */
+.group-header-right-bottom .badge,
+.group-header-right-bottom .pg-tag {
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  font-size: 0.95em !important;
+  padding: 4px 10px !important;
+  line-height: 1.1 !important;
+}
+
+/* Si usas Bootstrap, fuerza el tamaño aquí también */
+.group-header-right-bottom .badge-info,
+.group-header-right-bottom .badge-secondary {
+  font-size: 0.95em !important;
+  padding: 4px 10px !important;
+  line-height: 1.1 !important;
 }
 
 .pg-tag {
