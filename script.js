@@ -4598,51 +4598,20 @@ function addMergeStyles() {
     document.head.appendChild(style);
 }
 
-
+// Sticky table header for group items tables
 function createItemsTable(container, groupItems, skuToObject, highlightAttribute = null, customAttributes = null) {
-  // Preservar el header del grupo si existe
+  // Remueve tabla anterior si existe
   const existingHeader = container.querySelector('.group-header');
   const plecaDiv = container.querySelector('.group-details-pleca');
   const existingTable = container.querySelector('.table-responsive');
   if (existingTable) existingTable.remove();
 
-  const groupId = groupItems[0]?.["IG ID"];
-  const isMergedGroup = mergedGroups.has(groupId);
+  const groupId = groupItems[0]?.["IG ID"] || groupItems[0]?.SKU || groupItems[0]?.sku;
+  const isMergedGroup = typeof mergedGroups !== "undefined" && mergedGroups.has(groupId);
   if (isMergedGroup) container.classList.add('merged-group');
 
-  // Botones de header derecho del grupo
-  (function() {
-    let headerDiv = container.querySelector('.group-header');
-    if (!headerDiv) return;
-    let headerRight = headerDiv.querySelector('.group-header-right');
-    if (!headerRight) {
-      headerRight = document.createElement('div');
-      headerRight.className = "group-header-right";
-      headerDiv.appendChild(headerRight);
-    }
-    if (!headerRight.querySelector('.group-sort-btn')) {
-      const sortBtn = document.createElement("button");
-      sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
-      sortBtn.textContent = "Ordenar";
-      sortBtn.addEventListener('click', () =>
-        openGroupSortModal(groupId, groupItems, skuToObject, filteredAttributes.map(a => a.attribute))
-      );
-      headerRight.insertBefore(sortBtn, headerRight.firstChild);
-    }
-    if (!headerRight.querySelector('.move-info-btn')) {
-      const moveBtn = document.createElement("button");
-      moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
-      moveBtn.textContent = "Mover info";
-      moveBtn.addEventListener('click', () => {
-        let attributeList = filteredAttributes.map(a => a.attribute);
-        openMoveInfoModal(groupId, groupItems, attributeList);
-      });
-      headerRight.insertBefore(moveBtn, headerRight.firstChild);
-    }
-  })();
-
   const table = document.createElement("table");
-  table.className = "table table-striped table-bordered attribute-table";
+  table.className = "table table-striped table-bordered sticky-table-header attribute-table";
   table.style.width = "100%";
   table.style.tableLayout = "fixed";
 
@@ -4652,17 +4621,19 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     orderedAttributes = customAttributes.map(attr => ({
       attribute: attr.trim(),
       order: 0,
-      isForced: forcedColumns.includes(attr.trim())
+      isForced: typeof forcedColumns !== "undefined" && forcedColumns.includes(attr.trim())
     }));
   } else {
-    orderedAttributes = getOrderedAttributes(groupItems, skuToObject);
+    orderedAttributes = typeof getOrderedAttributes === "function"
+      ? getOrderedAttributes(groupItems, skuToObject)
+      : Object.keys(groupItems[0] || {}).map(attr => ({ attribute: attr, order: 0, isForced: false }));
   }
 
   // Filtrar atributos según showEmptyAttributes
   const filteredAttributes = orderedAttributes.filter(attr => {
-    if (showEmptyAttributes) return true;
+    if (typeof showEmptyAttributes !== "undefined" && showEmptyAttributes) return true;
     return groupItems.some(item => {
-      const details = skuToObject[item.SKU] || {};
+      const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
       if (attr.attribute === "product_ranking") {
         return (item.product_ranking || "").toString().trim();
       }
@@ -4671,7 +4642,8 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   });
 
   // Detección de SKUs repetidos
-  const allSkus = filteredItems.map(item => item.sku || item.SKU || "").filter(x => x);
+  const allSkus = (typeof filteredItems !== "undefined" ? filteredItems : groupItems)
+    .map(item => item.sku || item.SKU || "").filter(x => x);
   const skuCounts = {};
   allSkus.forEach(sku => {
     skuCounts[sku] = (skuCounts[sku] || 0) + 1;
@@ -4688,7 +4660,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   filteredAttributes.forEach(attr => {
     let isAllEmpty = true;
     for (const item of groupItems) {
-      const details = skuToObject[item.SKU] || {};
+      const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
       if (attr.attribute === "product_ranking") {
         if ((item.product_ranking || "").toString().trim()) {
           isAllEmpty = false;
@@ -4700,16 +4672,19 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       }
     }
     const isHighlighted = attr.attribute === highlightAttribute;
-    const highlightClass = groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
+    const highlightClass = typeof groupDestHighlightAttr !== "undefined" &&
+      groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
     theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
   });
-  forcedColumns.forEach(forced => {
-    let width = "";
-    if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
-    if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
-    if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
-    theadHtml += `<th style="${width}">${forced}</th>`;
-  });
+  if (typeof forcedColumns !== "undefined") {
+    forcedColumns.forEach(forced => {
+      let width = "";
+      if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
+      if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
+      if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
+      theadHtml += `<th style="${width}">${forced}</th>`;
+    });
+  }
   theadHtml += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th></tr></thead>`;
 
   // Crear TBODY
@@ -4720,8 +4695,10 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   let lastOrigenValue = null;
 
   groupItems.forEach((item, itemIndex) => {
-    const details = skuToObject[item.SKU] || {};
-    const currentItem = filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku));
+    const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
+    const currentItem = typeof filteredItems !== "undefined"
+      ? filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku))
+      : null;
     const isMergedItem = item.__originalIGID;
 
     const row = document.createElement("tr");
@@ -4742,8 +4719,8 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       } else {
         originalValue = details[attr.attribute]?.toString().trim() || "";
       }
-      const cellKey = `${item.SKU}-${attr.attribute}`;
-      const cellData = editedCells[cellKey];
+      const cellKey = `${item.SKU || item.sku}-${attr.attribute}`;
+      const cellData = typeof editedCells !== "undefined" ? editedCells[cellKey] : null;
       const shouldShowInput = !originalValue || (cellData && cellData.wasOriginallyEmpty);
       const isHighlighted = attr.attribute === highlightAttribute;
       const cell = document.createElement("td");
@@ -4756,21 +4733,29 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         input.type = "text";
         input.className = "form-control form-control-sm table-input";
         input.value = cellData?.value || originalValue;
-        input.dataset.sku = item.SKU;
+        input.dataset.sku = item.SKU || item.sku;
         input.dataset.attribute = attr.attribute;
         input.dataset.originallyEmpty = (!originalValue).toString();
         input.addEventListener('input', function() {
-          editedCells[cellKey] = {
-            value: this.value,
-            wasOriginallyEmpty: this.dataset.originallyEmpty === 'true'
-          };
-          updateCellStyle(cell, this.value.trim());
-          const itemToUpdate = objectData.find(o => o.SKU === this.dataset.sku);
-          if (itemToUpdate) {
-            itemToUpdate[this.dataset.attribute] = this.value.trim();
+          if (typeof editedCells !== "undefined") {
+            editedCells[cellKey] = {
+              value: this.value,
+              wasOriginallyEmpty: this.dataset.originallyEmpty === 'true'
+            };
+          }
+          if (typeof updateCellStyle === "function") {
+            updateCellStyle(cell, this.value.trim());
+          }
+          if (typeof objectData !== "undefined") {
+            const itemToUpdate = objectData.find(o => (o.SKU || o.sku) === this.dataset.sku);
+            if (itemToUpdate) {
+              itemToUpdate[this.dataset.attribute] = this.value.trim();
+            }
           }
         });
-        updateCellStyle(cell, input.value.trim());
+        if (typeof updateCellStyle === "function") {
+          updateCellStyle(cell, input.value.trim());
+        }
         cell.appendChild(input);
       } else {
         cell.textContent = originalValue;
@@ -4783,38 +4768,40 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     });
 
     // Columnas forzadas con anchos fijos
-    forcedColumns.forEach(forced => {
-      const cell = document.createElement("td");
-      let width = "";
-      if (forced === "sku") width = "100px";
-      if (forced === "item_code") width = "100px";
-      if (forced === "precio") width = "100px";
-      cell.style.width = width;
-      cell.style.minWidth = width;
-      cell.style.maxWidth = width;
+    if (typeof forcedColumns !== "undefined") {
+      forcedColumns.forEach(forced => {
+        const cell = document.createElement("td");
+        let width = "";
+        if (forced === "sku") width = "100px";
+        if (forced === "item_code") width = "100px";
+        if (forced === "precio") width = "100px";
+        cell.style.width = width;
+        cell.style.minWidth = width;
+        cell.style.maxWidth = width;
 
-      const value = details[forced] || details[forced.toUpperCase?.()] || "";
+        const value = details[forced] || details[forced?.toUpperCase?.()] || "";
 
-      if (forced === 'item_code' && value) {
-        // LINK SIEMPRE
-        const link = document.createElement("a");
-        link.href = `https://www.travers.com.mx/${encodeURIComponent(value)}`;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = value;
-        // COLOR SI ES DUPLICADO
-        const code = value.toString().trim();
-        if (duplicatedSkus.includes(code)) {
-          cell.classList.add("item-code-duplicate");
-          cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
+        if (forced === 'item_code' && value) {
+          // LINK SIEMPRE
+          const link = document.createElement("a");
+          link.href = `https://www.travers.com.mx/${encodeURIComponent(value)}`;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = value;
+          // COLOR SI ES DUPLICADO
+          const code = value.toString().trim();
+          if (duplicatedSkus.includes(code)) {
+            cell.classList.add("item-code-duplicate");
+            cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
+          }
+          cell.appendChild(link);
+        } else {
+          cell.textContent = value;
         }
-        cell.appendChild(link);
-      } else {
-        cell.textContent = value;
-      }
 
-      row.appendChild(cell);
-    });
+        row.appendChild(cell);
+      });
+    }
 
     // Columna de origen con ancho fijo
     const originCell = document.createElement("td");
@@ -4854,16 +4841,25 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
       onEnd: function(evt) {
-        handleRowReorder(evt);
+        if (typeof handleRowReorder === "function") {
+          handleRowReorder(evt);
+        }
       }
     });
   }
 
-  setupRowSelection(table);
+  if (typeof setupRowSelection === "function") {
+    setupRowSelection(table);
+  }
 
-  table.querySelector('.drag-reset-btn').addEventListener('click', function() {
-    resetGroupOrder(groupId);
-  });
+  const dragResetBtn = table.querySelector('.drag-reset-btn');
+  if (dragResetBtn) {
+    dragResetBtn.addEventListener('click', function() {
+      if (typeof resetGroupOrder === "function") {
+        resetGroupOrder(groupId);
+      }
+    });
+  }
 
   const style = document.createElement('style');
   style.textContent = `

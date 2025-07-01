@@ -1533,11 +1533,7 @@ tr.selected td {
   box-sizing: border-box;
 }
 
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
+
 .toggle-details-btn {
   background: #f8f9fa;
   border: 1px solid #ddd;
@@ -2024,4 +2020,13 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Sticky header para las tablas de items */
+.sticky-table-header th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
 }
