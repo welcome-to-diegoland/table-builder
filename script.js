@@ -872,16 +872,23 @@ function createGroupHeaderRight({
   igIdTag.textContent = groupIdStr;
   bottomDiv.appendChild(igIdTag);
 
-  // 2. PG (siempre se muestra)
-  const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
-  const pgTag = document.createElement("span");
+// 2. PG (siempre se muestra)
+const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
+let pgTag;
+if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
+  pgTag = document.createElement("a");
   pgTag.className = "badge bg-secondary text-white small";
-  if (groupObj && groupObj.catalog_page_number && String(groupObj.catalog_page_number).trim() !== "") {
-    pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
-  } else {
-    pgTag.textContent = "No en Catálogo";
-  }
-  bottomDiv.appendChild(pgTag);
+  pgTag.textContent = `PG. ${groupObj.catalog_page_number}`;
+  pgTag.href = `https://catalogo.travers.com.mx/catalogo/?page=${groupObj.catalog_page_number}`;
+  pgTag.target = "_blank";
+  pgTag.rel = "noopener noreferrer";
+  pgTag.style.textDecoration = "none"; // Opcional: por si quieres quitar el subrayado
+} else {
+  pgTag = document.createElement("span");
+  pgTag.className = "badge bg-secondary text-white small";
+  pgTag.textContent = "No en Catálogo";
+}
+bottomDiv.appendChild(pgTag);
 
   // 3. Llenos badge
   setTimeout(() => {
@@ -4397,6 +4404,8 @@ function makeGroupItemsEditable(groupDiv, groupId) {
   const skipColumns = new Set(["×", "Origen", "marca", "item_code"]);
 
   Array.from(table.tBodies[0].rows).forEach(row => {
+    if (row.classList.contains('sub-table-header')) return; // <--- ESTA LÍNEA ES LA CLAVE
+
     Array.from(row.cells).forEach((cell, i) => {
       // No editable si ya tiene input, select, o si es "not-editable"
       if (cell.querySelector('input,select') || cell.classList.contains('not-editable')) return;
@@ -4409,7 +4418,7 @@ function makeGroupItemsEditable(groupDiv, groupId) {
 
       // Si llegaste aquí, SÍ es editable
       const prevVal = cell.textContent.trim();
-      const input = document.createElement("input");
+      const input = document.createElement('input');
       input.type = "text";
       input.value = prevVal;
       input.className = "form-control form-control-sm table-input";
@@ -4650,9 +4659,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   });
   const duplicatedSkus = Object.keys(skuCounts).filter(sku => skuCounts[sku] > 1);
 
-  // Crear THEAD
-  let theadHtml = "<thead><tr>";
-  theadHtml += `
+  // Crear THEAD y guardar los TH para sub-header
+  let theadRowCells = '';
+  theadRowCells += `
     <th style='width: 10px;' class='drag-handle-column'>
       <span class='drag-reset-btn' title='Reordenar a estado original'>×</span>
     </th>
@@ -4674,7 +4683,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const isHighlighted = attr.attribute === highlightAttribute;
     const highlightClass = typeof groupDestHighlightAttr !== "undefined" &&
       groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
-    theadHtml += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
+    theadRowCells += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
   });
   if (typeof forcedColumns !== "undefined") {
     forcedColumns.forEach(forced => {
@@ -4682,10 +4691,12 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
       if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
       if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
-      theadHtml += `<th style="${width}">${forced}</th>`;
+      theadRowCells += `<th style="${width}">${forced}</th>`;
     });
   }
-  theadHtml += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th></tr></thead>`;
+  theadRowCells += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th>`;
+
+  let theadHtml = "<thead><tr>" + theadRowCells + "</tr></thead>";
 
   // Crear TBODY
   const tbody = document.createElement("tbody");
@@ -4695,6 +4706,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   let lastOrigenValue = null;
 
   groupItems.forEach((item, itemIndex) => {
+    // REPITE EL HEADER CADA 15 FILAS (pero no en la primera)
+    if (itemIndex % 15 === 0 && itemIndex !== 0) {
+      const subHeaderRow = document.createElement("tr");
+      subHeaderRow.className = "sub-table-header";
+      subHeaderRow.innerHTML = theadRowCells;
+      tbody.appendChild(subHeaderRow);
+    }
+
     const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
     const currentItem = typeof filteredItems !== "undefined"
       ? filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku))
@@ -4861,6 +4880,24 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     });
   }
 
+  // Estilos para los sub-headers (puedes mover esto a tu CSS principal)
+  if (!document.getElementById('sub-table-header-css')) {
+    const style = document.createElement('style');
+    style.id = 'sub-table-header-css';
+    style.textContent = `
+      .sub-table-header {
+        background: #f2f2f2;
+        font-weight: bold;
+        border-top: 2px solid #bbb;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Otros estilos de origen y drag
   const style = document.createElement('style');
   style.textContent = `
     .origen-cell-color1 { background-color: #e8f5e9 !important; }
