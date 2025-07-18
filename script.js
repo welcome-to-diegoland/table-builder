@@ -716,12 +716,14 @@ function confirmSeparateGroupModal() {
     item["IG ID"] = newGroupId;
     item["Original IG ID"] = groupId;
   });
-  // filteredItems = [nuevo grupo] + [resto de grupos]
+
+  // Elimina todos los items del grupo original antes de agregar los nuevos
   filteredItems = [
-    ...itemsToMove,
     ...filteredItems.filter(item => String(item["IG ID"]) !== groupId),
+    ...itemsToMove,
     ...itemsToKeep
   ];
+
   // Actualiza groupOrderMap
   groupOrderMap.set(newGroupId, itemsToMove.map(item => item.SKU));
   groupOrderMap.set(groupId, itemsToKeep.map(item => item.SKU));
@@ -788,10 +790,10 @@ function openSeparateGroupModal(groupIdStr, groupItems) {
   separateGroupModalState.selectedAttr = null;
   separateGroupModalState.selectedValue = null;
 
-  // Obtén atributos de la tabla de stats
-  const statsAttrs = Array.from(document.querySelectorAll('.attribute-stats-table tbody tr td select'))
-    .map(sel => sel.getAttribute('data-attribute'))
-    .filter(attr => attr && !excludedAttributes.has(attr));
+const statsAttrs = Array.from(document.querySelectorAll('.attribute-stats-table tbody tr td select'))
+  .map(sel => sel.getAttribute('data-attribute'))
+  .filter(attr => attr && !excludedAttributes.has(attr))
+  .sort((a, b) => a.localeCompare(b)); // <-- Ordena alfabéticamente
 
   // Obtén valores únicos por atributo en el grupo
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
@@ -4153,6 +4155,14 @@ function processItemGroups(skuToObject) {
     groups[groupIdStr].push(item);
   });
 
+  // --- REORDENA: separados primero ---
+  const separatedGroupIds = orderedGroupIds.filter(id => id.startsWith('split-'));
+  const normalGroupIds = orderedGroupIds.filter(id => !id.startsWith('split-'));
+  const finalGroupIds = [...separatedGroupIds, ...normalGroupIds];
+
+  output.innerHTML = '';
+  createStatusMessage();
+
   output.innerHTML = '';
   createStatusMessage();
 
@@ -4180,8 +4190,8 @@ function processItemGroups(skuToObject) {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = groups[groupIdStr];
+finalGroupIds.forEach(groupIdStr => {
+  const groupItems = groups[groupIdStr];
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
 
     if (!groupOrderMap.has(groupIdStr)) {
@@ -4193,11 +4203,11 @@ function processItemGroups(skuToObject) {
     }
 
     const groupInfo = skuToObject[groupIdStr] || {};
-    const isMergedGroup = mergedGroups.has(groupIdStr);
-
-    const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
-    groupDiv.dataset.groupId = groupIdStr;
+const isMergedGroup = mergedGroups.has(groupIdStr);
+const isSeparatedGroup = groupIdStr.startsWith('split-'); // Detecta grupo separado
+const groupDiv = document.createElement("div");
+groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
+groupDiv.dataset.groupId = groupIdStr;
 
     // Checkbox de selección
     const checkboxDiv = document.createElement("div");
@@ -4788,16 +4798,36 @@ function mergeSelectedGroups() {
 
 // 4. Agregar estos estilos CSS (puedes ponerlos en tu archivo CSS o crear un elemento style)
 function addMergeStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
+  if (document.getElementById('group-border-css')) return;
+  const style = document.createElement('style');
+  style.id = 'group-border-css';
+  style.textContent = `
 
-    
-    `;
-    document.head.appendChild(style);
+    .group-container.merged-group {
+      border-left: 5px solid #007bff;
+      margin-bottom: 18px;
+      background: #fff;
+    }
+  `;
+  document.head.appendChild(style);
 }
+addMergeStyles();
 
-/*
-// Sticky table header for group items tables
+function addSeparatedStyles() {
+  if (document.getElementById('group-separated-css')) return;
+  const style = document.createElement('style');
+  style.id = 'group-separated-css';
+  style.textContent = `
+    .group-container.separated-group {
+      border-left: 5px solid #ffe066;
+      margin-bottom: 18px;
+    }
+  `;
+  document.head.appendChild(style);
+}
+addSeparatedStyles();
+
+
 function createItemsTable(container, groupItems, skuToObject, highlightAttribute = null, customAttributes = null) {
   // Remueve tabla anterior si existe
   const existingHeader = container.querySelector('.group-header');
@@ -4814,6 +4844,15 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   table.style.width = "100%";
   table.style.tableLayout = "fixed";
 
+  // FILTRA SKUs DUPLICADOS SOLO EN ESTE GRUPO
+  const seenSkus = new Set();
+  const uniqueGroupItems = groupItems.filter(item => {
+    const sku = item.SKU || item.sku;
+    if (seenSkus.has(sku)) return false;
+    seenSkus.add(sku);
+    return true;
+  });
+
   // Obtener atributos ordenados
   let orderedAttributes;
   if (customAttributes) {
@@ -4824,14 +4863,14 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     }));
   } else {
     orderedAttributes = typeof getOrderedAttributes === "function"
-      ? getOrderedAttributes(groupItems, skuToObject)
-      : Object.keys(groupItems[0] || {}).map(attr => ({ attribute: attr, order: 0, isForced: false }));
+      ? getOrderedAttributes(uniqueGroupItems, skuToObject)
+      : Object.keys(uniqueGroupItems[0] || {}).map(attr => ({ attribute: attr, order: 0, isForced: false }));
   }
 
   // Filtrar atributos según showEmptyAttributes
   const filteredAttributes = orderedAttributes.filter(attr => {
     if (typeof showEmptyAttributes !== "undefined" && showEmptyAttributes) return true;
-    return groupItems.some(item => {
+    return uniqueGroupItems.some(item => {
       const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
       if (attr.attribute === "product_ranking") {
         return (item.product_ranking || "").toString().trim();
@@ -4840,9 +4879,8 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     });
   });
 
-  // Detección de SKUs repetidos
-  const allSkus = (typeof filteredItems !== "undefined" ? filteredItems : groupItems)
-    .map(item => item.sku || item.SKU || "").filter(x => x);
+  // Detección de SKUs repetidos SOLO EN LA TABLA ACTUAL
+  const allSkus = uniqueGroupItems.map(item => item.sku || item.SKU || "").filter(x => x);
   const skuCounts = {};
   allSkus.forEach(sku => {
     skuCounts[sku] = (skuCounts[sku] || 0) + 1;
@@ -4858,7 +4896,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   `;
   filteredAttributes.forEach(attr => {
     let isAllEmpty = true;
-    for (const item of groupItems) {
+    for (const item of uniqueGroupItems) {
       const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
       if (attr.attribute === "product_ranking") {
         if ((item.product_ranking || "").toString().trim()) {
@@ -4895,14 +4933,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   let currentColorClass = 'origen-cell-color1';
   let lastOrigenValue = null;
 
-  groupItems.forEach((item, itemIndex) => {
-    // REPITE EL HEADER CADA 15 FILAS (pero no en la primera)
-    if (itemIndex % 15 === 0 && itemIndex !== 0) {
-      const subHeaderRow = document.createElement("tr");
-      subHeaderRow.className = "sub-table-header";
-      subHeaderRow.innerHTML = theadRowCells;
-      tbody.appendChild(subHeaderRow);
-    }
+  uniqueGroupItems.forEach((item, itemIndex) => {
 
     const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
     const currentItem = typeof filteredItems !== "undefined"
@@ -4991,338 +5022,15 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         const value = details[forced] || details[forced?.toUpperCase?.()] || "";
 
         if (forced === 'item_code' && value) {
-          // LINK SIEMPRE
           const link = document.createElement("a");
           link.href = `https://www.travers.com.mx/${encodeURIComponent(value)}`;
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.textContent = value;
-          // COLOR SI ES DUPLICADO
           const code = value.toString().trim();
           if (duplicatedSkus.includes(code)) {
             cell.classList.add("item-code-duplicate");
-            cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
-          }
-          cell.appendChild(link);
-        } else {
-          cell.textContent = value;
-        }
-
-        row.appendChild(cell);
-      });
-    }
-
-    // Columna de origen con ancho fijo
-    const originCell = document.createElement("td");
-    originCell.style.width = "100px";
-    originCell.style.minWidth = "100px";
-    originCell.style.maxWidth = "100px";
-    let origenValue;
-    if (isMergedItem) {
-      origenValue = item.__originalIGID;
-      if (lastOrigenValue !== origenValue) {
-        currentColorClass = currentColorClass === 'origen-cell-color1'
-          ? 'origen-cell-color2'
-          : 'origen-cell-color1';
-        lastOrigenValue = origenValue;
-      }
-      originCell.textContent = origenValue;
-      originCell.classList.add(currentColorClass);
-      originCell.style.fontSize = "0.8em";
-      originCell.style.color = "#666";
-    } else {
-      originCell.textContent = "Original";
-      originCell.style.fontSize = "0.8em";
-      originCell.style.color = "#28a745";
-      originCell.style.fontWeight = "bold";
-    }
-    row.appendChild(originCell);
-    tbody.appendChild(row);
-  });
-
-  table.innerHTML = theadHtml;
-  table.appendChild(tbody);
-
-  if (typeof Sortable !== 'undefined') {
-    new Sortable(tbody, {
-      animation: 150,
-      handle: '.drag-handle',
-      ghostClass: 'sortable-ghost',
-      chosenClass: 'sortable-chosen',
-      onEnd: function(evt) {
-        if (typeof handleRowReorder === "function") {
-          handleRowReorder(evt);
-        }
-      }
-    });
-  }
-
-  if (typeof setupRowSelection === "function") {
-    setupRowSelection(table);
-  }
-
-  const dragResetBtn = table.querySelector('.drag-reset-btn');
-  if (dragResetBtn) {
-    dragResetBtn.addEventListener('click', function() {
-      if (typeof resetGroupOrder === "function") {
-        resetGroupOrder(groupId);
-      }
-    });
-  }
-
-  // Estilos para los sub-headers (puedes mover esto a tu CSS principal)
-  if (!document.getElementById('sub-table-header-css')) {
-    const style = document.createElement('style');
-    style.id = 'sub-table-header-css';
-    style.textContent = `
-      .sub-table-header {
-        background: #f2f2f2;
-        font-weight: bold;
-        border-top: 2px solid #bbb;
-        position: sticky;
-        top: 0;
-        z-index: 1;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Otros estilos de origen y drag
-  const style = document.createElement('style');
-  style.textContent = `
-    .origen-cell-color1 { background-color: #e8f5e9 !important; }
-    .origen-cell-color2 { background-color: #e3f2fd !important; }
-    .drag-handle-column {
-      position: relative;
-    }
-    .drag-reset-btn {
-      position: absolute;
-      top: 0;
-      right: 0;
-      cursor: pointer;
-      font-size: 16px;
-      padding: 0 3px;
-      color: #999;
-      z-index: 10;
-    }
-    .drag-reset-btn:hover {
-      color: #333;
-      background-color: #eee;
-      border-radius: 3px;
-    }
-  `;
-  table.appendChild(style);
-
-  const tableContainer = document.createElement("div");
-  tableContainer.className = "table-responsive";
-  tableContainer.appendChild(table);
-
-  if (plecaDiv) {
-    plecaDiv.insertAdjacentElement('afterend', tableContainer);
-  } else if (existingHeader) {
-    existingHeader.insertAdjacentElement('afterend', tableContainer);
-  } else {
-    container.appendChild(tableContainer);
-  }
-}*/
-
-// Sticky table header for group items tables (SIN HEADERS REPETIDOS)
-function createItemsTable(container, groupItems, skuToObject, highlightAttribute = null, customAttributes = null) {
-  // Remueve tabla anterior si existe
-  const existingHeader = container.querySelector('.group-header');
-  const plecaDiv = container.querySelector('.group-details-pleca');
-  const existingTable = container.querySelector('.table-responsive');
-  if (existingTable) existingTable.remove();
-
-  const groupId = groupItems[0]?.["IG ID"] || groupItems[0]?.SKU || groupItems[0]?.sku;
-  const isMergedGroup = typeof mergedGroups !== "undefined" && mergedGroups.has(groupId);
-  if (isMergedGroup) container.classList.add('merged-group');
-
-  const table = document.createElement("table");
-  table.className = "table table-striped table-bordered sticky-table-header attribute-table";
-  table.style.width = "100%";
-  table.style.tableLayout = "fixed";
-
-  // Obtener atributos ordenados
-  let orderedAttributes;
-  if (customAttributes) {
-    orderedAttributes = customAttributes.map(attr => ({
-      attribute: attr.trim(),
-      order: 0,
-      isForced: typeof forcedColumns !== "undefined" && forcedColumns.includes(attr.trim())
-    }));
-  } else {
-    orderedAttributes = typeof getOrderedAttributes === "function"
-      ? getOrderedAttributes(groupItems, skuToObject)
-      : Object.keys(groupItems[0] || {}).map(attr => ({ attribute: attr, order: 0, isForced: false }));
-  }
-
-  // Filtrar atributos según showEmptyAttributes
-  const filteredAttributes = orderedAttributes.filter(attr => {
-    if (typeof showEmptyAttributes !== "undefined" && showEmptyAttributes) return true;
-    return groupItems.some(item => {
-      const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
-      if (attr.attribute === "product_ranking") {
-        return (item.product_ranking || "").toString().trim();
-      }
-      return details[attr.attribute]?.toString().trim();
-    });
-  });
-
-  // Detección de SKUs repetidos
-  const allSkus = (typeof filteredItems !== "undefined" ? filteredItems : groupItems)
-    .map(item => item.sku || item.SKU || "").filter(x => x);
-  const skuCounts = {};
-  allSkus.forEach(sku => {
-    skuCounts[sku] = (skuCounts[sku] || 0) + 1;
-  });
-  const duplicatedSkus = Object.keys(skuCounts).filter(sku => skuCounts[sku] > 1);
-
-  // Crear THEAD y guardar los TH
-  let theadRowCells = '';
-  theadRowCells += `
-    <th style='width: 10px;' class='drag-handle-column'>
-      <span class='drag-reset-btn' title='Reordenar a estado original'>×</span>
-    </th>
-  `;
-  filteredAttributes.forEach(attr => {
-    let isAllEmpty = true;
-    for (const item of groupItems) {
-      const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
-      if (attr.attribute === "product_ranking") {
-        if ((item.product_ranking || "").toString().trim()) {
-          isAllEmpty = false;
-          break;
-        }
-      } else if (details[attr.attribute]?.toString().trim()) {
-        isAllEmpty = false;
-        break;
-      }
-    }
-    const isHighlighted = attr.attribute === highlightAttribute;
-    const highlightClass = typeof groupDestHighlightAttr !== "undefined" &&
-      groupDestHighlightAttr[groupId] === attr.attribute ? 'destination-filled-th' : '';
-    theadRowCells += `<th class="${isAllEmpty ? 'empty-header' : ''} ${isHighlighted ? 'highlight-column' : ''} ${highlightClass}">${attr.attribute}</th>`;
-  });
-  if (typeof forcedColumns !== "undefined") {
-    forcedColumns.forEach(forced => {
-      let width = "";
-      if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
-      if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
-      if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
-      theadRowCells += `<th style="${width}">${forced}</th>`;
-    });
-  }
-  theadRowCells += `<th style="width:70px;min-width:70px;max-width:70px;">Origen</th>`;
-
-  let theadHtml = "<thead><tr>" + theadRowCells + "</tr></thead>";
-
-  // Crear TBODY
-  const tbody = document.createElement("tbody");
-  tbody.id = `tbody-${groupId}`;
-
-  let currentColorClass = 'origen-cell-color1';
-  let lastOrigenValue = null;
-
-  groupItems.forEach((item, itemIndex) => {
-    const details = skuToObject[item.SKU] || skuToObject[item.sku] || {};
-    const currentItem = typeof filteredItems !== "undefined"
-      ? filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku))
-      : null;
-    const isMergedItem = item.__originalIGID;
-
-    const row = document.createElement("tr");
-    row.dataset.sku = item.SKU || item.sku;
-
-    // Celda de drag handle
-    const dragCell = document.createElement("td");
-    dragCell.className = "drag-handle";
-    dragCell.innerHTML = '≡';
-    dragCell.title = "Arrastrar para reordenar";
-    row.appendChild(dragCell);
-
-    // Columnas de atributos normales
-    filteredAttributes.forEach((attr, attrIdx) => {
-      let originalValue;
-      if (attr.attribute === "product_ranking") {
-        originalValue = (item.product_ranking || "").toString().trim();
-      } else {
-        originalValue = details[attr.attribute]?.toString().trim() || "";
-      }
-      const cellKey = `${item.SKU || item.sku}-${attr.attribute}`;
-      const cellData = typeof editedCells !== "undefined" ? editedCells[cellKey] : null;
-      const shouldShowInput = !originalValue || (cellData && cellData.wasOriginallyEmpty);
-      const isHighlighted = attr.attribute === highlightAttribute;
-      const cell = document.createElement("td");
-      cell.style.minWidth = "100px";
-      if (isHighlighted) {
-        cell.classList.add('highlight-cell');
-      }
-      if (shouldShowInput) {
-        const input = document.createElement("input");
-        input.type = "text";
-        input.className = "form-control form-control-sm table-input";
-        input.value = cellData?.value || originalValue;
-        input.dataset.sku = item.SKU || item.sku;
-        input.dataset.attribute = attr.attribute;
-        input.dataset.originallyEmpty = (!originalValue).toString();
-        input.addEventListener('input', function() {
-          if (typeof editedCells !== "undefined") {
-            editedCells[cellKey] = {
-              value: this.value,
-              wasOriginallyEmpty: this.dataset.originallyEmpty === 'true'
-            };
-          }
-          if (typeof updateCellStyle === "function") {
-            updateCellStyle(cell, this.value.trim());
-          }
-          if (typeof objectData !== "undefined") {
-            const itemToUpdate = objectData.find(o => (o.SKU || o.sku) === this.dataset.sku);
-            if (itemToUpdate) {
-              itemToUpdate[this.dataset.attribute] = this.value.trim();
-            }
-          }
-        });
-        if (typeof updateCellStyle === "function") {
-          updateCellStyle(cell, input.value.trim());
-        }
-        cell.appendChild(input);
-      } else {
-        cell.textContent = originalValue;
-        if (originalValue.length > 40) {
-          cell.style.whiteSpace = "normal";
-          cell.style.wordBreak = "break-word";
-        }
-      }
-      row.appendChild(cell);
-    });
-
-    // Columnas forzadas con anchos fijos
-    if (typeof forcedColumns !== "undefined") {
-      forcedColumns.forEach(forced => {
-        const cell = document.createElement("td");
-        let width = "";
-        if (forced === "sku") width = "100px";
-        if (forced === "item_code") width = "100px";
-        if (forced === "precio") width = "100px";
-        cell.style.width = width;
-        cell.style.minWidth = width;
-        cell.style.maxWidth = width;
-
-        const value = details[forced] || details[forced?.toUpperCase?.()] || "";
-
-        if (forced === 'item_code' && value) {
-          // LINK SIEMPRE
-          const link = document.createElement("a");
-          link.href = `https://www.travers.com.mx/${encodeURIComponent(value)}`;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = value;
-          // COLOR SI ES DUPLICADO
-          const code = value.toString().trim();
-          if (duplicatedSkus.includes(code)) {
-            cell.classList.add("item-code-duplicate");
-            cell.title = `item_code duplicado (${skuCounts[code]} veces en los visibles)`;
+            cell.title = `item_code duplicado (${skuCounts[code]} veces en la tabla)`;
           }
           cell.appendChild(link);
         } else {
@@ -5428,7 +5136,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   } else {
     container.appendChild(tableContainer);
   }
-}
+  }
 
 // === POPUP/MODAL PARA ORDENAR GRUPO POR ATRIBUTOS ===
 function injectGroupSortModal() {

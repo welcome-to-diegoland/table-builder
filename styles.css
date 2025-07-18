@@ -1240,15 +1240,6 @@ tr[data-original-igid]:nth-child(even) {
 }
 
 
-.merged-group::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #4a6baf, #a2b6df);
-}
 
 
 .merge-groups-container {
