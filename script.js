@@ -1263,6 +1263,37 @@ function exportAllData() {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
+
+// ...existing code...
+// Exportar hoja "Atributos" (stats)
+const atributosCols = ["CMS IG", "Atributo", "Filtros", "Web", "Cat"];
+const atributosData = [];
+const cmsSet = new Set(filteredItems.map(item => item["CMS IG"]).filter(Boolean));
+const attributes = [];
+document.querySelectorAll('.filter-order-input').forEach(input => {
+  const attr = input.getAttribute('data-attribute');
+  if (attr) attributes.push(attr);
+});
+cmsSet.forEach(cmsIgVal => {
+  attributes.forEach(attr => {
+    const filtroInput = document.querySelector(`.filter-order-input[data-attribute="${attr}"]`);
+    const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+    const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
+    atributosData.push({
+      "CMS IG": cmsIgVal,
+      "Atributo": attr,
+      "Filtros": filtroInput ? (filtroInput.value || "") : "",
+      "Web": webInput ? (webInput.value || "") : "",
+      "Cat": catInput ? (catInput.value || "") : ""
+    });
+  });
+});
+const wsAtributos = XLSX.utils.json_to_sheet(atributosData.length ? atributosData : [{}], { header: atributosCols });
+XLSX.utils.sheet_add_aoa(wsAtributos, [atributosCols], { origin: "A1" });
+XLSX.utils.book_append_sheet(wb, wsAtributos, "Atributos");
+// ...existing code...
+
+
   // 2. Exportar hoja "Orden Grupos" con el orden visual actual
   const ordenGruposData = [];
   groupOrderMap.forEach((skuList, groupId) => {
@@ -1585,7 +1616,33 @@ function handleAvanceExcel(event) {
           return orig;
         });
       }
-
+// ...existing code...
+const atributosSheet = workbook.Sheets["Atributos"];
+if (atributosSheet) {
+  const atributosRows = XLSX.utils.sheet_to_json(atributosSheet, { defval: "" });
+  atributosRows.forEach(row => {
+    const attr = row["Atributo"];
+    if (!attr) return;
+    // Filtros
+    if (attributeFilterInputs[attr]) {
+      attributeFilterInputs[attr].value = row["Filtros"] || "";
+      localStorage.setItem(`filter_${attr}`, row["Filtros"] || "0");
+    }
+    // Orden Web
+    const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]`);
+    if (webInput) {
+      webInput.value = row["Web"] || "";
+      localStorage.setItem(`order_${attr}`, row["Web"] || "");
+    }
+    // Orden Cat
+    const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+    if (catInput) {
+      catInput.value = row["Cat"] || "";
+      localStorage.setItem(`cat_order_${attr}`, row["Cat"] || "");
+    }
+  });
+}
+// ...existing code...
       // NUEVO: restaurar el orden visual de los grupos si existe la hoja "Orden Grupos"
       const ordenGruposSheet = workbook.Sheets["Orden Grupos"];
       if (ordenGruposSheet) {
