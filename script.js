@@ -678,9 +678,177 @@ bottomDiv.appendChild(pgTag);
     bottomDiv.appendChild(mergedBadge);
   }
 
+    // 6. Botón Separar grupo
+  const separarBtn = document.createElement("button");
+  separarBtn.textContent = "Separar";
+  separarBtn.className = "btn btn-sm btn-warning";
+  separarBtn.onclick = function() {
+    openSeparateGroupModal(groupIdStr, groupItems);
+  };
+  topDiv.appendChild(separarBtn);
+
+
   rightContainer.appendChild(bottomDiv);
 
   return rightContainer;
+}
+
+function confirmSeparateGroupModal() {
+  const { groupId, groupItems, selectedAttr, selectedValue } = separateGroupModalState;
+  if (!groupId || !groupItems.length || !selectedAttr || !selectedValue) {
+    showTemporaryMessage("Selecciona atributo y valor para separar.");
+    return;
+  }
+  // Genera nuevo IG ID único
+  const newGroupId = `split-${Date.now()}`;
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  // Items que se van al nuevo grupo
+  const itemsToMove = groupItems.filter(item =>
+    (skuToObject[item.SKU]?.[selectedAttr] || "") === selectedValue
+  );
+  // Items que permanecen en el grupo original
+  const itemsToKeep = groupItems.filter(item =>
+    (skuToObject[item.SKU]?.[selectedAttr] || "") !== selectedValue
+  );
+  // Actualiza IG ID de los items movidos
+  itemsToMove.forEach(item => {
+    item.__originalIGID = groupId;
+    item["IG ID"] = newGroupId;
+    item["Original IG ID"] = groupId;
+  });
+  // filteredItems = [nuevo grupo] + [resto de grupos]
+  filteredItems = [
+    ...itemsToMove,
+    ...filteredItems.filter(item => String(item["IG ID"]) !== groupId),
+    ...itemsToKeep
+  ];
+  // Actualiza groupOrderMap
+  groupOrderMap.set(newGroupId, itemsToMove.map(item => item.SKU));
+  groupOrderMap.set(groupId, itemsToKeep.map(item => item.SKU));
+  // Opcional: crea objeto grupo en objectData
+  const origGroupObj = objectData.find(o => String(o.SKU) === groupId);
+  if (origGroupObj) {
+    objectData.push({
+      ...origGroupObj,
+      SKU: newGroupId,
+      name: `[Separado] ${origGroupObj.name || groupId}`,
+      "IG ID": newGroupId
+    });
+  }
+  closeSeparateGroupModal();
+  showTemporaryMessage(`Grupo separado: ${itemsToMove.length} items movidos a ${newGroupId}`);
+  render();
+}
+
+function injectSeparateGroupModal() {
+  if (document.getElementById('separateGroupModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'separateGroupModal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="separate-group-modal-backdrop"></div>
+    <div class="separate-group-modal-content">
+      <h3>Separar grupo por atributo</h3>
+      <div id="separateGroupAttrList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button id="separateGroupConfirmBtn" class="btn btn-warning btn-sm">Separar</button>
+        <button id="separateGroupCancelBtn" class="btn btn-outline-secondary btn-sm">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // SOLO para separar grupo: CSS exclusivo
+  if (!document.getElementById('separate-group-css')) {
+    const style = document.createElement('style');
+    style.id = 'separate-group-css';
+    style.textContent = `
+      .separate-group-modal-backdrop {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.2);}
+      .separate-group-modal-content {
+        background:white;max-width:400px;padding:24px 18px 18px 18px;border-radius:8px;
+        box-shadow:0 6px 32px 0 #2222;position:fixed;top:50%;left:50%;
+        transform:translate(-50%,-50%);
+      }
+      .separate-group-row {display:flex;align-items:center;gap:8px;padding:3px 0;}
+      .separate-group-row.selected {background:#fffbe6;}
+      .separate-group-row label {flex:1;}
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.getElementById('separateGroupCancelBtn').onclick = closeSeparateGroupModal;
+}
+injectSeparateGroupModal();
+
+let separateGroupModalState = { groupId: null, groupItems: [], selectedAttr: null, selectedValue: null };
+
+function openSeparateGroupModal(groupIdStr, groupItems) {
+  separateGroupModalState.groupId = groupIdStr;
+  separateGroupModalState.groupItems = groupItems;
+  separateGroupModalState.selectedAttr = null;
+  separateGroupModalState.selectedValue = null;
+
+  // Obtén atributos de la tabla de stats
+  const statsAttrs = Array.from(document.querySelectorAll('.attribute-stats-table tbody tr td select'))
+    .map(sel => sel.getAttribute('data-attribute'))
+    .filter(attr => attr && !excludedAttributes.has(attr));
+
+  // Obtén valores únicos por atributo en el grupo
+  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+  const attrValuesMap = {};
+  statsAttrs.forEach(attr => {
+    attrValuesMap[attr] = new Set();
+    groupItems.forEach(item => {
+      const val = (skuToObject[item.SKU]?.[attr] || "").toString().trim();
+      if (val) attrValuesMap[attr].add(val);
+    });
+  });
+
+  // Renderiza el modal
+  const listDiv = document.getElementById('separateGroupAttrList');
+  listDiv.innerHTML = `
+    <div>
+      <label>Atributo:</label>
+      <select id="separateGroupAttrSelect" class="form-control form-control-sm">
+        <option value="">Selecciona atributo</option>
+        ${statsAttrs.map(attr => `<option value="${attr}">${attr}</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-top:10px;">
+      <label>Valor:</label>
+      <select id="separateGroupValueSelect" class="form-control form-control-sm" disabled>
+        <option value="">Selecciona valor</option>
+      </select>
+    </div>
+  `;
+
+  // Listeners para selects
+  const attrSelect = document.getElementById('separateGroupAttrSelect');
+  const valueSelect = document.getElementById('separateGroupValueSelect');
+  attrSelect.onchange = function() {
+    const attr = this.value;
+    separateGroupModalState.selectedAttr = attr;
+    valueSelect.innerHTML = `<option value="">Selecciona valor</option>`;
+    if (attr && attrValuesMap[attr]) {
+      valueSelect.disabled = false;
+      attrValuesMap[attr].forEach(val => {
+        valueSelect.innerHTML += `<option value="${val}">${val}</option>`;
+      });
+    } else {
+      valueSelect.disabled = true;
+    }
+  };
+  valueSelect.onchange = function() {
+    separateGroupModalState.selectedValue = this.value;
+  };
+
+  document.getElementById('separateGroupModal').style.display = 'block';
+  document.getElementById('separateGroupConfirmBtn').onclick = confirmSeparateGroupModal;
+}
+
+function closeSeparateGroupModal() {
+  document.getElementById('separateGroupModal').style.display = 'none';
+  separateGroupModalState = { groupId: null, groupItems: [], selectedAttr: null, selectedValue: null };
 }
 
 function createBrandLogoElement(brandLogoPath) {
@@ -5281,25 +5449,27 @@ function injectGroupSortModal() {
   `;
   document.body.appendChild(modal);
 
-  // CSS rápido (puedes llevarlo a tu stylesheet)
-  const style = document.createElement('style');
-  style.innerHTML = `
-    #groupSortModal { position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;display:none; }
-    .group-sort-modal-backdrop {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.2);}
-    .group-sort-modal-content {
-      background:white;max-width:400px;padding:24px 18px 18px 18px;border-radius:8px;
-      box-shadow:0 6px 32px 0 #2222;position:fixed;top:50%;left:50%;
-      transform:translate(-50%,-50%);
-    }
-    .group-sort-attr-row {display:flex;align-items:center;gap:8px;padding:3px 0;}
-    .group-sort-attr-row.selected {background:#e6f7ff;}
-    .group-sort-attr-row .move-btn {font-size:1.2em;cursor:pointer;background:none;border:none;}
-    .group-sort-attr-row .move-btn:disabled {opacity:0.2;}
-    .group-sort-attr-row label {flex:1;}
-  `;
-  document.head.appendChild(style);
+  // SOLO para ordenar grupo: CSS propio
+  if (!document.getElementById('group-sort-css')) {
+    const style = document.createElement('style');
+    style.id = 'group-sort-css';
+    style.textContent = `
+      #groupSortModal { position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;display:none; }
+      .group-sort-modal-backdrop {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.2);}
+      .group-sort-modal-content {
+        background:white;max-width:400px;padding:24px 18px 18px 18px;border-radius:8px;
+        box-shadow:0 6px 32px 0 #2222;position:fixed;top:50%;left:50%;
+        transform:translate(-50%,-50%);
+      }
+      .group-sort-attr-row {display:flex;align-items:center;gap:8px;padding:3px 0;}
+      .group-sort-attr-row.selected {background:#e6f7ff;}
+      .group-sort-attr-row .move-btn {font-size:1.2em;cursor:pointer;background:none;border:none;}
+      .group-sort-attr-row .move-btn:disabled {opacity:0.2;}
+      .group-sort-attr-row label {flex:1;}
+    `;
+    document.head.appendChild(style);
+  }
 
-  // Cancel
   document.getElementById('groupSortCancelBtn').onclick = closeGroupSortModal;
 }
 injectGroupSortModal();
