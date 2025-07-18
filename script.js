@@ -1231,19 +1231,25 @@ function exportAllData() {
       if (!sheetHeader.includes('table_attributes_cat')) {
         sheetHeader.push('table_attributes_cat');
       }
+      // NUEVO: agrega la columna IG ID Original si no existe
+      if (!sheetHeader.includes('IG ID Original')) {
+        sheetHeader.push('IG ID Original');
+      }
 
       // Ahora usa el header original y el orden correcto
       sheetData = ordered.map(item => {
         const row = {};
         sheetHeader.forEach(col => row[col] = item[col] ?? "");
         row['table_attributes_cat'] = catOrderString;
+        // NUEVO: agrega IG ID Original si existe
+        row['IG ID Original'] = item.__originalIGID || item["IG ID Original"] || "";
         return row;
       });
     }
     else if (sheetName === "category-data") {
       sheetData = categoryData.map(item => {
         const row = {};
-        sheetHeader.forEach(col => row[col] ??= item[col] ?? "");
+        sheetHeader.forEach(col => row[col] = item[col] ?? "");
         return row;
       });
     }
@@ -1559,7 +1565,13 @@ function handleAvanceExcel(event) {
         });
         filteredItems = filteredItems.map(orig => {
           let sku = String(orig.SKU);
-          return avanceMap[sku] ? { ...orig, ...avanceMap[sku] } : orig;
+          let avance = avanceMap[sku];
+          if (avance) {
+            // NUEVO: restaura IG ID Original si existe
+            orig.__originalIGID = avance["IG ID Original"] || avance.__originalIGID || orig.__originalIGID || "";
+            return { ...orig, ...avance };
+          }
+          return orig;
         });
         // NO actualices filteredItemsOriginal aquí
         // Si necesitas actualizar groupOrderMap con el orden de avance, hazlo aquí
