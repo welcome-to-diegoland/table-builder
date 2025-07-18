@@ -1263,7 +1263,18 @@ function exportAllData() {
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  // 2. Guardar el Excel con el nombre personalizado
+  // 2. Exportar hoja "Orden Grupos" con el orden visual actual
+  const ordenGruposData = [];
+  groupOrderMap.forEach((skuList, groupId) => {
+    ordenGruposData.push({
+      "IG ID": groupId,
+      "Orden SKUs": skuList.join(",")
+    });
+  });
+  const wsOrdenGrupos = XLSX.utils.json_to_sheet(ordenGruposData, { header: ["IG ID", "Orden SKUs"] });
+  XLSX.utils.book_append_sheet(wb, wsOrdenGrupos, "Orden Grupos");
+
+  // 3. Guardar el Excel con el nombre personalizado
   XLSX.writeFile(wb, excelFilename);
 
   // 3. Exportar el CSV de objectData (modificado)
@@ -1573,9 +1584,20 @@ function handleAvanceExcel(event) {
           }
           return orig;
         });
-        // NO actualices filteredItemsOriginal aquí
-        // Si necesitas actualizar groupOrderMap con el orden de avance, hazlo aquí
       }
+
+      // NUEVO: restaurar el orden visual de los grupos si existe la hoja "Orden Grupos"
+      const ordenGruposSheet = workbook.Sheets["Orden Grupos"];
+      if (ordenGruposSheet) {
+        const ordenRows = XLSX.utils.sheet_to_json(ordenGruposSheet, { defval: "" });
+        ordenRows.forEach(row => {
+          if (row["IG ID"] && row["Orden SKUs"]) {
+            const skuList = row["Orden SKUs"].split(",").map(s => s.trim()).filter(Boolean);
+            groupOrderMap.set(row["IG ID"], skuList);
+          }
+        });
+      }
+
       showTemporaryMessage('Avance Excel aplicado');
       render();
     } catch (e) {
