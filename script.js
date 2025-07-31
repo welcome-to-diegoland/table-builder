@@ -74,11 +74,11 @@ const excludedAttributes = new Set([
   "image", "small_image", "thumbnail", "pdp_display_attribute",
   "pdp_description_attribute", "pdp_short_description_attribute", "icon_order",
   "orden_cms", "aplicaciones", "cms_web", "incluye", 
-  "paginadecatalogo", "seccion", "ventajas", "brand_logo",
-  "item_group_id", "categoria", "item_codeunspcweb_search_term",
+  "seccion", "ventajas", "brand_logo",
+  "categoria", "item_codeunspcweb_search_term",
   "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web",
   "unspc", "description", "especificaciones", "web_search_term", 
-  "catalog_page_number", "Weight", "icono_nuevo", "orden_tabla"
+  "Weight", "icono_nuevo"
 ]);
 const script = document.createElement('script');
 script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js';
@@ -198,7 +198,10 @@ document.getElementById('exportOrdenGruposBtn').addEventListener('click', functi
       const changed = originalOrder.length === currentOrder.length &&
         originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
       if (!changed) continue;
-      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
+let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+if (!groupObj) {
+  groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
+}
       const titulo = groupObj && groupObj.name ? groupObj.name : "";
       currentOrder.forEach(sku => {
         ordenExportData.push({
@@ -226,8 +229,10 @@ document.getElementById('exportMergedBtn').addEventListener('click', function() 
   if (typeof groupOrderMap.entries === "function") {
     for (const [igid, currentOrder] of groupOrderMap.entries()) {
       const igidStr = String(igid);
-      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-      const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
+let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+if (!groupObj) {
+  groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
+}      const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
       if (!igidStr.startsWith('merged-') || !groupObj || !hasItems) continue;
       if (!Array.isArray(currentOrder)) continue;
       let titulo = "";
@@ -327,8 +332,10 @@ document.getElementById('exportValoresNuevosBtn').addEventListener('click', func
 
   groupOrderMap.forEach((currentOrder, igid) => {
     const igidStr = String(igid);
-    const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-    const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
+let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+if (!groupObj) {
+  groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
+}    const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
 
     // Valores actuales
     const titulo = (groupObj && groupObj.name ? groupObj.name : "").trim();
@@ -699,22 +706,38 @@ function confirmSeparateGroupModal() {
     showTemporaryMessage("Selecciona atributo y valor para separar.");
     return;
   }
-  // Genera nuevo IG ID único
-  const newGroupId = `split-${Date.now()}`;
+  // Genera base de IG ID único con timestamp
+  const baseId = `split-${Date.now()}`;
+  const newGroupId = `${baseId}2`;
+  const newOldGroupId = `${baseId}1`;
   const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
   // Items que se van al nuevo grupo
-  const itemsToMove = groupItems.filter(item =>
-    (skuToObject[item.SKU]?.[selectedAttr] || "") === selectedValue
-  );
+  const itemsToMove = groupItems.filter(item => {
+    const val = (skuToObject[item.SKU]?.[selectedAttr] || "").toString().trim().replace(/["']/g, "");
+    const selected = (selectedValue || "").toString().trim().replace(/["']/g, "");
+    return val === selected;
+  });
   // Items que permanecen en el grupo original
-  const itemsToKeep = groupItems.filter(item =>
-    (skuToObject[item.SKU]?.[selectedAttr] || "") !== selectedValue
-  );
+  const itemsToKeep = groupItems.filter(item => {
+    const val = (skuToObject[item.SKU]?.[selectedAttr] || "").toString().trim().replace(/["']/g, "");
+    const selected = (selectedValue || "").toString().trim().replace(/["']/g, "");
+    return val !== selected;
+  });
   // Actualiza IG ID de los items movidos
   itemsToMove.forEach(item => {
-    item.__originalIGID = groupId;
+    if (!item.__originalIGID && !item["Original IG ID"]) {
+      item.__originalIGID = item["IG ID"];
+      item["Original IG ID"] = item["IG ID"];
+    }
     item["IG ID"] = newGroupId;
-    item["Original IG ID"] = groupId;
+  });
+  // Actualiza IG ID de los items que permanecen (grupo viejo)
+  itemsToKeep.forEach(item => {
+    if (!item.__originalIGID && !item["Original IG ID"]) {
+      item.__originalIGID = item["IG ID"];
+      item["Original IG ID"] = item["IG ID"];
+    }
+    item["IG ID"] = newOldGroupId;
   });
 
   // Elimina todos los items del grupo original antes de agregar los nuevos
@@ -726,8 +749,9 @@ function confirmSeparateGroupModal() {
 
   // Actualiza groupOrderMap
   groupOrderMap.set(newGroupId, itemsToMove.map(item => item.SKU));
-  groupOrderMap.set(groupId, itemsToKeep.map(item => item.SKU));
-  // Opcional: crea objeto grupo en objectData
+  groupOrderMap.set(newOldGroupId, itemsToKeep.map(item => item.SKU));
+
+  // Opcional: crea objeto grupo en objectData para ambos
   const origGroupObj = objectData.find(o => String(o.SKU) === groupId);
   if (origGroupObj) {
     objectData.push({
@@ -736,9 +760,17 @@ function confirmSeparateGroupModal() {
       name: `[Separado] ${origGroupObj.name || groupId}`,
       "IG ID": newGroupId
     });
+    objectData.push({
+      ...origGroupObj,
+      SKU: newOldGroupId,
+      name: `[Restante] ${origGroupObj.name || groupId}`,
+      "IG ID": newOldGroupId
+    });
+    // Elimina el objeto original
+    objectData = objectData.filter(o => String(o.SKU) !== groupId);
   }
   closeSeparateGroupModal();
-  showTemporaryMessage(`Grupo separado: ${itemsToMove.length} items movidos a ${newGroupId}`);
+  showTemporaryMessage(`Grupo separado: ${itemsToMove.length} items movidos a ${newGroupId}, ${itemsToKeep.length} items a ${newOldGroupId}`);
   render();
 }
 
@@ -1205,8 +1237,10 @@ function exportAllDataCustom() {
       const changed = originalOrder.length === currentOrder.length &&
         originalOrder.some((sku, idx) => sku !== currentOrder[idx]);
       if (!changed) continue;
-      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-      const titulo = groupObj && groupObj.name ? groupObj.name : "";
+let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+if (!groupObj) {
+  groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
+}      const titulo = groupObj && groupObj.name ? groupObj.name : "";
       currentOrder.forEach(sku => {
         ordenExportData.push({
           "IG ID": igidStr,
@@ -1221,51 +1255,53 @@ function exportAllDataCustom() {
   XLSX.utils.sheet_add_aoa(wsOrden, [ordenCols], { origin: "A1" });
   XLSX.utils.book_append_sheet(wb, wsOrden, "Orden Grupos");
 
-  // ===== 3. Hoja "Merged" =====
-  const mergedExportData = [];
-  if (typeof groupOrderMap.entries === "function") {
-    for (const [igid, currentOrder] of groupOrderMap.entries()) {
-      const igidStr = String(igid);
-      const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-      const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
-      if (!igidStr.startsWith('merged-') || !groupObj || !hasItems) continue;
-      if (!Array.isArray(currentOrder)) continue;
-      let titulo = "";
-      const titleInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .group-title-input`);
-      if (titleInput && titleInput.value) {
-        titulo = titleInput.value;
-      } else {
-        titulo = groupObj.name || "";
-      }
-      let detalles = "";
-      const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
-      if (detailsInput && detailsInput.value) {
-        detalles = detailsInput.value.trim();
-      } else {
-        detalles =
-          groupObj.details ||
-          groupObj.detalles ||
-          groupObj.ventajas ||
-          groupObj.descripcion ||
-          "";
-      }
-      currentOrder.forEach(sku => {
-        const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
-        const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
-        mergedExportData.push({
-          "ID": igidStr.replace('merged-', ''),
-          "IG ID Original": originalIGID,
-          "titulo": titulo,
-          "Detalles": detalles,
-          "Sku": sku
-        });
-      });
+// ===== 3. Hoja "Merged" =====
+const mergedExportData = [];
+if (typeof groupOrderMap.entries === "function") {
+  for (const [igid, currentOrder] of groupOrderMap.entries()) {
+    const igidStr = String(igid);
+    let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+    if (!groupObj) {
+      groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
     }
+    const hasItems = filteredItems.some(item => String(item["IG ID"]) === igidStr);
+    if (!groupObj || !hasItems || !Array.isArray(currentOrder)) continue; // <-- solo filtra si no hay grupo o items
+    let titulo = "";
+    const titleInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .group-title-input`);
+    if (titleInput && titleInput.value) {
+      titulo = titleInput.value;
+    } else {
+      titulo = groupObj.name || "";
+    }
+    let detalles = "";
+    const detailsInput = document.querySelector(`.group-container[data-group-id="${igidStr}"] .merged-group-textarea`);
+    if (detailsInput && detailsInput.value) {
+      detalles = detailsInput.value.trim();
+    } else {
+      detalles =
+        groupObj.details ||
+        groupObj.detalles ||
+        groupObj.ventajas ||
+        groupObj.descripcion ||
+        "";
+    }
+    currentOrder.forEach(sku => {
+      const item = filteredItems.find(i => i.SKU === sku && String(i["IG ID"]) === igidStr);
+      const originalIGID = item?.__originalIGID || item?.["Original IG ID"] || "";
+      mergedExportData.push({
+        "ID": igidStr,
+        "IG ID Original": originalIGID,
+        "titulo": titulo,
+        "Detalles": detalles,
+        "Sku": sku
+      });
+    });
   }
-  const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
-  const wsMerged = XLSX.utils.json_to_sheet(mergedExportData.length ? mergedExportData : [{}], { header: mergedCols });
-  XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
-  XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
+}
+const mergedCols = ["ID", "IG ID Original", "titulo", "Detalles", "Sku"];
+const wsMerged = XLSX.utils.json_to_sheet(mergedExportData.length ? mergedExportData : [{}], { header: mergedCols });
+XLSX.utils.sheet_add_aoa(wsMerged, [mergedCols], { origin: "A1" });
+XLSX.utils.book_append_sheet(wb, wsMerged, "Merged");
 
   // ===== 4. Hoja "Valores Nuevos" (igual que tu botón separado) =====
   const originalMap = Object.fromEntries(objectDataOriginal.map(o => [o.SKU, o]));
@@ -1321,8 +1357,10 @@ function exportAllDataCustom() {
 
   groupOrderMap.forEach((currentOrder, igid) => {
     const igidStr = String(igid);
-    const groupObj = objectData.find(o => String(o.SKU) === igidStr);
-    const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
+let groupObj = objectData.find(o => String(o.SKU) === igidStr);
+if (!groupObj) {
+  groupObj = objectData.find(o => String(o["IG ID"]) === igidStr);
+}    const originalObj = (window.originalGroupData || []).find(o => String(o.SKU) === igidStr) || {};
 
     // Valores actuales
     const titulo = (groupObj && groupObj.name ? groupObj.name : "").trim();
@@ -1350,7 +1388,14 @@ function exportAllDataCustom() {
   XLSX.utils.book_append_sheet(wb, wsValoresNuevosGrupos, "Valores Nuevos Grupos");
 
   // ===== Exporta el archivo Excel =====
-  XLSX.writeFile(wb, `${cmsIg}_todo.xlsx`);
+  const now = new Date();
+const yyyy = now.getFullYear();
+const mm = String(now.getMonth() + 1).padStart(2, '0');
+const dd = String(now.getDate()).padStart(2, '0');
+const hh = String(now.getHours()).padStart(2, '0');
+const min = String(now.getMinutes()).padStart(2, '0');
+const fecha = `${yyyy}${mm}${dd}_${hh}${min}`;
+XLSX.writeFile(wb, `${cmsIg}_ALL_${fecha}.xlsx`);
 }
 
 function exportAllData() {
@@ -1861,9 +1906,28 @@ function handleAvanceCSV(event) {
         return avanceMap[sku] ? { ...orig, ...avanceMap[sku] } : orig;
       });
 
+      // Agrega merged- y split- que no existan en objectData
       avanceRows.forEach(row => {
-        if (row.SKU && row.SKU.startsWith("merged-") && !objectData.find(o => o.SKU === row.SKU)) {
+        if (
+          row.SKU &&
+          (row.SKU.startsWith("merged-") || row.SKU.startsWith("split-")) &&
+          !objectData.find(o => o.SKU === row.SKU)
+        ) {
           objectData.push(row);
+        }
+      });
+
+      // === RECONSTRUIR mergedGroups para que la raya azul aparezca ===
+      mergedGroups.clear();
+      objectData.forEach(obj => {
+        if (String(obj.SKU).startsWith("merged-")) {
+          mergedGroups.set(String(obj.SKU), {
+            originalGroups: obj.__originalGroups || [],
+            items: [], // Si tienes los items, agrégalos aquí
+            creationTime: obj.groupCreatedAt || Date.now(),
+            details: obj.details || "",
+            name: obj.name || ""
+          });
         }
       });
 
@@ -2190,72 +2254,6 @@ function selectRange(startRow, endRow) {
     }
   });
 }
-
-function confirmGroupSortModal(orderedAttrs) {
-  const { groupId } = groupSortModalState;
-  // SIEMPRE usa los items de filteredItems actuales del grupo
-  const groupItems = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
-  const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
-
-  // Mapa para sort_order rápido
-  const valueOrderMap = new Map();
-  (window.valueOrderList || []).forEach(row => {
-    if (!row["Nombre atributo"] || !row["Valor de Atributo"]) return;
-    const key = `${row["Nombre atributo"]}|||${row["Valor de Atributo"]}`;
-    valueOrderMap.set(key, Number(row.sort_order));
-  });
-
-  // Ordena según los atributos seleccionados y sort_order
-  const items = groupItems.slice();
-  items.sort((a, b) => {
-    for (const attr of orderedAttrs) {
-      const va = (skuToObject[a.SKU]?.[attr] || "");
-      const vb = (skuToObject[b.SKU]?.[attr] || "");
-      // --- NUEVO: product_ranking se ordena numérico ASC ---
-      if (attr === "product_ranking") {
-        const na = Number(va) || Infinity;
-        const nb = Number(vb) || Infinity;
-        if (na !== nb) return na - nb;
-      } else {
-        const sortA = valueOrderMap.get(`${attr}|||${va}`);
-        const sortB = valueOrderMap.get(`${attr}|||${vb}`);
-        if (sortA !== undefined && sortB !== undefined) {
-          if (sortA !== sortB) return sortA - sortB;
-        } else if (sortA !== undefined) {
-          return -1;
-        } else if (sortB !== undefined) {
-          return 1;
-        } else {
-          if (va < vb) return -1;
-          if (va > vb) return 1;
-        }
-      }
-    }
-    return 0;
-  });
-
-  // Actualiza el orden en el groupOrderMap
-  groupOrderMap.set(groupId, items.map(it => it.SKU));
-
-  // Forzar que el render del grupo use el NUEVO ORDEN de groupOrderMap
-  const groupContainer = document.querySelector(`.group-container[data-group-id="${groupId}"]`);
-  if (groupContainer) {
-    // Elimina solo la tabla previa
-    const existingTable = groupContainer.querySelector('.table-responsive');
-    if (existingTable) existingTable.remove();
-
-    // OJO: aquí fuerza el orden usando groupOrderMap
-    const orderedSkus = groupOrderMap.get(groupId);
-    const orderedItems = orderedSkus
-      .map(sku => items.find(it => it.SKU === sku))
-      .filter(Boolean);
-
-    createItemsTable(groupContainer, orderedItems, skuToObject);
-  }
-
-  showTemporaryMessage('Grupo ordenado por atributos seleccionados');
-}
-
 // 1. Guarda el orden original de cada grupo al filtrar/cargar la categoría
 // (pon esto después de: filteredItems = filtered; en tu renderCategoryTree o donde filtras por CMS IG)
 window.originalGroupOrderMap = new Map();
@@ -2603,6 +2601,7 @@ function displayFilteredResults(filteredItems) {
       const attr = this.getAttribute('data-attribute');
       delete activeFilters[attr];
       if (Object.keys(activeFilters).length === 0) {
+        render();
       } else {
         applyMultipleFilters();
       }
@@ -2610,6 +2609,30 @@ function displayFilteredResults(filteredItems) {
   });
 
   updateAttributeDropdowns(filteredItems);
+
+  // --- Controles de selección y agrupación ---
+  const controlsDiv = document.createElement("div");
+  controlsDiv.className = "groups-controls";
+  const mergeBtn = document.createElement("button");
+  mergeBtn.className = "btn btn-primary";
+  mergeBtn.textContent = "Agrupar";
+  mergeBtn.addEventListener('click', mergeSelectedGroups);
+  const selectAllBtn = document.createElement("button");
+  selectAllBtn.className = "btn btn-secondary";
+  selectAllBtn.textContent = "Seleccionar Todos";
+  selectAllBtn.addEventListener('click', selectAllGroups);
+  const deselectAllBtn = document.createElement("button");
+  deselectAllBtn.className = "btn btn-outline-secondary";
+  deselectAllBtn.textContent = "Deseleccionar Todos";
+  deselectAllBtn.addEventListener('click', deselectAllGroups);
+  const selectionCount = document.createElement("span");
+  selectionCount.className = "selection-count";
+  selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
+  controlsDiv.appendChild(mergeBtn);
+  controlsDiv.appendChild(selectAllBtn);
+  controlsDiv.appendChild(deselectAllBtn);
+  controlsDiv.appendChild(selectionCount);
+  output.appendChild(controlsDiv);
 
   // Agrupar items por grupo
   const groupMap = {};
@@ -2636,11 +2659,21 @@ function displayFilteredResults(filteredItems) {
     }
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-
-    // --- Render group container ---
+    const isSeparatedGroup = groupIdStr.startsWith('split-');
     const groupDiv = document.createElement("div");
-    groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}`;
+    groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
+
+    // Checkbox de selección
+    const checkboxDiv = document.createElement("div");
+    checkboxDiv.className = "group-checkbox-container";
+    checkboxDiv.innerHTML = `
+      <input type="checkbox" class="group-checkbox" id="group-${groupIdStr}" 
+             data-group-id="${groupIdStr}"
+             ${selectedGroups.has(groupIdStr) ? 'checked' : ''}>
+      <label for="group-${groupIdStr}"></label>
+    `;
+    groupDiv.appendChild(checkboxDiv);
 
     // --- Header ---
     const headerDiv = document.createElement("div");
@@ -2751,7 +2784,98 @@ function displayFilteredResults(filteredItems) {
     createItemsTable(groupDiv, groupItems, skuToObject);
 
     output.appendChild(groupDiv);
+
+    // Checkbox handler
+    const groupCheckbox = groupDiv.querySelector('.group-checkbox');
+    if (groupCheckbox) {
+      groupCheckbox.addEventListener('change', function() {
+        if (this.checked) selectedGroups.add(this.dataset.groupId);
+        else selectedGroups.delete(this.dataset.groupId);
+        selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
+      });
+    }
   });
+}
+
+function mergeVisibleItemsOnly() {
+  const visibleGroupIds = Array.from(selectedGroups);
+  if (visibleGroupIds.length < 2) {
+    alert("Selecciona al menos 2 grupos visibles para unir");
+    return;
+  }
+
+  const newGroupId = `merged-visible-${Date.now()}`;
+  const mergedItems = [];
+  const originalGroups = [];
+
+  visibleGroupIds.forEach(groupId => {
+    // Todos los items del grupo original
+    const allItems = objectData.filter(item => String(item["IG ID"]) === String(groupId));
+    // Solo los items visibles
+    const visibleItems = filteredItems.filter(item => String(item["IG ID"]) === String(groupId));
+    // Los no visibles
+    const notVisibleItems = allItems.filter(item => !visibleItems.some(v => v.SKU === item.SKU));
+
+    // Cambia IG ID de los visibles al nuevo grupo
+    visibleItems.forEach(item => {
+      if (!item.__originalIGID && !item["Original IG ID"]) {
+        item.__originalIGID = item["IG ID"];
+        item["Original IG ID"] = item["IG ID"];
+      }
+      item["IG ID"] = newGroupId;
+      mergedItems.push(item);
+    });
+    originalGroups.push(groupId);
+
+    // Los no visibles se quedan en el grupo original
+    notVisibleItems.forEach(item => {
+      item["IG ID"] = groupId;
+    });
+
+    // Si el grupo original se queda sin items, elimina el objeto de grupo
+    if (notVisibleItems.length === 0) {
+      objectData = objectData.filter(o => String(o.SKU) !== String(groupId));
+    }
+  });
+
+  // Actualiza filteredItems y objectData
+  filteredItems = [
+    ...filteredItems.filter(item => !mergedItems.includes(item)),
+    ...mergedItems
+  ];
+  objectData = [
+    ...objectData.filter(item => !mergedItems.includes(item)),
+    ...mergedItems
+  ];
+
+  // Registrar el grupo unido
+  mergedGroups.set(newGroupId, {
+    originalGroups,
+    items: mergedItems,
+    creationTime: Date.now(),
+    details: ''
+  });
+
+  // Crea el objeto de grupo unido SOLO con los datos del primer item visible
+  const firstItem = mergedItems[0];
+  objectData = objectData.filter(o => o.SKU !== newGroupId);
+  objectData.push({
+    ...firstItem,
+    SKU: newGroupId,
+    "IG ID": newGroupId,
+    name: `[Grouped] ${firstItem.name || newGroupId}`,
+    __isMergedGroup: true,
+    __originalGroups: [...originalGroups],
+    groupCreatedAt: Date.now(),
+    details: ''
+  });
+
+  // Limpiar la selección visual
+  selectedGroups.clear();
+  document.querySelectorAll('.group-checkbox').forEach(cb => { cb.checked = false; });
+
+  render();
+  showTemporaryMessage(`✅ Grupos visibles unidos como ${newGroupId}. Los no visibles se quedaron en sus bloques originales.`);
 }
 
 function getAttributeStatsForItems(items) {
@@ -4155,13 +4279,34 @@ function processItemGroups(skuToObject) {
     groups[groupIdStr].push(item);
   });
 
-  // --- REORDENA: separados primero ---
-  const separatedGroupIds = orderedGroupIds.filter(id => id.startsWith('split-'));
-  const normalGroupIds = orderedGroupIds.filter(id => !id.startsWith('split-'));
-  const finalGroupIds = [...separatedGroupIds, ...normalGroupIds];
+  // --- REORDENA: split- nuevo justo arriba del grupo original ---
+  let finalGroupIds = [...orderedGroupIds];
+  const splitIds = orderedGroupIds.filter(id => id.startsWith('split-'));
+  if (splitIds.length) {
+    // Solo mueve el split más reciente justo arriba del grupo original
+    const newestSplitId = splitIds.reduce((maxId, id) => {
+      const ts = Number(id.replace('split-', ''));
+      return (!maxId || ts > Number(maxId.replace('split-', ''))) ? id : maxId;
+    }, null);
 
-  output.innerHTML = '';
-  createStatusMessage();
+    // Encuentra el grupo original usando el IG ID original de los items del split
+    const splitItems = filteredItems.filter(item => String(item["IG ID"]) === newestSplitId);
+    const originalGroupId = splitItems.length
+      ? (splitItems[0]["Original IG ID"] || splitItems[0].__originalIGID || null)
+      : null;
+
+    if (originalGroupId && finalGroupIds.includes(originalGroupId)) {
+      const idx = finalGroupIds.indexOf(originalGroupId);
+      finalGroupIds = [
+        ...finalGroupIds.slice(0, idx),
+        newestSplitId,
+        ...finalGroupIds.slice(idx)
+      ].filter((id, i, arr) => arr.indexOf(id) === i); // Sin duplicados
+    } else {
+      // Si no, ponlo arriba
+      finalGroupIds = [newestSplitId, ...orderedGroupIds.filter(id => id !== newestSplitId)];
+    }
+  }
 
   output.innerHTML = '';
   createStatusMessage();
@@ -4190,8 +4335,8 @@ function processItemGroups(skuToObject) {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
-finalGroupIds.forEach(groupIdStr => {
-  const groupItems = groups[groupIdStr];
+  finalGroupIds.forEach(groupIdStr => {
+    const groupItems = groups[groupIdStr];
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
 
     if (!groupOrderMap.has(groupIdStr)) {
@@ -4203,11 +4348,11 @@ finalGroupIds.forEach(groupIdStr => {
     }
 
     const groupInfo = skuToObject[groupIdStr] || {};
-const isMergedGroup = mergedGroups.has(groupIdStr);
-const isSeparatedGroup = groupIdStr.startsWith('split-'); // Detecta grupo separado
-const groupDiv = document.createElement("div");
-groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
-groupDiv.dataset.groupId = groupIdStr;
+    const isMergedGroup = mergedGroups.has(groupIdStr);
+    const isSeparatedGroup = groupIdStr.startsWith('split-');
+    const groupDiv = document.createElement("div");
+    groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
+    groupDiv.dataset.groupId = groupIdStr;
 
     // Checkbox de selección
     const checkboxDiv = document.createElement("div");
@@ -4295,7 +4440,6 @@ groupDiv.dataset.groupId = groupIdStr;
     // Contenedor de detalles (pleca)
     const groupObj = objectData.find(o => String(o.SKU) === String(groupIdStr));
     let detailsHtml = "";
-    // --- CORRECCIÓN AQUÍ: mostrar primero el campo details editable, si existe ---
     if (groupObj) {
       if (groupObj.details && groupObj.details.trim() !== "") {
         detailsHtml = groupObj.details.replace(/\n/g, "<br>");
@@ -4320,7 +4464,6 @@ groupDiv.dataset.groupId = groupIdStr;
       detailsDiv.style.display = "none";
 
       if (isMergedGroup) {
-        // Grupos unidos: textarea editable
         const mergedTextarea = document.createElement("textarea");
         mergedTextarea.className = "form-control merged-group-textarea";
         mergedTextarea.rows = 10;
@@ -4355,7 +4498,6 @@ groupDiv.dataset.groupId = groupIdStr;
         detailsDiv.appendChild(mergedTextarea);
         detailsDiv.appendChild(saveBtn);
       } else {
-        // Grupos normales: div de texto + textarea editable (oculto)
         const detailsTextDiv = document.createElement("div");
         detailsTextDiv.className = "group-details-text";
         detailsTextDiv.innerHTML = detailsHtml;
@@ -4382,7 +4524,6 @@ groupDiv.dataset.groupId = groupIdStr;
         detailsDiv.appendChild(detailsTextarea);
       }
 
-      // Toggle
       toggleDetailsBtn.addEventListener("click", function () {
         const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
         toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
@@ -4413,7 +4554,6 @@ groupDiv.dataset.groupId = groupIdStr;
     }
   });
 }
-
 // ------------
 
 function renderMergedGroups(skuToObject) {
@@ -4735,11 +4875,11 @@ function mergeSelectedGroups() {
       const code = item.item_code || item.SKU; // Usa aquí el campo correcto
       if (!mergedItemsMap.has(code)) {
         const mergedItem = {
-          ...item,
-          __originalIGID: groupId,
-          "IG ID": newGroupId,
-          "Original IG ID": groupId
-        };
+  ...item,
+  __originalIGID: item.__originalIGID || item["Original IG ID"] || groupId,
+  "IG ID": newGroupId,
+  "Original IG ID": item.__originalIGID || item["Original IG ID"] || groupId
+};
         mergedItemsMap.set(code, mergedItem);
       }
     });
@@ -4939,7 +5079,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     const currentItem = typeof filteredItems !== "undefined"
       ? filteredItems.find(fi => (fi.SKU || fi.sku) === (item.SKU || item.sku))
       : null;
-    const isMergedItem = item.__originalIGID;
+    const isMergedItem = item.__originalIGID || item["Original IG ID"];
 
     const row = document.createElement("tr");
     row.dataset.sku = item.SKU || item.sku;
@@ -5047,8 +5187,9 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
     originCell.style.minWidth = "100px";
     originCell.style.maxWidth = "100px";
     let origenValue;
-    if (isMergedItem) {
-      origenValue = item.__originalIGID;
+    // CAMBIO: SIEMPRE muestra el IG ID original si existe, aunque se agrupe varias veces
+    origenValue = item["Original IG ID"] || item.__originalIGID || "-";
+    if (origenValue !== "-") {
       if (lastOrigenValue !== origenValue) {
         currentColorClass = currentColorClass === 'origen-cell-color1'
           ? 'origen-cell-color2'
@@ -5060,7 +5201,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       originCell.style.fontSize = "0.8em";
       originCell.style.color = "#666";
     } else {
-      originCell.textContent = "Original";
+      originCell.textContent = "-";
       originCell.style.fontSize = "0.8em";
       originCell.style.color = "#28a745";
       originCell.style.fontWeight = "bold";
@@ -5136,7 +5277,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
   } else {
     container.appendChild(tableContainer);
   }
-  }
+}
 
 // === POPUP/MODAL PARA ORDENAR GRUPO POR ATRIBUTOS ===
 function injectGroupSortModal() {
@@ -5201,12 +5342,16 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
 
   // Forzar que 'marca' esté siempre en la lista (después de product_ranking)
   if (!available.includes("marca")) {
-    // Si product_ranking ya está al inicio, pon marca después, si no, al principio
     if (available[0] === "product_ranking") {
       available.splice(1, 0, "marca");
     } else {
       available.unshift("marca");
     }
+  }
+
+  // NUEVO: Agrega IG ID Original como opción para ordenar
+  if (!available.includes("IG ID Original")) {
+    available.unshift("IG ID Original");
   }
 
   // UI ajustada
@@ -5420,6 +5565,8 @@ function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
   document.getElementById('groupSortModal').style.display = 'block';
 }
 
+
+
 // ORDENAMIENTO: product_ranking como número
 function confirmGroupSortModal(orderedAttrs) {
   const { groupId } = groupSortModalState;
@@ -5436,13 +5583,22 @@ function confirmGroupSortModal(orderedAttrs) {
   const items = groupItems.slice();
   items.sort((a, b) => {
     for (const attr of orderedAttrs) {
-      const va = (skuToObject[a.SKU]?.[attr] ?? a[attr] ?? "");
-      const vb = (skuToObject[b.SKU]?.[attr] ?? b[attr] ?? "");
-      if (attr === "product_ranking") {
+      let va, vb;
+      if (attr === "IG ID Original") {
+        va = a["IG ID Original"] || a.__originalIGID || "";
+        vb = b["IG ID Original"] || b.__originalIGID || "";
+        if (va < vb) return -1;
+        if (va > vb) return 1;
+        // Si son iguales, sigue al siguiente atributo
+      } else if (attr === "product_ranking") {
+        va = (skuToObject[a.SKU]?.[attr] ?? a[attr] ?? "");
+        vb = (skuToObject[b.SKU]?.[attr] ?? b[attr] ?? "");
         const na = Number(va) || Infinity;
         const nb = Number(vb) || Infinity;
         if (na !== nb) return na - nb;
       } else {
+        va = (skuToObject[a.SKU]?.[attr] ?? a[attr] ?? "");
+        vb = (skuToObject[b.SKU]?.[attr] ?? b[attr] ?? "");
         const sortA = valueOrderMap.get(`${attr}|||${va}`);
         const sortB = valueOrderMap.get(`${attr}|||${vb}`);
         if (sortA !== undefined && sortB !== undefined) {
