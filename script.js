@@ -49,6 +49,9 @@ let attributeFilterInputs = {};
 let currentFilteredItems = [];
 let originalExcelSheets = {}; // { sheetName: { header: [], data: [] } }
 let originalCsvHeader = [];
+let moveInfoModalState = { groupId: null, groupItems: [], attributes: [] };
+let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
+let separateGroupModalState = { groupId: null, groupItems: [], selectedAttr: null, selectedValue: null };
 let originalCsvData = [];
 let activeFilters = {};
 let defaultFilterAttributes = new Set();
@@ -63,6 +66,9 @@ let currentViewState = {
   catOrder: false,
   showEmpty: false
 };
+
+
+
 
 // Configuración
 const forcedColumns = ["marca", "item_code", "precio"];
@@ -376,6 +382,10 @@ function clearAllChecks() {
   });
 }
 
+injectMoveInfoModal();
+injectGroupSortModal();
+injectSeparateGroupModal();
+
 // Esta función regresa el rightContainer con BOTONES y BADGES para el header del grupo
 function createGroupHeaderRight({
   groupIdStr, groupItems, skuToObject, isMergedGroup, groupDiv
@@ -392,6 +402,8 @@ function createGroupHeaderRight({
   moveBtn.className = "btn btn-sm btn-outline-secondary move-info-btn";
   moveBtn.textContent = "Mover info";
   moveBtn.onclick = function () {
+      console.log('Mover info click', groupIdStr);
+
     let attributeList = [];
     const table = groupDiv.querySelector('.attribute-table');
     if (table) {
@@ -499,6 +511,8 @@ function createGroupHeaderRight({
   sortBtn.className = "btn btn-sm btn-outline-primary group-sort-btn";
   sortBtn.textContent = "Ordenar";
   sortBtn.onclick = function () {
+      console.log('Ordenar click', groupIdStr);
+
     let attributeList = [];
     const table = groupDiv.querySelector('.attribute-table');
     if (table) {
@@ -690,6 +704,8 @@ bottomDiv.appendChild(pgTag);
   separarBtn.textContent = "Separar";
   separarBtn.className = "btn btn-sm btn-warning";
   separarBtn.onclick = function() {
+      console.log('Separar click', groupIdStr);
+
     openSeparateGroupModal(groupIdStr, groupItems);
   };
   topDiv.appendChild(separarBtn);
@@ -814,7 +830,6 @@ function injectSeparateGroupModal() {
 }
 injectSeparateGroupModal();
 
-let separateGroupModalState = { groupId: null, groupItems: [], selectedAttr: null, selectedValue: null };
 
 function openSeparateGroupModal(groupIdStr, groupItems) {
   separateGroupModalState.groupId = groupIdStr;
@@ -5177,10 +5192,8 @@ function injectGroupSortModal() {
 
   document.getElementById('groupSortCancelBtn').onclick = closeGroupSortModal;
 }
-injectGroupSortModal();
 
 // Estado temporal del modal (por grupo)
-let groupSortModalState = { groupId: null, groupItems: [], orderedAttrs: [] };
 
 // MODAL DE ORDEN: SIEMPRE incluye product_ranking
 function openGroupSortModal(groupId, groupItems, skuToObject, attributeList) {
@@ -5906,6 +5919,8 @@ function clearFilterInputs() {
 }
 // ========== MODAL "Mover Info" ==========
 
+
+
 function injectMoveInfoModal() {
   if (document.getElementById('moveInfoModal')) return;
   const modal = document.createElement('div');
@@ -5944,13 +5959,8 @@ function injectMoveInfoModal() {
 
   document.getElementById('moveInfoCancelBtn').onclick = closeMoveInfoModal;
 }
-injectMoveInfoModal();
 
-let moveInfoModalState = {
-  groupId: null,
-  groupItems: [],
-  attributes: []
-};
+
 
 function openMoveInfoModal(groupId, groupItems, attributeList) {
   moveInfoModalState.groupId = groupId;
