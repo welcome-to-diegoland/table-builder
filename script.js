@@ -46,7 +46,7 @@ let moveInfoBackups = {}; // { [groupId]: [array de copias de objetos] }
 
 let attributeFiltersState = {};
 let attributeFilterInputs = {};
-
+let statsOriginalOrder = null; // Variable global o fuera de la función
 let currentFilteredItems = [];
 let originalExcelSheets = {}; // { sheetName: { header: [], data: [] } }
 let originalCsvHeader = [];
@@ -2697,8 +2697,7 @@ mergeVisibleBtn.addEventListener('click', mergeVisibleItemsOnly);
     }
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-    const isSeparatedGroup = groupIdStr.startsWith('split-');
-    const groupDiv = document.createElement("div");
+const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');    const groupDiv = document.createElement("div");
     groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
@@ -3092,55 +3091,76 @@ function createStatsColumn(stats) {
           <div class="att-header-toggle-container">
             <button type="button" id="stats-toggleEmptyBtn" class="att-header-toggle-btn" title="Mostrar/Ocultar atributos vacíos">
               <span class="toggle-content">
-                Vacíos  
+                Vacíos</br>
                 <span class="toggle-state">${showEmptyAttributes ? 'On' : 'Off'}</span>
               </span>
             </button>
           </div>
-          <div class="attribute-header-wrapper">
-            Atributo
-<button type="button" id="stats-addAttributeBtn" class="btn-clear-filter" title="Agregar atributos">
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <line x1="12" y1="5" x2="12" y2="19"/>
-    <line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-</button>
-            <button class="btn-clear-filter" title="Limpiar filtros" type="button">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
+ <div class="attribute-header-wrapper">
+  Atributo
+  <button type="button" id="stats-addAttributeBtn" class="btn-clear-filter" title="Agregar atributos">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+  <button type="button" id="stats-sortAlphaBtn" class="btn-clear-filter" title="Ordenar alfabéticamente">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <text x="9" y="16" font-size="15" fill="currentColor">A</text>
+    </svg>
+  </button>
+  <button class="btn-clear-filter" title="Limpiar filtros" type="button">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>
+  </button>
+</div>
         </th>
  <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro}; position:relative;">
   <div class="filter-header-icons">
-    <button type="button" id="stats-loadDefaultFiltersBtn" class="web-header-icon-btn" title="Aplicar Filtros Actuales">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <button type="button" id="stats-clearFilterInputsBtn" class="web-header-icon-btn" title="Limpiar Filtros Nuevos">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+<button type="button" id="stats-loadDefaultFiltersBtn" class="web-header-icon-btn" title="Aplicar Filtros Actuales">
+  <i class="bi bi-cloud"></i>
+</button>
+<button type="button" id="stats-clearFilterInputsBtn" class="web-header-icon-btn" title="Limpiar Filtros Nuevos">
+  <i class="bi bi-x-lg"></i>
+</button>
   </div>
   <div class="filter-header-divider"></div>
   Filtro
 </th>
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
   <div class="web-header-icons grid-2x2">
-    <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Actual">✓</button>
-    <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn filter-header-icon-btn" title="Autoordenar Web">○</button>
-    <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Nuevas">+</button>
-    <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">x</button>
+  <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Actual">
+    <i class="bi bi-cloud"></i>
+  </button>
+  <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn filter-header-icon-btn" title="Autoordenar Web">
+    <i class="bi bi-circle"></i>
+  </button>
+  <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Nuevas">
+    <i class="bi bi-check-lg"></i>
+  </button>
+  <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">
+    <i class="bi bi-x-lg"></i>
+  </button>
   </div>
   <div class="web-header-divider"></div>
   Web ⏵
 </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-  <div class="cat-header-icons grid-2x2">
-    <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
-    <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">○</button>
-    <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
-    <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
-  </div>
+<div class="cat-header-icons grid-2x2">
+  <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">
+    <i class="bi bi-cloud"></i>
+  </button>
+  <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">
+    <i class="bi bi-circle"></i>
+  </button>
+  <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">
+    <i class="bi bi-check-lg"></i>
+  </button>
+  <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">
+    <i class="bi bi-x-lg"></i>
+  </button>
+</div>
   <div class="cat-header-divider"></div>
   ⏴ Cat
 </th>
@@ -3217,7 +3237,25 @@ function createStatsColumn(stats) {
       openAddStatsAttributeModal();
     });
   }
-
+const statsSortAlphaBtn = table.querySelector('#stats-sortAlphaBtn');
+if (statsSortAlphaBtn) {
+  statsSortAlphaBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    const isCurrentlyAlpha = column.getAttribute('data-alpha') === 'true';
+    let newColumn;
+    if (!isCurrentlyAlpha) {
+      // Guarda el orden original solo la primera vez
+      if (!window.statsOriginalOrder) window.statsOriginalOrder = [...stats];
+      const sortedStats = [...stats].sort((a, b) => a.attribute.localeCompare(b.attribute));
+      newColumn = createStatsColumn(sortedStats, true);
+      newColumn.setAttribute('data-alpha', 'true');
+    } else {
+      newColumn = createStatsColumn(window.statsOriginalOrder, false);
+      newColumn.setAttribute('data-alpha', 'false');
+    }
+    column.parentNode.replaceChild(newColumn, column);
+  });
+}
   // --------- LISTENERS ---------
   // Limpiar filtros generales
 const clearFilterBtn = table.querySelector('.btn-clear-filter[title="Limpiar filtros"]');
@@ -4273,8 +4311,7 @@ function processItemGroups(skuToObject) {
 
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-    const isSeparatedGroup = groupIdStr.startsWith('split-');
-    const groupDiv = document.createElement("div");
+const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');    const groupDiv = document.createElement("div");
     groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
@@ -5862,7 +5899,7 @@ function initHorizontalDrag(e, topBoxId, bottomBoxId) {
     const newTopHeight = startTopHeight + dy;
     const newBottomHeight = startBottomHeight - dy;
 
-    if (newTopHeight >= 50 && newBottomHeight >= 50) {
+    if (newTopHeight >= 30 && newBottomHeight >= 90) {
       topBox.style.height = newTopHeight + 'px';
       bottomBox.style.height = newBottomHeight + 'px';
       topBox.style.flexGrow = '0';

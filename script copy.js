@@ -3093,12 +3093,20 @@ function createStatsColumn(stats) {
   Web ⏵
 </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
-  <div class="cat-header-icons grid-2x2">
-    <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">✓</button>
-    <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">○</button>
-    <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">+</button>
-    <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">x</button>
-  </div>
+<div class="cat-header-icons grid-2x2">
+  <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">
+    <i class="bi bi-check"></i>
+  </button>
+  <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">
+    <i class="bi bi-arrow-repeat"></i>
+  </button>
+  <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">
+    <i class="bi bi-plus"></i>
+  </button>
+  <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">
+    <i class="bi bi-x"></i>
+  </button>
+</div>
   <div class="cat-header-divider"></div>
   ⏴ Cat
 </th>
@@ -4193,6 +4201,21 @@ function processItemGroups(skuToObject) {
     }
     groups[groupIdStr].push(item);
   });
+orderedGroupIds.sort((a, b) => {
+  const isMergedA = mergedGroups.has(a);
+  const isMergedB = mergedGroups.has(b);
+  const isSeparatedA = a.startsWith('split-') || a.startsWith('split-visible-');
+  const isSeparatedB = b.startsWith('split-') || b.startsWith('split-visible-');
+
+  // Merged primero
+  if (isMergedA && !isMergedB) return -1;
+  if (!isMergedA && isMergedB) return 1;
+  // Separated después
+  if (isSeparatedA && !isSeparatedB) return -1;
+  if (!isSeparatedA && isSeparatedB) return 1;
+  // El resto
+  return 0;
+});
 
   // --- REORDENA: separados primero ---
   const separatedGroupIds = orderedGroupIds.filter(id => id.startsWith('split-'));
