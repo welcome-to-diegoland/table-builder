@@ -1306,6 +1306,10 @@ tr[data-original-igid]:nth-child(even) {
   font-size: 13px !important;
 }
 
+.btn-warning {
+  font-size: 13px !important;
+}
+
 .group-info {
   flex: 1;
 }

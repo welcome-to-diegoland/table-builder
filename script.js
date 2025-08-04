@@ -3091,7 +3091,7 @@ function createStatsColumn(stats) {
           <div class="att-header-toggle-container">
             <button type="button" id="stats-toggleEmptyBtn" class="att-header-toggle-btn" title="Mostrar/Ocultar atributos vacíos">
               <span class="toggle-content">
-                Vacíos</br>
+                Vacíos
                 <span class="toggle-state">${showEmptyAttributes ? 'On' : 'Off'}</span>
               </span>
             </button>
@@ -5899,7 +5899,7 @@ function initHorizontalDrag(e, topBoxId, bottomBoxId) {
     const newTopHeight = startTopHeight + dy;
     const newBottomHeight = startBottomHeight - dy;
 
-    if (newTopHeight >= 30 && newBottomHeight >= 90) {
+    if (newTopHeight >= 50 && newBottomHeight >= 50) {
       topBox.style.height = newTopHeight + 'px';
       bottomBox.style.height = newBottomHeight + 'px';
       topBox.style.flexGrow = '0';
