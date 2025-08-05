@@ -99,6 +99,10 @@ document.addEventListener('DOMContentLoaded', function() {
   injectSeparateGroupModal();
   injectAddStatsAttributeModal();
 
+    const mergeVisibleHeaderBtn = document.getElementById('mergeVisibleGroupsBtn');
+  if (mergeVisibleHeaderBtn) {
+    mergeVisibleHeaderBtn.addEventListener('click', mergeVisibleItemsOnly);
+  }
 
   verticalDivider.addEventListener('mousedown', initVerticalDrag);
   document.getElementById('horizontalDivider').addEventListener('mousedown', (e) => {
@@ -119,6 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
   addMergeStyles();
 
   const applyCatTablesBtn = document.getElementById("applyCatTablesBtn");
+
+  document.getElementById('exportWebAttributesBtn').addEventListener('click', exportWebAttributesToExcel);
 
   // SOLO ESTE MANEJADOR para exportar TODO. Elimina cualquier otro para este botón.
   document.getElementById('exportStatsExcelBtn').addEventListener('click', exportAllDataCustom);
@@ -2665,13 +2671,33 @@ mergeVisibleBtn.addEventListener('click', mergeVisibleItemsOnly);
   selectionCount.className = "selection-count";
   selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
 
-  controlsDiv.appendChild(mergeBtn);
-  controlsDiv.appendChild(mergeVisibleBtn); // <-- NUEVO BOTÓN
-  controlsDiv.appendChild(selectAllBtn);
-  controlsDiv.appendChild(deselectAllBtn);
-  controlsDiv.appendChild(selectionCount);
-  output.appendChild(controlsDiv);
+controlsDiv.appendChild(mergeBtn);
+controlsDiv.appendChild(mergeVisibleBtn);
+controlsDiv.appendChild(selectAllBtn);
+controlsDiv.appendChild(deselectAllBtn);
+controlsDiv.appendChild(selectionCount);
+output.appendChild(controlsDiv);
 
+// --- SOLO DROPDOWN, SIN LÓGICA ---
+const viewDropdown = document.createElement("select");
+viewDropdown.className = "form-select view-mode-dropdown";
+viewDropdown.style.width = "120px";
+viewDropdown.style.marginLeft = "auto";
+viewDropdown.title = "Cambiar vista";
+
+["Tabla", "List", "Cuadrícula"].forEach(opt => {
+  const option = document.createElement("option");
+  option.value = opt.toLowerCase();
+  option.textContent = opt;
+  viewDropdown.appendChild(option);
+});
+controlsDiv.appendChild(viewDropdown);
+
+output.appendChild(controlsDiv);
+  
+
+
+controlsDiv.appendChild(viewDropdown);
   // Agrupar items por grupo
   const groupMap = {};
   const orderedGroupIds = [];
@@ -2701,6 +2727,8 @@ const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWit
     groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
+
+    
     // Checkbox de selección
     const checkboxDiv = document.createElement("div");
     checkboxDiv.className = "group-checkbox-container";
@@ -4286,10 +4314,51 @@ function processItemGroups(skuToObject) {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
+const vistaContainer = document.createElement("div");
+vistaContainer.style.display = "flex";
+vistaContainer.style.alignItems = "center";
+vistaContainer.style.marginLeft = "auto";
+vistaContainer.style.gap = "6px"; // Espacio pequeño entre icono, label y select
+
+// Icono Bootstrap
+const vistaIcon = document.createElement("i");
+vistaIcon.className = "bi bi-columns-gap"; // Cambia por el icono que prefieras
+vistaIcon.style.fontSize = "1.1em";
+vistaIcon.style.marginRight = "2px";
+
+// Label
+const vistaLabel = document.createElement("label");
+vistaLabel.textContent = "Vista:";
+vistaLabel.style.fontWeight = "700";
+vistaLabel.style.fontSize = "1em";
+vistaLabel.htmlFor = "viewModeDropdown";
+vistaLabel.style.margin = "0";
+
+// Dropdown
+const viewDropdown = document.createElement("select");
+viewDropdown.className = "form-select view-mode-dropdown";
+viewDropdown.style.fontWeight = "500";
+viewDropdown.style.fontSize = ".95em";
+viewDropdown.id = "viewModeDropdown";
+viewDropdown.style.width = "150px";
+viewDropdown.title = "Cambiar vista";
+
+["Tabla", "List", "Cuadrícula"].forEach(opt => {
+  const option = document.createElement("option");
+  option.value = opt.toLowerCase();
+  option.textContent = opt;
+  viewDropdown.appendChild(option);
+});
+
+vistaContainer.appendChild(vistaIcon);
+vistaContainer.appendChild(vistaLabel);
+vistaContainer.appendChild(viewDropdown);
+controlsDiv.appendChild(vistaContainer);
+
   // ORDENAR: merged-visible y split al principio
   orderedGroupIds.sort((a, b) => {
-    const isMergedA = a.startsWith('merged-visible') || a.startsWith('split-');
-    const isMergedB = b.startsWith('merged-visible') || b.startsWith('split-');
+    const isMergedA = a.startsWith('merged') || a.startsWith('split-');
+    const isMergedB = b.startsWith('merged') || b.startsWith('split-');
     if (isMergedA && !isMergedB) return -1;
     if (!isMergedA && isMergedB) return 1;
     return 0;
@@ -6426,4 +6495,52 @@ function separateVisibleAndRestFromGroups(selectedGroupIds, filteredItems, objec
     originalGroups,
     objectData
   };
+}
+
+function exportWebAttributesToExcel() {
+  // 1. Obtén los SKUs y datos del CMS actual
+  const cmsIg = getCmsIg();
+  const itemsData = filteredItems.filter(item => item["CMS IG"] === cmsIg);
+
+  // 2. Obtén el orden de atributos Web según los inputs de la columna Web
+  const webOrderInputs = Array.from(document.querySelectorAll('.order-input'))
+    .filter(input => input.value && parseInt(input.value) > 0)
+    .sort((a, b) => parseInt(a.value) - parseInt(b.value));
+  const webAttributesOrder = webOrderInputs.map(input => input.getAttribute('data-attribute'));
+
+  // 3. Construye los datos para exportar SOLO si hay algún campo vacío
+  const exportRows = [];
+  exportRows.push(['SKU', 'titulo', 'marca', 'no_de_modelo', ...webAttributesOrder]);
+ itemsData.forEach(item => {
+  const obj = objectData.find(o => String(o.SKU) === String(item.SKU)) || {};
+  const row = [
+    item.SKU,
+    obj.titulo || obj.title || '',
+    obj.marca || '',
+    obj.no_de_modelo || obj.no_de_modelo || ''
+  ];
+  webAttributesOrder.forEach(attr => {
+    row.push(obj[attr] !== undefined ? obj[attr] : '');
+  });
+  // Solo cuenta faltantes en los atributos web (no en los primeros 4)
+  const hasMissing = webAttributesOrder.some((attr, idx) => {
+    const val = row[4 + idx];
+    return val === '' || val === null || val === undefined;
+  });
+  if (hasMissing) {
+    exportRows.push(row);
+  }
+});
+
+  // Si no hay ningún SKU con faltantes, muestra mensaje y no exporta
+  if (exportRows.length === 1) {
+    showTemporaryMessage('Todos los SKUs tienen información completa en los atributos exportados.');
+    return;
+  }
+
+  // 4. Exporta a Excel usando XLSX
+  const ws = XLSX.utils.aoa_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Faltantes");
+  XLSX.writeFile(wb, `${cmsIg}_Faltantes.xlsx`);
 }

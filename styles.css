@@ -860,6 +860,22 @@ h2 a:hover {
   line-height: 1.4;
 }
 
+.header-valores-btn{
+  padding: 5px 10px;
+  background-color: #2ac7fb !important;
+  color: rgb(24, 24, 24);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem !important;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  line-height: 1.4;
+}
+
 .header-group-btn{
   padding: 5px 10px;
   background-color: #2576da !important;
@@ -1294,6 +1310,11 @@ tr[data-original-igid]:nth-child(even) {
   background: #f5f7fa;
   margin-bottom: 10px;
   border-radius: 5px;
+}
+
+.view-mode-dropdown {
+  margin-left: auto;
+  min-width: 110px;
 }
 
 .btn-secondary {

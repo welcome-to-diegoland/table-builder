@@ -4252,6 +4252,26 @@ orderedGroupIds.sort((a, b) => {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
+
+// --- SOLO DROPDOWN, SIN LÓGICA ---
+const viewDropdown = document.createElement("select");
+viewDropdown.className = "form-select view-mode-dropdown";
+viewDropdown.style.width = "120px";
+viewDropdown.style.marginLeft = "auto";
+viewDropdown.title = "Cambiar vista";
+
+["Tabla", "List", "Cuadrícula"].forEach(opt => {
+  const option = document.createElement("option");
+  option.value = opt.toLowerCase();
+  option.textContent = opt;
+  viewDropdown.appendChild(option);
+});
+controlsDiv.appendChild(viewDropdown);
+
+output.appendChild(controlsDiv);
+
+
+
 finalGroupIds.forEach(groupIdStr => {
   const groupItems = groups[groupIdStr];
     if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
@@ -5666,6 +5686,7 @@ function applyCategoryTables() {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
+  
   for (const groupIdStr in groups) {
     const groupItems = groups[groupIdStr];
     if (!groupItems.length) continue;
