@@ -846,7 +846,7 @@ h2 a:hover {
 
 .header-avance-btn{
   padding: 5px 10px;
-  background-color: #ef3a1e !important;
+  background-color: #e13116 !important;
   color: white;
   border: none;
   border-radius: 4px;
@@ -2075,3 +2075,7 @@ html, body {
   margin-bottom: 18px;
 }
 
+.custom-icon {
+  font-size: 1.1rem;
+  margin-right: 3px;
+}
