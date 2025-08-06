@@ -2592,7 +2592,7 @@ mergeVisibleBtn.addEventListener('click', mergeVisibleItemsOnly);
   
     controlsDiv.appendChild(selectionCount);
   
-  const vistaContainer = document.createElement("div");
+const vistaContainer = document.createElement("div");
 vistaContainer.style.display = "flex";
 vistaContainer.style.alignItems = "center";
 vistaContainer.style.marginLeft = "auto";
@@ -2606,7 +2606,7 @@ vistaIcon.style.marginRight = "2px";
 
 // Label
 const vistaLabel = document.createElement("label");
-vistaLabel.textContent = "Vista default en PLP:";
+vistaLabel.textContent = "Vista default en Web:";
 vistaLabel.style.fontWeight = "600";
 vistaLabel.style.fontSize = "1em";
 vistaLabel.htmlFor = "viewModeDropdown";
@@ -2627,6 +2627,10 @@ viewDropdown.title = "Cambiar vista";
   option.textContent = opt;
   viewDropdown.appendChild(option);
 });
+  vistaContainer.appendChild(vistaIcon); 
+  vistaContainer.appendChild(vistaLabel);
+  vistaContainer.appendChild(viewDropdown);
+  controlsDiv.appendChild(vistaContainer);
   
   // --- SOLO UNA VEZ, AL FINAL ---
   output.appendChild(controlsDiv);
@@ -4513,7 +4517,7 @@ function processItemGroups(skuToObject) {
   controlsDiv.appendChild(deselectAllBtn);
   controlsDiv.appendChild(selectionCount);
   
-  const vistaContainer = document.createElement("div");
+const vistaContainer = document.createElement("div");
 vistaContainer.style.display = "flex";
 vistaContainer.style.alignItems = "center";
 vistaContainer.style.marginLeft = "auto";
