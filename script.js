@@ -2540,6 +2540,8 @@ function displayFilteredResults(filteredItems) {
     </div>
   `;
 
+  
+
   // Listeners para quitar filtros
   document.querySelectorAll('.remove-filter-btn').forEach(btn => {
     btn.addEventListener('click', function () {
@@ -2583,33 +2585,68 @@ mergeVisibleBtn.addEventListener('click', mergeVisibleItemsOnly);
   selectionCount.className = "selection-count";
   selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
 
-controlsDiv.appendChild(mergeBtn);
-controlsDiv.appendChild(mergeVisibleBtn);
-controlsDiv.appendChild(selectAllBtn);
-controlsDiv.appendChild(deselectAllBtn);
-controlsDiv.appendChild(selectionCount);
-output.appendChild(controlsDiv);
+  controlsDiv.appendChild(mergeBtn);
+  controlsDiv.appendChild(mergeVisibleBtn);
+  controlsDiv.appendChild(selectAllBtn);
+  controlsDiv.appendChild(deselectAllBtn);
+  
+    controlsDiv.appendChild(selectionCount);
+  
+  const vistaContainer = document.createElement("div");
+vistaContainer.style.display = "flex";
+vistaContainer.style.alignItems = "center";
+vistaContainer.style.marginLeft = "auto";
+vistaContainer.style.gap = "6px"; // Espacio pequeño entre icono, label y select
 
-// --- SOLO DROPDOWN, SIN LÓGICA ---
+// Icono Bootstrap
+const vistaIcon = document.createElement("i");
+vistaIcon.className = "bi bi-columns-gap"; // Cambia por el icono que prefieras
+vistaIcon.style.fontSize = "1.1em";
+vistaIcon.style.marginRight = "2px";
+
+// Label
+const vistaLabel = document.createElement("label");
+vistaLabel.textContent = "Vista default en PLP:";
+vistaLabel.style.fontWeight = "600";
+vistaLabel.style.fontSize = "1em";
+vistaLabel.htmlFor = "viewModeDropdown";
+vistaLabel.style.margin = "0";
+
+// Dropdown
 const viewDropdown = document.createElement("select");
 viewDropdown.className = "form-select view-mode-dropdown";
-viewDropdown.style.width = "120px";
-viewDropdown.style.marginLeft = "auto";
+viewDropdown.style.fontWeight = "500";
+viewDropdown.style.fontSize = ".95em";
+viewDropdown.id = "viewModeDropdown";
+viewDropdown.style.width = "150px";
 viewDropdown.title = "Cambiar vista";
 
-["Tabla", "List", "Cuadrícula"].forEach(opt => {
+["table", "grid", "list"].forEach(opt => {
   const option = document.createElement("option");
   option.value = opt.toLowerCase();
   option.textContent = opt;
   viewDropdown.appendChild(option);
 });
-controlsDiv.appendChild(viewDropdown);
-
-output.appendChild(controlsDiv);
   
+  // --- SOLO UNA VEZ, AL FINAL ---
+  output.appendChild(controlsDiv);
 
 
-controlsDiv.appendChild(viewDropdown);
+const cmsIgValue = filteredItems[0]?.['CMS IG'];
+if (cmsIgValue && Array.isArray(categoryData)) {
+  const matchedItem = categoryData.find(item =>
+    item.image && item.image.includes(`W${cmsIgValue}.png`)
+  );
+  if (matchedItem && matchedItem.enable_table_view) {
+    // Normaliza el valor (puede venir como "Grid", "grid", etc.)
+    const viewValue = matchedItem.enable_table_view.toLowerCase();
+    // Si existe esa opción en el dropdown, selecciónala
+    const option = Array.from(viewDropdown.options).find(opt => opt.value === viewValue);
+    if (option) {
+      viewDropdown.value = viewValue;
+    }
+  }
+}
   // Agrupar items por grupo
   const groupMap = {};
   const orderedGroupIds = [];
@@ -4438,42 +4475,85 @@ function processItemGroups(skuToObject) {
     groups[groupIdStr].push(item);
   });
 
-  output.innerHTML = '';
+    output.innerHTML = '';
   createStatusMessage();
-
-  // Controles de selección y agrupación
+  
+  // --- Controles de selección y agrupación ---
   const controlsDiv = document.createElement("div");
   controlsDiv.className = "groups-controls";
+  
   const mergeBtn = document.createElement("button");
   mergeBtn.className = "btn btn-primary";
-  mergeBtn.textContent = "Agrupar Bloques";
+  mergeBtn.textContent = "Agrupar (bloques)";
   mergeBtn.addEventListener('click', mergeSelectedGroups);
-
+  
   const mergeVisibleBtn = document.createElement("button");
   mergeVisibleBtn.className = "btn btn-warning";
-  mergeVisibleBtn.textContent = "Agrupar Visibles";
+  mergeVisibleBtn.textContent = "Agrupar visibles";
   mergeVisibleBtn.title = "Agrupa solo los items visibles en pantalla";
   mergeVisibleBtn.addEventListener('click', mergeVisibleItemsOnly);
-
+  
   const selectAllBtn = document.createElement("button");
   selectAllBtn.className = "btn btn-secondary";
   selectAllBtn.textContent = "Seleccionar Todos";
   selectAllBtn.addEventListener('click', selectAllGroups);
-
+  
   const deselectAllBtn = document.createElement("button");
   deselectAllBtn.className = "btn btn-outline-secondary";
   deselectAllBtn.textContent = "Deseleccionar Todos";
   deselectAllBtn.addEventListener('click', deselectAllGroups);
-
+  
   const selectionCount = document.createElement("span");
   selectionCount.className = "selection-count";
   selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
-
+  
   controlsDiv.appendChild(mergeBtn);
   controlsDiv.appendChild(mergeVisibleBtn);
   controlsDiv.appendChild(selectAllBtn);
   controlsDiv.appendChild(deselectAllBtn);
   controlsDiv.appendChild(selectionCount);
+  
+  const vistaContainer = document.createElement("div");
+vistaContainer.style.display = "flex";
+vistaContainer.style.alignItems = "center";
+vistaContainer.style.marginLeft = "auto";
+vistaContainer.style.gap = "6px"; // Espacio pequeño entre icono, label y select
+
+// Icono Bootstrap
+const vistaIcon = document.createElement("i");
+vistaIcon.className = "bi bi-columns-gap"; // Cambia por el icono que prefieras
+vistaIcon.style.fontSize = "1.1em";
+vistaIcon.style.marginRight = "2px";
+
+// Label
+const vistaLabel = document.createElement("label");
+vistaLabel.textContent = "Vista default en Web:";
+vistaLabel.style.fontWeight = "600";
+vistaLabel.style.fontSize = "1em";
+vistaLabel.htmlFor = "viewModeDropdown";
+vistaLabel.style.margin = "0";
+
+// Dropdown
+const viewDropdown = document.createElement("select");
+viewDropdown.className = "form-select view-mode-dropdown";
+viewDropdown.style.fontWeight = "500";
+viewDropdown.style.fontSize = ".95em";
+viewDropdown.id = "viewModeDropdown";
+viewDropdown.style.width = "150px";
+viewDropdown.title = "Cambiar vista";
+
+["table", "grid", "list"].forEach(opt => {
+  const option = document.createElement("option");
+  option.value = opt.toLowerCase();
+  option.textContent = opt;
+  viewDropdown.appendChild(option);
+});
+  vistaContainer.appendChild(vistaIcon); 
+  vistaContainer.appendChild(vistaLabel);
+  vistaContainer.appendChild(viewDropdown);
+  controlsDiv.appendChild(vistaContainer);
+  
+  // --- SOLO UNA VEZ, AL FINAL ---
   output.appendChild(controlsDiv);
 
   orderedGroupIds.forEach(groupIdStr => {
