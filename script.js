@@ -2638,19 +2638,20 @@ viewDropdown.title = "Cambiar vista";
 
 const cmsIgValue = filteredItems[0]?.['CMS IG'];
 if (cmsIgValue && Array.isArray(categoryData)) {
+  // Busca la fila donde image === `W${cmsIgValue}.png`
   const matchedItem = categoryData.find(item =>
-    item.image && item.image.includes(`W${cmsIgValue}.png`)
+    item.image && item.image.trim() === `W${cmsIgValue}.png`
   );
   if (matchedItem && matchedItem.enable_table_view) {
-    // Normaliza el valor (puede venir como "Grid", "grid", etc.)
     const viewValue = matchedItem.enable_table_view.toLowerCase();
-    // Si existe esa opción en el dropdown, selecciónala
     const option = Array.from(viewDropdown.options).find(opt => opt.value === viewValue);
     if (option) {
       viewDropdown.value = viewValue;
     }
   }
 }
+
+
   // Agrupar items por grupo
   const groupMap = {};
   const orderedGroupIds = [];
@@ -3100,10 +3101,10 @@ function createStatsColumn(stats) {
  <th style="width:${colWidthFiltro}; min-width:${colWidthFiltro}; position:relative;">
   <div class="filter-header-icons">
 <button type="button" id="stats-loadDefaultFiltersBtn" class="web-header-icon-btn" title="Aplicar Filtros Actuales">
-  <i class="bi bi-cloud"></i>
+<i class="bi bi-folder" style="font-size: 1.2em;"></i>
 </button>
 <button type="button" id="stats-clearFilterInputsBtn" class="web-header-icon-btn" title="Limpiar Filtros Nuevos">
-  <i class="bi bi-x-lg"></i>
+<i class="bi bi-trash3"></i>
 </button>
   </div>
   <div class="filter-header-divider"></div>
@@ -3112,16 +3113,16 @@ function createStatsColumn(stats) {
         <th style="width:${colWidthWeb}; min-width:${colWidthWeb}; position:relative;">
   <div class="web-header-icons grid-2x2">
   <button type="button" id="stats-loadWebOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Actual">
-    <i class="bi bi-cloud"></i>
+<i class="bi bi-folder" style="font-size: 1.2em;"></i>
   </button>
   <button type="button" id="stats-fillWebSequentialBtn" class="web-header-icon-btn filter-header-icon-btn" title="Autoordenar Web">
-    <i class="bi bi-circle"></i>
+    <i class="bi bi-card-checklist" style="font-size: 1.2em;"></i>
   </button>
   <button type="button" id="stats-applyOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Aplicar Web Nuevas">
-    <i class="bi bi-check-lg"></i>
+    <i class="bi bi-check-circle" style="font-size: 1.1em;"></i>
   </button>
   <button type="button" id="stats-clearOrderBtn" class="web-header-icon-btn filter-header-icon-btn" title="Limpiar Web Nuevas">
-    <i class="bi bi-x-lg"></i>
+<i class="bi bi-trash3"></i>
   </button>
   </div>
   <div class="web-header-divider"></div>
@@ -3130,16 +3131,16 @@ function createStatsColumn(stats) {
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
 <div class="cat-header-icons grid-2x2">
   <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">
-    <i class="bi bi-cloud"></i>
+<i class="bi bi-folder" style="font-size: 1.2em;"></i>
   </button>
   <button type="button" id="stats-fillCatSequentialBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Autoordenar Catálogo">
-    <i class="bi bi-circle"></i>
+    <i class="bi bi-card-checklist" style="font-size: 1.2em;"></i>
   </button>
   <button type="button" id="stats-applyCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Nuevas">
-    <i class="bi bi-check-lg"></i>
+    <i class="bi bi-check-circle" style="font-size: 1.1em;"></i>
   </button>
   <button type="button" id="stats-clearCatOrderBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Limpiar Catálogo Nuevas">
-    <i class="bi bi-x-lg"></i>
+<i class="bi bi-trash3"></i>
   </button>
 </div>
   <div class="cat-header-divider"></div>
@@ -4517,6 +4518,7 @@ function processItemGroups(skuToObject) {
   controlsDiv.appendChild(deselectAllBtn);
   controlsDiv.appendChild(selectionCount);
   
+
 const vistaContainer = document.createElement("div");
 vistaContainer.style.display = "flex";
 vistaContainer.style.alignItems = "center";
@@ -4559,6 +4561,24 @@ viewDropdown.title = "Cambiar vista";
   
   // --- SOLO UNA VEZ, AL FINAL ---
   output.appendChild(controlsDiv);
+
+
+const cmsIgValue = filteredItems[0]?.['CMS IG'];
+if (cmsIgValue && Array.isArray(categoryData)) {
+  // Busca la fila donde image === `W${cmsIgValue}.png`
+  const matchedItem = categoryData.find(item =>
+    item.image && item.image.trim() === `W${cmsIgValue}.png`
+  );
+  if (matchedItem && matchedItem.enable_table_view) {
+    const viewValue = matchedItem.enable_table_view.toLowerCase();
+    const option = Array.from(viewDropdown.options).find(opt => opt.value === viewValue);
+    if (option) {
+      viewDropdown.value = viewValue;
+    }
+  }
+}
+
+
 
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = groups[groupIdStr];
