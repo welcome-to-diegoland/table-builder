@@ -29,6 +29,7 @@ let objectData = [];
 let categoryData = [];
 let currentStatClickFilter = null;
 let isVerticalDragging = false;
+let defaultCatAttributesOrder = {};
 let startX, startLeftWidth;
 let currentFilter = {
   attribute: null,
@@ -112,6 +113,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const mergeHeaderBtn = document.getElementById('mergeSelectedGroupsBtn');
   if (mergeHeaderBtn) {
     mergeHeaderBtn.addEventListener('click', mergeSelectedGroups);
+  }
+
+    // Nuevo: botón en el header para aplicar catálogo actual
+  const applyCatTablesHeaderBtn = document.getElementById('applyCatTablesHeaderBtn');
+  if (applyCatTablesHeaderBtn) {
+    applyCatTablesHeaderBtn.addEventListener('click', function() {
+      if (typeof applyCategoryTables === 'function') applyCategoryTables();
+    });
   }
 
   //xlsxFileInput.addEventListener("change", handleXLSX);
@@ -2018,38 +2027,82 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
 }
 
 function processCategoryDataFromSheet() {
-  // Si no hay datos, no procesar
   if (!categoryData.length || !filteredItems.length) return;
-  // Tomar el CMS IG actual
   const cmsIgValue = filteredItems[0]['CMS IG'];
-  // Buscar la fila de categoryData correspondiente al CMS IG
   const matchedItem = categoryData.find(item => item.image && item.image.includes(`W${cmsIgValue}.png`));
   if (matchedItem) {
-    // Procesa los atributos para defaultAttributesOrder, defaultFilterAttributes, etc...
-    let attributesStr = matchedItem.table_attributes || "";
-    if (!attributesStr.includes(',') && attributesStr.includes(' ')) {
-      attributesStr = attributesStr.replace(/\s+/g, ',');
-    }
-    const attributes = attributesStr.split(',').map(attr => attr.trim()).filter(attr => attr && !['marca', 'sku', 'price'].includes(attr));
-    defaultAttributesOrder = {};
-    attributes.forEach((attr, index) => {
-      defaultAttributesOrder[attr] = index + 1;
-      // SOLO actualiza localStorage aquí
-      localStorage.setItem(`order_${attr}`, (index + 1).toString());
-      localStorage.setItem(`cat_order_${attr}`, "");
+// --- CAT ---
+let catAttributesStr = matchedItem.cat_attributes || "";
+if (!catAttributesStr.includes(',') && catAttributesStr.includes(' ')) {
+  catAttributesStr = catAttributesStr.replace(/\s+/g, ',');
+}
+const catAttributes = catAttributesStr.split(',').map(attr => attr.trim()).filter(Boolean);
+defaultCatAttributesOrder = {};
+catAttributes.forEach((attr, idx) => {
+  defaultCatAttributesOrder[attr] = idx + 1;
+  const input = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+  if (input) {
+    input.value = idx + 1;
+    localStorage.setItem(`cat_order_${attr}`, (idx + 1).toString());
+  }
+});
+    // Limpiar los que no están en cat_attributes
+    document.querySelectorAll('.order-cat-input').forEach(input => {
+      const attr = input.getAttribute('data-attribute');
+      if (!catAttributes.includes(attr)) {
+        input.value = '';
+        localStorage.removeItem(`cat_order_${attr}`);
+      }
     });
 
-    // Filtros
+    // --- WEB ---
+    let webAttributesStr = matchedItem.table_attributes || "";
+    if (!webAttributesStr.includes(',') && webAttributesStr.includes(' ')) {
+      webAttributesStr = webAttributesStr.replace(/\s+/g, ',');
+    }
+    const webAttributes = webAttributesStr.split(',').map(attr => attr.trim()).filter(Boolean);
+    // ACTUALIZA defaultAttributesOrder para el CMS actual (usa los de Web)
+    defaultAttributesOrder = {};
+    webAttributes.forEach((attr, idx) => {
+      defaultAttributesOrder[attr] = idx + 1;
+      const input = document.querySelector(`.order-input[data-attribute="${attr}"]`);
+      if (input) {
+        input.value = idx + 1;
+        localStorage.setItem(`order_${attr}`, (idx + 1).toString());
+      }
+    });
+    // Limpiar los que no están en table_attributes
+    document.querySelectorAll('.order-input').forEach(input => {
+      const attr = input.getAttribute('data-attribute');
+      if (!webAttributes.includes(attr)) {
+        input.value = '';
+        localStorage.removeItem(`order_${attr}`);
+      }
+    });
+
+    // --- FILTROS ---
     let filterAttributesStr = matchedItem.filter_attributes || "";
     if (!filterAttributesStr.includes(',') && filterAttributesStr.includes(' ')) {
       filterAttributesStr = filterAttributesStr.replace(/\s+/g, ',');
     }
-    const filterAttributes = filterAttributesStr.split(',').map(attr => attr.trim()).filter(attr => attr);
+    const filterAttributes = filterAttributesStr.split(',').map(attr => attr.trim()).filter(Boolean);
+    // ACTUALIZA defaultFilterAttributes para el CMS actual
     defaultFilterAttributes = new Set(filterAttributes);
     forcedFilterAttributes.forEach(attr => defaultFilterAttributes.add(attr));
-    attributes.forEach((attr) => {
-      const filterOrder = filterAttributes.indexOf(attr) + 1;
-      localStorage.setItem(`filter_${attr}`, filterOrder > 0 ? filterOrder.toString() : "0");
+    filterAttributes.forEach((attr, idx) => {
+      const input = document.querySelector(`.filter-order-input[data-attribute="${attr}"]`);
+      if (input) {
+        input.value = idx + 1;
+        localStorage.setItem(`filter_${attr}`, (idx + 1).toString());
+      }
+    });
+    // Limpiar los que no están en filter_attributes
+    document.querySelectorAll('.filter-order-input').forEach(input => {
+      const attr = input.getAttribute('data-attribute');
+      if (!filterAttributes.includes(attr)) {
+        input.value = '';
+        localStorage.removeItem(`filter_${attr}`);
+      }
     });
   }
 }
@@ -2421,27 +2474,24 @@ function updateOrderInputs() {
     }
   });
 
-  const inputs = document.querySelectorAll('.order-input, .order-cat-input');
-  if (!inputs.length) return;
+  const inputs = document.querySelectorAll('.order-input, .order-cat-input, .filter-order-input');
 
-  inputs.forEach(input => {
-    const attribute = input.getAttribute('data-attribute');
-    // Siempre sobreescribe el valor, no solo si está vacío
-    const savedOrder = localStorage.getItem(
-      input.classList.contains('order-cat-input') ? `cat_order_${attribute}` : `order_${attribute}`
-    );
-    if (savedOrder !== null && savedOrder !== undefined && savedOrder !== "") {
-      input.value = savedOrder;
-    } else if (defaultAttributesOrder[attribute]) {
-      input.value = defaultAttributesOrder[attribute];
-      localStorage.setItem(
-        input.classList.contains('order-cat-input') ? `cat_order_${attribute}` : `order_${attribute}`,
-        defaultAttributesOrder[attribute]
-      );
-    } else {
-      input.value = '';
-    }
-  });
+inputs.forEach(input => {
+  const attribute = input.getAttribute('data-attribute');
+  const isCat = input.classList.contains('order-cat-input');
+  const savedOrder = localStorage.getItem(isCat ? `cat_order_${attribute}` : `order_${attribute}`);
+  if (savedOrder !== null && savedOrder !== undefined && savedOrder !== "") {
+    input.value = savedOrder;
+  } else if (isCat && defaultCatAttributesOrder[attribute]) {
+    input.value = defaultCatAttributesOrder[attribute];
+    localStorage.setItem(`cat_order_${attribute}`, defaultCatAttributesOrder[attribute]);
+  } else if (!isCat && defaultAttributesOrder[attribute]) {
+    input.value = defaultAttributesOrder[attribute];
+    localStorage.setItem(`order_${attribute}`, defaultAttributesOrder[attribute]);
+  } else {
+    input.value = '';
+  }
+});
 
   fileInfoDiv.scrollTop = fileInfoDiv.scrollHeight;
 }
@@ -3062,6 +3112,7 @@ function createStatsColumn(stats) {
   const column = document.createElement("div");
   column.className = "stats-column";
   
+  
   const table = document.createElement("table");
   table.className = "table table-sm table-bordered attribute-stats-table";
   table.style.tableLayout = "fixed";
@@ -3126,8 +3177,8 @@ function createStatsColumn(stats) {
   </button>
   </div>
   <div class="web-header-divider"></div>
-  Web ⏵
-</th>
+ <span id="copyWebToCat" class="copy-header-label" style="cursor:pointer;">Web ⏵</span>
+ </th>
         <th style="width:${colWidthCat}; min-width:${colWidthCat}; position:relative;">
 <div class="cat-header-icons grid-2x2">
   <button type="button" id="stats-applyCatTablesBtn" class="cat-header-icon-btn filter-header-icon-btn" title="Aplicar Catálogo Actual">
@@ -3144,7 +3195,7 @@ function createStatsColumn(stats) {
   </button>
 </div>
   <div class="cat-header-divider"></div>
-  ⏴ Cat
+  <span id="copyCatToWeb" class="copy-header-label" style="cursor:pointer;">⏴ Cat</span>
 </th>
         <th style="width:${colWidthConValor}; min-width:${colWidthConValor};">Con</th>
         <th style="width:${colWidthSinValor}; min-width:${colWidthSinValor};">Sin</th>
@@ -3270,6 +3321,57 @@ if (clearFilterBtn) {
       }
     });
   });
+
+const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
+if (statsApplyCatTablesBtn) {
+  statsApplyCatTablesBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+
+    // 1. Obtener el CMS IG actual
+    const cmsIgValue = filteredItems[0]?.['CMS IG'];
+    if (!cmsIgValue || !Array.isArray(categoryData)) {
+      showTemporaryMessage('No hay CMS IG seleccionado o categoryData vacío');
+      return;
+    }
+
+    // 2. Buscar la fila de categoryData para el CMS actual
+    const matchedItem = categoryData.find(item =>
+      item.image && item.image.trim() === `W${cmsIgValue}.png`
+    );
+    if (!matchedItem || !matchedItem.cat_attributes) {
+      showTemporaryMessage('No hay atributos de catálogo para esta categoría');
+      return;
+    }
+
+    // 3. Procesar los atributos y valores
+    let catAttributesStr = matchedItem.cat_attributes;
+    if (!catAttributesStr.includes(',') && catAttributesStr.includes(' ')) {
+      catAttributesStr = catAttributesStr.replace(/\s+/g, ',');
+    }
+    const catAttributes = catAttributesStr.split(',').map(attr => attr.trim()).filter(Boolean);
+
+    // 4. Actualizar los inputs de orden Cat con los atributos de cat_attributes
+    catAttributes.forEach((attr, idx) => {
+      const input = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+      if (input) {
+        input.value = idx + 1;
+        localStorage.setItem(`cat_order_${attr}`, (idx + 1).toString());
+      }
+    });
+
+    // 5. Limpiar los que no están en cat_attributes
+    document.querySelectorAll('.order-cat-input').forEach(input => {
+      const attr = input.getAttribute('data-attribute');
+      if (!catAttributes.includes(attr)) {
+        input.value = '';
+        localStorage.removeItem(`cat_order_${attr}`);
+      }
+    });
+
+    showTemporaryMessage('Atributos de catálogo aplicados desde category-data');
+  });
+}
+
   // Inputs de orden
   table.querySelectorAll('.order-input, .order-cat-input').forEach(input => {
     input.addEventListener('change', saveAttributeOrder);
@@ -3342,13 +3444,7 @@ if (clearFilterBtn) {
   }
 
   // --------- Listeners Header Cat ---------
-  const statsApplyCatTablesBtn = table.querySelector('#stats-applyCatTablesBtn');
-  if (statsApplyCatTablesBtn) {
-    statsApplyCatTablesBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      if (typeof applyCategoryTables === 'function') applyCategoryTables();
-    });
-  }
+
   const statsApplyCatOrderBtn = table.querySelector('#stats-applyCatOrderBtn');
   if (statsApplyCatOrderBtn) {
     statsApplyCatOrderBtn.addEventListener('click', function(e) {
@@ -3364,60 +3460,51 @@ if (clearFilterBtn) {
     });
   }
 
-  // --------- COPIAR ORDEN ENTRE WEB Y CAT Y CURSOR MANO ---------
-  setTimeout(() => {
-    // Header Web
-    const webThDivider = table.querySelector('th:nth-child(3) .web-header-divider');
-    if (webThDivider) {
-      webThDivider.parentElement.style.cursor = "pointer";
-      webThDivider.parentElement.addEventListener('click', function (e) {
-        // Evita activar con los botones internos
-        if (e.target.closest('.web-header-icon-btn')) return;
-        // Copia de Web a Cat
-        document.querySelectorAll('.order-input:not(.order-cat-input)').forEach(webInput => {
-          const attr = webInput.getAttribute('data-attribute');
-          const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
-          if (catInput) {
-            catInput.value = webInput.value;
-            localStorage.setItem(`cat_order_${attr}`, webInput.value);
-          }
-        });
-        showTemporaryMessage('Valores de Web copiados a Catálogo');
-      });
-    }
-    // Header Cat
-    const catThDivider = table.querySelector('th:nth-child(4) .cat-header-divider');
-    if (catThDivider) {
-      catThDivider.parentElement.style.cursor = "pointer";
-      catThDivider.parentElement.addEventListener('click', function (e) {
-        if (e.target.closest('.cat-header-icon-btn')) return;
-        // Copia de Cat a Web
-        document.querySelectorAll('.order-cat-input').forEach(catInput => {
-          const attr = catInput.getAttribute('data-attribute');
-          const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]:not(.order-cat-input)`);
-          if (webInput) {
-            webInput.value = catInput.value;
-            localStorage.setItem(`order_${attr}`, catInput.value);
-          }
-        });
-        showTemporaryMessage('Valores de Catálogo copiados a Web');
-      });
-    }
-  }, 0);
+ 
 
   // --------- OPCIONAL: CSS global para feedback visual de hover ---------
   if (!document.getElementById('stats-header-pointer-css')) {
     const style = document.createElement('style');
     style.id = 'stats-header-pointer-css';
     style.innerHTML = `
-      .attribute-stats-table th:nth-child(3):hover,
-      .attribute-stats-table th:nth-child(4):hover {
-        cursor: pointer !important;
-        background: #e8f4ff;
-      }
     `;
     document.head.appendChild(style);
   }
+  // --------- COPIAR ORDEN ENTRE WEB Y CAT SOLO EN EL SPAN ---------
+setTimeout(() => {
+  // Web → Cat
+  const copyWebToCat = table.querySelector('#copyWebToCat');
+  if (copyWebToCat) {
+    copyWebToCat.addEventListener('click', function (e) {
+      e.stopPropagation();
+      document.querySelectorAll('.order-input:not(.order-cat-input)').forEach(webInput => {
+        const attr = webInput.getAttribute('data-attribute');
+        const catInput = document.querySelector(`.order-cat-input[data-attribute="${attr}"]`);
+        if (catInput) {
+          catInput.value = webInput.value;
+          localStorage.setItem(`cat_order_${attr}`, webInput.value);
+        }
+      });
+      showTemporaryMessage('Valores de Web copiados a Catálogo');
+    });
+  }
+  // Cat → Web
+  const copyCatToWeb = table.querySelector('#copyCatToWeb');
+  if (copyCatToWeb) {
+    copyCatToWeb.addEventListener('click', function (e) {
+      e.stopPropagation();
+      document.querySelectorAll('.order-cat-input').forEach(catInput => {
+        const attr = catInput.getAttribute('data-attribute');
+        const webInput = document.querySelector(`.order-input[data-attribute="${attr}"]:not(.order-cat-input)`);
+        if (webInput) {
+          webInput.value = catInput.value;
+          localStorage.setItem(`order_${attr}`, catInput.value);
+        }
+      });
+      showTemporaryMessage('Valores de Catálogo copiados a Web');
+    });
+  }
+}, 0);
 
   column.appendChild(table);
   return column;

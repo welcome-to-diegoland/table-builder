@@ -2079,3 +2079,28 @@ html, body {
   font-size: 1.1rem;
   margin-right: 3px;
 }
+
+.copy-header-label {
+  cursor: pointer;
+  color: #007bff;
+  font-weight: 600;
+  transition: color 0.15s, background 0.15s;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.copy-header-label:hover {
+  color: #0056b3;
+  background: #e8f4ff;
+  text-decoration: underline;
+}
+
+.header-active-web {
+  background: #e3f0ff !important;
+  border-bottom: 3px solid #339cff !important;
+  transition: background 0.2s;
+}
+.header-active-cat {
+  background: #fff7e0 !important;
+  border-bottom: 3px solid #ffc107 !important;
+  transition: background 0.2s;
+}
