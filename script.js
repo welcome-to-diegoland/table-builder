@@ -74,7 +74,7 @@ let currentViewState = {
 
 
 // Configuración
-const forcedColumns = ["marca", "item_code", "precio"];
+const forcedColumns = ["marca", "item_code"];
 const priorityStatsAttributes = ["titulo", "marca", "orden_tabla", "shop_by"];
 const excludedAttributes = new Set([
   "product.type", "url_key", "product.attribute_set", "product.websites",
@@ -85,8 +85,8 @@ const excludedAttributes = new Set([
   "orden_cms", "aplicaciones", "cms_web", "incluye", 
   "seccion", "ventajas", "brand_logo",
   "categoria", "item_codeunspcweb_search_term",
-  "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web",
-  "unspc", "description", "especificaciones", "web_search_term", 
+  "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web", "paginadecatalogo",
+  "unspc", "description", "especificaciones", "web_search_term", "product_ranking",
   "Weight", "icono_nuevo"
 ]);
 const script = document.createElement('script');
@@ -1147,12 +1147,13 @@ function openAddStatsAttributeModal() {
     addStatsModalState.selected = [];
   }
 
-  // Render dual-list
+  // Render dual-list con filtro de búsqueda
   const listDiv = document.getElementById('addStatsAttrList');
   listDiv.innerHTML = `
     <div class="dual-list-modal compact">
       <div class="dual-list-col">
         <div class="dual-list-label">Disponibles</div>
+        <input type="text" id="addStats-search" class="form-control form-control-sm" placeholder="Buscar atributo..." style="margin-bottom:4px;">
         <ul id="addStats-available" class="dual-list-box" tabindex="0">
           ${addStatsModalState.available.map(attr => `<li tabindex="0">${attr}</li>`).join('')}
         </ul>
@@ -1170,12 +1171,20 @@ function openAddStatsAttributeModal() {
     </div>
   `;
 
-  // --- Dual-list logic ---
+  // --- Filtro de búsqueda ---
+  const searchInput = document.getElementById('addStats-search');
   const availUl = document.getElementById('addStats-available');
+  searchInput.addEventListener('input', function() {
+    const term = this.value.trim().toLowerCase();
+    Array.from(availUl.children).forEach(li => {
+      li.style.display = li.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+
+  // --- Dual-list logic ---
   const selUl = document.getElementById('addStats-selected');
   let selectedAvailable = null, selectedSelected = null;
 
-  // Seleccionar disponible (click)
   availUl.onclick = e => {
     if (e.target.tagName === "LI") {
       selectedAvailable = e.target;
@@ -1183,7 +1192,6 @@ function openAddStatsAttributeModal() {
       e.target.classList.add('selected');
     }
   };
-  // Seleccionar seleccionado (click)
   selUl.onclick = e => {
     if (e.target.tagName === "LI") {
       selectedSelected = e.target;
@@ -1191,7 +1199,6 @@ function openAddStatsAttributeModal() {
       e.target.classList.add('selected');
     }
   };
-  // Pasar a la derecha (flecha o doble click)
   document.getElementById('addStats-add').onclick = () => {
     if (!selectedAvailable) return;
     const attr = selectedAvailable.textContent;
@@ -1207,8 +1214,6 @@ function openAddStatsAttributeModal() {
       openAddStatsAttributeModal();
     }
   };
-
-  // Quitar de la derecha (flecha o doble click)
   document.getElementById('addStats-remove').onclick = () => {
     if (!selectedSelected) return;
     const attr = selectedSelected.textContent;
@@ -1228,6 +1233,7 @@ function openAddStatsAttributeModal() {
   document.getElementById('addStatsAttributeModal').style.display = 'block';
   document.getElementById('addStatsAttrConfirmBtn').onclick = confirmAddStatsAttributesModal;
 }
+
 
 function exportAllDataCustom() {
   const cmsIg = getCmsIg();
@@ -1959,6 +1965,12 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
     // 1. Filtra los SKUs del CMS
     const filtered = filteredItemsOriginal.filter(x => (x["CMS IG"] || "").trim() === cmsCode);
 
+    filtered.sort((a, b) => {
+  const oa = parseInt(a.orden_tabla) || 99999;
+  const ob = parseInt(b.orden_tabla) || 99999;
+  return oa - ob;
+});
+
     if (!filtered.length) {
       alert("No hay SKUs para este código CMS en los datos cargados.");
       return;
@@ -1981,6 +1993,23 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
 
     // 4. Actualiza el array visible
     filteredItems = filtered;
+
+    // 4.1 Inicializa el orden de los SKUs en cada grupo según orden_tabla
+groupOrderMap = new Map();
+const groupMap = {};
+filteredItems.forEach(item => {
+  const groupId = String(item["IG ID"]);
+  if (!groupMap[groupId]) groupMap[groupId] = [];
+  groupMap[groupId].push(item);
+});
+Object.entries(groupMap).forEach(([groupId, items]) => {
+  items.sort((a, b) => {
+    const oa = parseInt(a.orden_tabla) || 99999;
+    const ob = parseInt(b.orden_tabla) || 99999;
+    return oa - ob;
+  });
+  groupOrderMap.set(groupId, items.map(item => item.SKU));
+});
 
     // 5. Limpia merges/selección si aplica (si existen esas variables)
     if (typeof selectedGroups !== "undefined") selectedGroups.clear();
@@ -2714,17 +2743,19 @@ if (cmsIgValue && Array.isArray(categoryData)) {
     groupMap[groupIdStr].push(item);
   });
 
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = groupMap[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
 
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+orderedGroupIds.forEach(groupIdStr => {
+  const groupItems = groups[groupIdStr];
+  if (!groupItems || !groupItems.length) return;
+  const orderedSkus = groupOrderMap.get(groupIdStr);
+  let orderedGroupItems = groupItems;
+  if (Array.isArray(orderedSkus)) {
+    // Solo los SKUs filtrados, pero en el orden original
+    orderedGroupItems = orderedSkus
+      .map(sku => groupItems.find(item => item.SKU === sku))
+      .filter(Boolean);
+  }
+
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
 const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');    const groupDiv = document.createElement("div");
@@ -3006,27 +3037,27 @@ function processAttributeStats(skuToObject) {
   }
   // ----------- FIN CAMBIO -----------
 
- // ===> INICIO: AGREGAR product_ranking AL PRINCIPIO, SIEMPRE USANDO filteredItems <===
-  // Quita cualquier stat existente de product_ranking
   let stats = [...priorityStats, ...otherStats].filter(s => s.attribute !== "product_ranking");
-  // Calcula stats reales de product_ranking desde filteredItems:
-  let pr_with = 0, pr_without = 0;
-  let pr_values = new Map();
-  filteredItems.forEach(item => {
-    const pr = (item.product_ranking || "").toString();
-    if (pr) {
-      pr_with++;
-      pr_values.set(pr, (pr_values.get(pr) || 0) + 1);
-    } else {
-      pr_without++;
-    }
-  });
-  stats.unshift({
-    attribute: "product_ranking",
-    withValue: pr_with,
-    withoutValue: pr_without,
-    uniqueValues: pr_values,
-  });
+
+  stats = stats.sort((a, b) => {
+  // marca y titulo siempre primero
+  if (a.attribute === "marca") return -5;
+  if (b.attribute === "marca") return 5;
+  if (a.attribute === "titulo") return -4;
+  if (b.attribute === "titulo") return 4;
+
+  if (a.attribute === "catalog_page_number") return -3;
+  if (b.attribute === "catalog_page_number") return 3;
+
+  if (a.attribute === "item_group_id") return -2;
+  if (b.attribute === "item_group_id") return 2;
+
+      if (a.attribute === "orden_tabla") return -1;
+  if (b.attribute === "orden_tabla") return 1;
+
+  // luego por cantidad de valores con valor (descendente)
+  return b.withValue - a.withValue;
+});
   // ===> FIN CAMBIO <===
 
   if (stats.length) {
@@ -3367,6 +3398,24 @@ if (statsApplyCatTablesBtn) {
         localStorage.removeItem(`cat_order_${attr}`);
       }
     });
+
+    // 6. Aplica el orden de catálogo en la tabla (igual que applyCatOrder)
+    if (objectData.length && filteredItems.length) {
+      // Guarda los órdenes de catálogo
+      document.querySelectorAll('.order-cat-input').forEach(input => {
+        const attribute = input.getAttribute('data-attribute');
+        const value = input.value.trim();
+        if (value) {
+          localStorage.setItem(`cat_order_${attribute}`, value);
+        } else {
+          localStorage.removeItem(`cat_order_${attribute}`);
+        }
+      });
+
+      // Procesa los grupos con el orden de catálogo
+      const skuToObject = Object.fromEntries(objectData.map(o => [o.SKU, o]));
+      processItemGroups(skuToObject);
+    }
 
     showTemporaryMessage('Atributos de catálogo aplicados desde category-data');
   });
@@ -4284,15 +4333,10 @@ function displayFilteredGroups(filteredGroupIds, attribute, type) {
       if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) {
         return;
       }
-      if (!groupOrderMap.has(groupIdStr)) {
-        groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-      }
-      const orderedSkus = groupOrderMap.get(groupIdStr);
-      if (!Array.isArray(orderedSkus)) {
-        console.error('[render][error] orderedSkus no es array!', groupIdStr, orderedSkus);
-      } else {
-        groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-      }
+const orderedSkus = groupOrderMap.get(groupIdStr);
+if (Array.isArray(orderedSkus)) {
+  groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+}
 
       const groupInfo = skuToObject[groupIdStr] || {};
       const isMergedGroup = mergedGroups.has(groupIdStr);
@@ -4373,112 +4417,27 @@ function handleStatClick(event) {
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
     const orderedSkus = groupOrderMap.get(groupIdStr);
+    let orderedGroupItems = groupItems;
     if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
+      // Solo los SKUs filtrados, pero en el orden original
+      orderedGroupItems = orderedSkus
+        .map(sku => groupItems.find(item => item.SKU === sku))
+        .filter(Boolean);
     }
+
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container ${isMergedGroup ? 'merged-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
-    // Header
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "group-header";
-    const leftContainer = document.createElement("div");
-    leftContainer.className = "group-header-left";
-    const productImg = createProductImageElement(groupInfo.image);
-    leftContainer.appendChild(productImg);
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "group-info";
-    const title = document.createElement("h2");
-    title.className = "group-title";
-    const link = document.createElement("a");
-    link.href = `https://www.travers.com.mx/${groupIdStr}`;
-    link.target = "_blank";
-    link.textContent = groupInfo.name || groupIdStr;
-    title.appendChild(link);
-    infoDiv.appendChild(title);
-    const logo = createBrandLogoElement(groupInfo.brand_logo);
-    infoDiv.appendChild(logo);
-    if (groupInfo.sku) {
-      const skuP = document.createElement("p");
-      skuP.textContent = "SKU: " + groupInfo.sku;
-      infoDiv.appendChild(skuP);
-    }
-    leftContainer.appendChild(infoDiv);
-    headerDiv.appendChild(leftContainer);
-    const rightContainer = createGroupHeaderRight({
-      groupIdStr,
-      groupItems,
-      skuToObject,
-      isMergedGroup,
-      groupDiv
-    });
-    headerDiv.appendChild(rightContainer);
-
-    // Detalles de grupo unido
-    if (isMergedGroup) {
-      const detailsContainer = document.createElement("div");
-      detailsContainer.className = "group-details-container";
-      const toggleDetailsBtn = document.createElement("button");
-      toggleDetailsBtn.className = "toggle-details-btn";
-      toggleDetailsBtn.textContent = "▼ Detalles";
-      toggleDetailsBtn.setAttribute("aria-expanded", "false");
-      const detailsDiv = document.createElement("div");
-      detailsDiv.className = "group-extra-details";
-      detailsDiv.style.display = "none";
-      const mergedTextarea = document.createElement("textarea");
-      mergedTextarea.className = "form-control merged-group-textarea";
-      mergedTextarea.rows = 10;
-      let mergedContent = getMergedGroupDetails(groupIdStr);
-      if (!mergedContent) {
-        // Default solo si nunca se editó
-        const mergedGroupData = mergedGroups.get(groupIdStr);
-        mergedContent = "";
-        mergedGroupData.originalGroups.forEach(originalGroupId => {
-          const originalGroupInfo = objectData.find(o => o.SKU === originalGroupId) || {};
-          mergedContent += `${originalGroupId}, ${originalGroupInfo.name || ''}, ${originalGroupInfo.brand_logo || ''}\n`;
-          const fields = ['ventajas', 'aplicaciones', 'especificaciones', 'incluye'];
-          fields.forEach(field => {
-            if (originalGroupInfo[field]) {
-              let fieldValue = originalGroupInfo[field]
-                .replace(/<special[^>]*>|<\/special>|<strong>|<\/strong>/gi, '')
-                .replace(/<br\s*\/?>|<\/br>/gi, '\n');
-              mergedContent += `${field.charAt(0).toUpperCase() + field.slice(1)}:\n${fieldValue}\n\n`;
-            }
-          });
-          mergedContent += "--------------------\n\n";
-        });
-      }
-      mergedTextarea.value = mergedContent.trim();
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn btn-sm btn-primary save-merged-btn";
-      saveBtn.textContent = "Guardar Cambios";
-      saveBtn.addEventListener('click', function() {
-        saveMergedGroupDetails(groupIdStr, mergedTextarea.value);
-      });
-      detailsDiv.appendChild(mergedTextarea);
-      detailsDiv.appendChild(saveBtn);
-      toggleDetailsBtn.addEventListener("click", function () {
-        const expanded = toggleDetailsBtn.getAttribute("aria-expanded") === "true";
-        toggleDetailsBtn.setAttribute("aria-expanded", !expanded);
-        detailsDiv.style.display = expanded ? "none" : "block";
-        toggleDetailsBtn.textContent = expanded ? "▼ Detalles" : "▲ Detalles";
-      });
-      detailsContainer.appendChild(toggleDetailsBtn);
-      detailsContainer.appendChild(detailsDiv);
-      headerDiv.appendChild(detailsContainer);
-    }
-    groupDiv.appendChild(headerDiv);
-    createItemsTable(groupDiv, groupItems, skuToObject, filterAttribute);
+    createGroupHeader(groupDiv, groupInfo, isMergedGroup, orderedGroupItems, skuToObject);
+    createItemsTable(groupDiv, orderedGroupItems, skuToObject, attribute);
     output.appendChild(groupDiv);
   });
 }
+   
 
 // REEMPLAZA tu clearFilter por esto:
 function clearFilter() {
@@ -4667,17 +4626,19 @@ if (cmsIgValue && Array.isArray(categoryData)) {
 
 
 
-  orderedGroupIds.forEach(groupIdStr => {
-    const groupItems = groups[groupIdStr];
-    if (!groupItems || !Array.isArray(groupItems) || groupItems.length === 0) return;
 
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
+orderedGroupIds.forEach(groupIdStr => {
+  const groupItems = groups[groupIdStr];
+  if (!groupItems || !groupItems.length) return;
+  const orderedSkus = groupOrderMap.get(groupIdStr);
+  let orderedGroupItems = groupItems;
+  if (Array.isArray(orderedSkus)) {
+    // Solo los SKUs filtrados, pero en el orden original
+    orderedGroupItems = orderedSkus
+      .map(sku => groupItems.find(item => item.SKU === sku))
+      .filter(Boolean);
+  }
+
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
     const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');
@@ -5364,7 +5325,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
       let width = "";
       if (forced === "sku") width = "width:95px;min-width:95px;max-width:95px;";
       if (forced === "item_code") width = "width:95px;min-width:95px;max-width:95px;";
-      if (forced === "precio") width = "width:58px;min-width:58px;max-width:58px;";
       theadRowCells += `<th style="${width}">${forced}</th>`;
     });
   }
@@ -5460,7 +5420,6 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         let width = "";
         if (forced === "sku") width = "100px";
         if (forced === "item_code") width = "100px";
-        if (forced === "precio") width = "100px";
         cell.style.width = width;
         cell.style.minWidth = width;
         cell.style.maxWidth = width;
@@ -6065,18 +6024,25 @@ function applyCategoryTables() {
   controlsDiv.appendChild(selectionCount);
   output.appendChild(controlsDiv);
 
-  for (const groupIdStr in groups) {
-    const groupItems = groups[groupIdStr];
-    if (!groupItems.length) continue;
-    if (!groupOrderMap.has(groupIdStr)) {
-      groupOrderMap.set(groupIdStr, groupItems.map(item => item.SKU));
-    }
-    const orderedSkus = groupOrderMap.get(groupIdStr);
-    if (Array.isArray(orderedSkus)) {
-      groupItems.sort((a, b) => orderedSkus.indexOf(a.SKU) - orderedSkus.indexOf(b.SKU));
-    }
-    const groupInfo = skuToObject[groupIdStr] || {};
-    const isMergedGroup = mergedGroups.has(groupIdStr);
+const orderedGroupIds = [
+  ...Array.from(groupOrderMap.keys()).filter(id => groups[id]),
+  ...Object.keys(groups).filter(id => !groupOrderMap.has(id))
+];
+
+orderedGroupIds.forEach(groupIdStr => {
+  const groupItems = groups[groupIdStr];
+  if (!groupItems || !groupItems.length) return;
+  const orderedSkus = groupOrderMap.get(groupIdStr);
+  let orderedGroupItems = groupItems;
+  if (Array.isArray(orderedSkus)) {
+    // Solo los SKUs filtrados, pero en el orden original
+    orderedGroupItems = orderedSkus
+      .map(sku => groupItems.find(item => item.SKU === sku))
+      .filter(Boolean);
+  }
+
+  const groupInfo = skuToObject[groupIdStr] || {};
+  const isMergedGroup = mergedGroups.has(groupIdStr);
 
     // --- Checkbox fuera del header, igual que processItemGroups ---
     const groupDiv = document.createElement("div");
@@ -6258,7 +6224,7 @@ function applyCategoryTables() {
         selectionCount.textContent = selectedGroups.size > 0 ? `(${selectedGroups.size} seleccionados)` : "";
       });
     }
-  }
+      });
 }
 
 function initVerticalDrag(e) {
