@@ -31,6 +31,7 @@ let currentStatClickFilter = null;
 let isVerticalDragging = false;
 let defaultCatAttributesOrder = {};
 let startX, startLeftWidth;
+let currentCmsIg = null;
 let currentFilter = {
   attribute: null,
   type: null
@@ -82,8 +83,8 @@ const excludedAttributes = new Set([
   "Tax_class_id", "Visibility", "name", "category.name", "leaf_name_filter",
   "image", "small_image", "thumbnail", "pdp_display_attribute",
   "pdp_description_attribute", "pdp_short_description_attribute", "icon_order",
-  "orden_cms", "aplicaciones", "cms_web", "incluye", 
-  "seccion", "ventajas", "brand_logo",
+  "orden_cms", "aplicaciones", "incluye", 
+    "seccion", "ventajas", "brand_logo",
   "categoria", "item_codeunspcweb_search_term",
   "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web", "paginadecatalogo",
   "unspc", "description", "especificaciones", "web_search_term", "product_ranking",
@@ -1956,6 +1957,7 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       return;
     }
     const cmsCode = match[1].trim();
+currentCmsIg = cmsCode; // <--- AGREGA ESTA LÍNEA AQUÍ
 
     if (!filteredItemsOriginal.length || !objectDataOriginal.length) {
       alert("Primero carga los archivos de datos.");
@@ -5464,7 +5466,24 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         cell.style.minWidth = width;
         cell.style.maxWidth = width;
 
-        const value = details[forced] || details[forced?.toUpperCase?.()] || "";
+          // El valor real del item_code (SKU) viene de item["sku"]
+  const value = forced === "item_code"
+    ? item["sku"] || item["SKU"] || ""
+    : details[forced] || details[forced?.toUpperCase?.()] || "";
+
+  // Pinta la celda de item_code si el CMS IC es diferente al CMS IG seleccionado
+  if (forced === "item_code") {
+  console.log('item_code:', value, 'CMS IC:', item["CMS IC"], 'currentCmsIg:', currentCmsIg);
+}
+if (
+  forced === "item_code" &&
+  item["CMS IC"] &&
+  currentCmsIg &&
+  item["CMS IC"].toString().trim() !== currentCmsIg.toString().trim()
+) {
+  cell.style.backgroundColor = "#ffe0e0";
+  cell.title = "CMS IC diferente al CMS IG seleccionado";
+}
 
         if (forced === 'item_code' && value) {
           const link = document.createElement("a");
