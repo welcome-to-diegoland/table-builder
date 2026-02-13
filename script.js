@@ -31,7 +31,6 @@ let currentStatClickFilter = null;
 let isVerticalDragging = false;
 let defaultCatAttributesOrder = {};
 let startX, startLeftWidth;
-let currentCmsIg = null;
 let currentFilter = {
   attribute: null,
   type: null
@@ -83,8 +82,8 @@ const excludedAttributes = new Set([
   "Tax_class_id", "Visibility", "name", "category.name", "leaf_name_filter",
   "image", "small_image", "thumbnail", "pdp_display_attribute",
   "pdp_description_attribute", "pdp_short_description_attribute", "icon_order",
-  "orden_cms", "aplicaciones", "incluye", 
-    "seccion", "ventajas", "brand_logo",
+  "orden_cms", "aplicaciones", "cms_web", "incluye", 
+  "seccion", "ventajas", "brand_logo",
   "categoria", "item_codeunspcweb_search_term",
   "beneficio_principal", "catalog_cover_image", "item_code", "titulo_web", "paginadecatalogo",
   "unspc", "description", "especificaciones", "web_search_term", "product_ranking",
@@ -1957,7 +1956,6 @@ function renderCategoryTree(categoryData, fileInfoDiv) {
       return;
     }
     const cmsCode = match[1].trim();
-currentCmsIg = cmsCode; // <--- AGREGA ESTA LÍNEA AQUÍ
 
     if (!filteredItemsOriginal.length || !objectDataOriginal.length) {
       alert("Primero carga los archivos de datos.");
@@ -2745,23 +2743,9 @@ if (cmsIgValue && Array.isArray(categoryData)) {
     groupMap[groupIdStr].push(item);
   });
 
-// Ordena: merged y split primero, luego el resto
-orderedGroupIds.sort((a, b) => {
-  const isMergedA = a.startsWith('merged-');
-  const isMergedB = b.startsWith('merged-');
-  const isSplitA = a.startsWith('split-') || a.startsWith('split-');
-  const isSplitB = b.startsWith('split-') || b.startsWith('split-');
-  // Merged primero, luego split, luego el resto
-  if (isMergedA && !isMergedB) return -1;
-  if (!isMergedA && isMergedB) return 1;
-  if (isSplitA && !isSplitB) return -1;
-  if (!isSplitA && isSplitB) return 1;
-  return 0;
-});
-
 
 orderedGroupIds.forEach(groupIdStr => {
-  const groupItems = groupMap[groupIdStr]; // <-- Cambia groups por groupMap
+  const groupItems = groups[groupIdStr];
   if (!groupItems || !groupItems.length) return;
   const orderedSkus = groupOrderMap.get(groupIdStr);
   let orderedGroupItems = groupItems;
@@ -2774,7 +2758,7 @@ orderedGroupIds.forEach(groupIdStr => {
 
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-');    const groupDiv = document.createElement("div");
+const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');    const groupDiv = document.createElement("div");
     groupDiv.className = `group-container filtered-group${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
 
@@ -4430,20 +4414,6 @@ function handleStatClick(event) {
     }
   });
 
-// Ordena: merged y split primero, luego el resto
-orderedGroupIds.sort((a, b) => {
-  const isMergedA = a.startsWith('merged-');
-  const isMergedB = b.startsWith('merged-');
-  const isSplitA = a.startsWith('split-') || a.startsWith('split-');
-  const isSplitB = b.startsWith('split-') || b.startsWith('split-');
-  // Merged primero, luego split, luego el resto
-  if (isMergedA && !isMergedB) return -1;
-  if (!isMergedA && isMergedB) return 1;
-  if (isSplitA && !isSplitB) return -1;
-  if (!isSplitA && isSplitB) return 1;
-  return 0;
-});
-
   orderedGroupIds.forEach(groupIdStr => {
     const groupItems = filteredItemsMap[groupIdStr];
     if (!groupItems || groupItems.length === 0) return;
@@ -4654,19 +4624,7 @@ if (cmsIgValue && Array.isArray(categoryData)) {
   }
 }
 
-// Ordena: merged y split primero, luego el resto
-orderedGroupIds.sort((a, b) => {
-  const isMergedA = a.startsWith('merged-');
-  const isMergedB = b.startsWith('merged-');
-  const isSplitA = a.startsWith('split-') || a.startsWith('split-');
-  const isSplitB = b.startsWith('split-') || b.startsWith('split-');
-  // Merged primero, luego split, luego el resto
-  if (isMergedA && !isMergedB) return -1;
-  if (!isMergedA && isMergedB) return 1;
-  if (isSplitA && !isSplitB) return -1;
-  if (!isSplitA && isSplitB) return 1;
-  return 0;
-});
+
 
 
 orderedGroupIds.forEach(groupIdStr => {
@@ -4683,7 +4641,7 @@ orderedGroupIds.forEach(groupIdStr => {
 
     const groupInfo = skuToObject[groupIdStr] || {};
     const isMergedGroup = mergedGroups.has(groupIdStr);
-    const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-');
+    const isSeparatedGroup = groupIdStr.startsWith('split-') || groupIdStr.startsWith('split-visible-');
     const groupDiv = document.createElement("div");
     groupDiv.className = `group-container${isMergedGroup ? ' merged-group' : ''}${isSeparatedGroup ? ' separated-group' : ''}`;
     groupDiv.dataset.groupId = groupIdStr;
@@ -5466,24 +5424,7 @@ function createItemsTable(container, groupItems, skuToObject, highlightAttribute
         cell.style.minWidth = width;
         cell.style.maxWidth = width;
 
-          // El valor real del item_code (SKU) viene de item["sku"]
-  const value = forced === "item_code"
-    ? item["sku"] || item["SKU"] || ""
-    : details[forced] || details[forced?.toUpperCase?.()] || "";
-
-  // Pinta la celda de item_code si el CMS IC es diferente al CMS IG seleccionado
-  if (forced === "item_code") {
-  console.log('item_code:', value, 'CMS IC:', item["CMS IC"], 'currentCmsIg:', currentCmsIg);
-}
-if (
-  forced === "item_code" &&
-  item["CMS IC"] &&
-  currentCmsIg &&
-  item["CMS IC"].toString().trim() !== currentCmsIg.toString().trim()
-) {
-  cell.style.backgroundColor = "#ffe0e0";
-  cell.title = "CMS IC diferente al CMS IG seleccionado";
-}
+        const value = details[forced] || details[forced?.toUpperCase?.()] || "";
 
         if (forced === 'item_code' && value) {
           const link = document.createElement("a");
@@ -6087,20 +6028,6 @@ const orderedGroupIds = [
   ...Array.from(groupOrderMap.keys()).filter(id => groups[id]),
   ...Object.keys(groups).filter(id => !groupOrderMap.has(id))
 ];
-
-// Ordena: merged y split primero, luego el resto
-orderedGroupIds.sort((a, b) => {
-  const isMergedA = a.startsWith('merged-');
-  const isMergedB = b.startsWith('merged-');
-  const isSplitA = a.startsWith('split-') || a.startsWith('split-');
-  const isSplitB = b.startsWith('split-') || b.startsWith('split-');
-  // Merged primero, luego split, luego el resto
-  if (isMergedA && !isMergedB) return -1;
-  if (!isMergedA && isMergedB) return 1;
-  if (isSplitA && !isSplitB) return -1;
-  if (!isSplitA && isSplitB) return 1;
-  return 0;
-});
 
 orderedGroupIds.forEach(groupIdStr => {
   const groupItems = groups[groupIdStr];
@@ -6721,7 +6648,7 @@ function mergeVisibleItemsOnly() {
 
     // Split para visibles
     if (visibleItems.length > 0) {
-      const splitVisibleId = `split-${Date.now()}-${groupId}`;
+      const splitVisibleId = `split-visible-${Date.now()}-${groupId}`;
       visibleItems.forEach(item => {
         item.__originalIGID = item.__originalIGID || item["Original IG ID"] || groupId;
         item["Original IG ID"] = item.__originalIGID;
@@ -6826,7 +6753,7 @@ function separateVisibleAndRestFromGroups(selectedGroupIds, filteredItems, objec
 
     // Split para visibles
     if (visibleItems.length > 0) {
-      const splitVisibleId = `split-${Date.now()}-${groupId}`;
+      const splitVisibleId = `split-visible-${Date.now()}-${groupId}`;
       visibleItems.forEach(item => {
         item.__originalIGID = item.__originalIGID || item["Original IG ID"] || groupId;
         item["Original IG ID"] = item.__originalIGID;
